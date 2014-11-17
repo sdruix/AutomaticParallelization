@@ -27,10 +27,11 @@ Easy peasy:
 
 
 	1. git clone git://github.com/sdruix/OpenMP2Parallel.git ~/.mcxx
-	2. cd ~/.mcxx && ./configure [--prefix=path/to/set] --enable-tl-openmp-profile
-  	3. make
-  	4. [sudo] make install
-  	5. For OMP2HMPP execution: omp2hmpp [-h] 
+	2. cd ~/.mcxx && autoreconf
+	3. ./configure [--prefix=path/to/set] --enable-tl-openmp-profile
+  	4. make
+  	5. [sudo] make install
+  	6. For OMP2HMPP execution: omp2hmpp [-h] 
 
 Pay attention to the installation/configuration process because some questions will be asked. Sometimes easy ones as your Github user/email, sometimes more difficult ones as your root credentials to be able to proceed!
 
