@@ -38,8 +38,7 @@ Pay attention to the installation/configuration process because some questions w
 Relative to my work, I'd like to share it with the world under an simple clause: If you use it the least you must choose something from this list.
 
 * Make any constructive comment of my code. I'm here to learn.
-* Contribute something to this scripts. Updates, fixes, features... Whatever!
+* Contribute something to this source code. Updates, fixes, features... Whatever!
 
-Besides that, I hope you are kind enough to reference any your sources whether is my code or a code from a 3rd party!
-I must to apollogize since I know that the source code is not well commented, but all the funcion names are thought to be meanful.
+Besides that, I hope you are kind enough to reference any your sources whether is my code or a code from a 3rd party! I must to apologize since I know that the source code is not well commented, but all the function names were thought to be meaningful.
 
