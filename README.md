@@ -1,10 +1,9 @@
-Ins
+
 
 OpenMP2Parallel
 ==========
 
-Custom bootstrap installation and configuration for Mac. Kind of a "dotfiles
-repo" too.
+Custom OpenMP2Parallel + Mercurium Framework installation and configuration for Linux.
 
 <br />
 Introduction
