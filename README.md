@@ -3,7 +3,7 @@
 OpenMP2Parallel
 ==========
 
-Custom OpenMP2Parallel + Mercurium Framework installation and configuration for Linux.
+Custom OpenMP2Parallel + Mercurium Framework installation and configuration for Linux. 
 
 <br />
 Introduction
@@ -41,5 +41,5 @@ Relative to my work, I'd like to share it with the world under an simple clause:
 * Contribute something to this scripts. Updates, fixes, features... Whatever!
 
 Besides that, I hope you are kind enough to reference any your sources whether is my code or a code from a 3rd party!
-
+I must to apollogize since I know that the source code is not well commented, but all the funcion names are thought to be meanful.
 
