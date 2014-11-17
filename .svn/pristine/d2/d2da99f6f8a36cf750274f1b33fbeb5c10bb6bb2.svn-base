@@ -1,0 +1,33 @@
+# Plain profile
+[plaincc]
+language = C
+options =
+preprocessor_name = gcc
+preprocessor_options = -E
+compiler_name = gcc
+compiler_options = 
+linker_name = gcc
+linker_options = 
+
+[plaincxx]
+language = C++
+options = 
+preprocessor_name = g++
+preprocessor_options = -E 
+compiler_name = g++
+compiler_options = 
+linker_name = g++
+linker_options = 
+
+[plainfc]
+language = Fortran
+options = 
+preprocessor_name = gfortran
+preprocessor_options = -cpp -E
+compiler_name = gfortran
+compiler_options = 
+linker_name = gfortran
+linker_options = 
+{openmp} compiler_phase = libtlomp-core.so
+
+[plainf95 : plainfc]

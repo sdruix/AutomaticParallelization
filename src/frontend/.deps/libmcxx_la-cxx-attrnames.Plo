@@ -1,0 +1,152 @@
+libmcxx_la-cxx-attrnames.lo: cxx-attrnames.c cxx-attrnames.h \
+ libmcxx-common.h cxx-macros.h cxx-ast.h ../../lib/extstruct.h \
+ /usr/include/stdlib.h /usr/include/features.h /usr/include/stdc-predef.h \
+ /usr/include/i386-linux-gnu/sys/cdefs.h \
+ /usr/include/i386-linux-gnu/bits/wordsize.h \
+ /usr/include/i386-linux-gnu/gnu/stubs.h \
+ /usr/include/i386-linux-gnu/gnu/stubs-32.h \
+ /usr/lib/gcc/i686-linux-gnu/4.4.7/include/stddef.h \
+ /usr/include/i386-linux-gnu/bits/waitflags.h \
+ /usr/include/i386-linux-gnu/bits/waitstatus.h /usr/include/endian.h \
+ /usr/include/i386-linux-gnu/bits/endian.h \
+ /usr/include/i386-linux-gnu/bits/byteswap.h \
+ /usr/include/i386-linux-gnu/bits/types.h \
+ /usr/include/i386-linux-gnu/bits/typesizes.h \
+ /usr/include/i386-linux-gnu/bits/byteswap-16.h \
+ /usr/include/i386-linux-gnu/sys/types.h /usr/include/time.h \
+ /usr/include/i386-linux-gnu/sys/select.h \
+ /usr/include/i386-linux-gnu/bits/select.h \
+ /usr/include/i386-linux-gnu/bits/sigset.h \
+ /usr/include/i386-linux-gnu/bits/time.h \
+ /usr/include/i386-linux-gnu/bits/select2.h \
+ /usr/include/i386-linux-gnu/sys/sysmacros.h \
+ /usr/include/i386-linux-gnu/bits/pthreadtypes.h /usr/include/alloca.h \
+ /usr/include/i386-linux-gnu/bits/stdlib-bsearch.h \
+ /usr/include/i386-linux-gnu/bits/stdlib-float.h \
+ /usr/include/i386-linux-gnu/bits/stdlib.h ../../lib/red_black_tree.h \
+ ../../lib/libutils-common.h cxx-ast-decls.h cxx-asttype.h \
+ cxx-type-decls.h cxx-cexpr-decls.h cxx-scopelink-decls.h cxx-tltype.h \
+ cxx-scope-decls.h ../../lib/red_black_tree.h cxx-buildscope-decls.h \
+ cxx-gccsupport-decls.h cxx-typeenviron-decls.h ../../config.h \
+ cxx-entrylist-decls.h cxx-entity-specs.h cxx-typeutils.h \
+ cxx-solvetemplate.h cxx-typeunif.h cxx-typeunif-decls.h cxx-exprtype.h \
+ cxx-exprtype-decls.h cxx-cexpr.h /usr/include/stdint.h \
+ /usr/include/i386-linux-gnu/bits/wchar.h
+
+cxx-attrnames.h:
+
+libmcxx-common.h:
+
+cxx-macros.h:
+
+cxx-ast.h:
+
+../../lib/extstruct.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/features.h:
+
+/usr/include/stdc-predef.h:
+
+/usr/include/i386-linux-gnu/sys/cdefs.h:
+
+/usr/include/i386-linux-gnu/bits/wordsize.h:
+
+/usr/include/i386-linux-gnu/gnu/stubs.h:
+
+/usr/include/i386-linux-gnu/gnu/stubs-32.h:
+
+/usr/lib/gcc/i686-linux-gnu/4.4.7/include/stddef.h:
+
+/usr/include/i386-linux-gnu/bits/waitflags.h:
+
+/usr/include/i386-linux-gnu/bits/waitstatus.h:
+
+/usr/include/endian.h:
+
+/usr/include/i386-linux-gnu/bits/endian.h:
+
+/usr/include/i386-linux-gnu/bits/byteswap.h:
+
+/usr/include/i386-linux-gnu/bits/types.h:
+
+/usr/include/i386-linux-gnu/bits/typesizes.h:
+
+/usr/include/i386-linux-gnu/bits/byteswap-16.h:
+
+/usr/include/i386-linux-gnu/sys/types.h:
+
+/usr/include/time.h:
+
+/usr/include/i386-linux-gnu/sys/select.h:
+
+/usr/include/i386-linux-gnu/bits/select.h:
+
+/usr/include/i386-linux-gnu/bits/sigset.h:
+
+/usr/include/i386-linux-gnu/bits/time.h:
+
+/usr/include/i386-linux-gnu/bits/select2.h:
+
+/usr/include/i386-linux-gnu/sys/sysmacros.h:
+
+/usr/include/i386-linux-gnu/bits/pthreadtypes.h:
+
+/usr/include/alloca.h:
+
+/usr/include/i386-linux-gnu/bits/stdlib-bsearch.h:
+
+/usr/include/i386-linux-gnu/bits/stdlib-float.h:
+
+/usr/include/i386-linux-gnu/bits/stdlib.h:
+
+../../lib/red_black_tree.h:
+
+../../lib/libutils-common.h:
+
+cxx-ast-decls.h:
+
+cxx-asttype.h:
+
+cxx-type-decls.h:
+
+cxx-cexpr-decls.h:
+
+cxx-scopelink-decls.h:
+
+cxx-tltype.h:
+
+cxx-scope-decls.h:
+
+../../lib/red_black_tree.h:
+
+cxx-buildscope-decls.h:
+
+cxx-gccsupport-decls.h:
+
+cxx-typeenviron-decls.h:
+
+../../config.h:
+
+cxx-entrylist-decls.h:
+
+cxx-entity-specs.h:
+
+cxx-typeutils.h:
+
+cxx-solvetemplate.h:
+
+cxx-typeunif.h:
+
+cxx-typeunif-decls.h:
+
+cxx-exprtype.h:
+
+cxx-exprtype-decls.h:
+
+cxx-cexpr.h:
+
+/usr/include/stdint.h:
+
+/usr/include/i386-linux-gnu/bits/wchar.h:

@@ -1,0 +1,21 @@
+CC=g++
+CFLAGS=-I
+SOURCES=test.cpp PerformanceLap.cpp PerformanceLap.h
+EXECUTABLE=test
+.PHONY : clean install
+all: 
+	#$(CC) $(CFLAGS) ../eigen/ $(SOURCES) -o $(EXECUTABLE)
+	$(CC) $(CFLAGS) ../../eigen2/eigen/ test2.cpp -o test2
+test1:
+	$(CC) $(CFLAGS) ../eigen/ $(SOURCES) -o $(EXECUTABLE)
+test2:
+	$(CC) $(CFLAGS) ../../eigen2/eigen/ test2.cpp -o test2
+install:
+	hg clone https://bitbucket.org/eigen/eigen/
+clean:
+	rm *.csv *.o *.exe *.exe.stackdump
+
+	
+
+	
+

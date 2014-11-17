@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="80">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <logicalFolder name="driver"
+                   displayName="driver"
+                   projectFiles="true"
+                   root="../../src/driver">
+      <itemPath>../../src/driver/cxx-configfile-lexer.c</itemPath>
+      <itemPath>../../src/driver/cxx-configfile-lexer.h</itemPath>
+      <itemPath>../../src/driver/cxx-configfile-lexer.l</itemPath>
+      <itemPath>../../src/driver/cxx-configfile-parser-internal.h</itemPath>
+      <itemPath>../../src/driver/cxx-configfile-parser.c</itemPath>
+      <itemPath>../../src/driver/cxx-configfile-parser.h</itemPath>
+      <itemPath>../../src/driver/cxx-configfile-parser.y</itemPath>
+      <itemPath>../../src/driver/cxx-configfile.c</itemPath>
+      <itemPath>../../src/driver/cxx-configfile.h</itemPath>
+      <itemPath>../../src/driver/cxx-configoptions.c</itemPath>
+      <itemPath>../../src/driver/cxx-configoptions.gperf</itemPath>
+      <itemPath>../../src/driver/cxx-debugflags.c</itemPath>
+      <itemPath>../../src/driver/cxx-debugflags.gperf</itemPath>
+      <itemPath>../../src/driver/cxx-driver-decls.h</itemPath>
+      <itemPath>../../src/driver/cxx-driver-utils.c</itemPath>
+      <itemPath>../../src/driver/cxx-driver-utils.h</itemPath>
+      <itemPath>../../src/driver/cxx-driver.c</itemPath>
+      <itemPath>../../src/driver/cxx-driver.h</itemPath>
+      <itemPath>../../src/driver/cxx-embed.c</itemPath>
+      <itemPath>../../src/driver/cxx-embed.h</itemPath>
+      <itemPath>../../src/driver/cxx-fileextensions.c</itemPath>
+      <itemPath>../../src/driver/cxx-fileextensions.gperf</itemPath>
+      <itemPath>../../src/driver/cxx-multifile.c</itemPath>
+      <itemPath>../../src/driver/cxx-multifile.h</itemPath>
+      <itemPath>../../src/driver/cxx-parameters.c</itemPath>
+      <itemPath>../../src/driver/cxx-parameters.h</itemPath>
+      <itemPath>../../src/driver/cxx-profile.c</itemPath>
+      <itemPath>../../src/driver/cxx-profile.h</itemPath>
+    </logicalFolder>
+    <df name="inline" root=".">
+      <in>a.c</in>
+      <in>a2.c</in>
+      <in>corectinline.c</in>
+      <in>inline.cpp</in>
+      <in>inline_phase.cpp</in>
+      <in>inline_phase.hpp</in>
+      <in>newfile1.c</in>
+      <in>traverse.cpp</in>
+      <in>traverse.hpp</in>
+    </df>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceFolderFilter>^(nbproject)$</sourceFolderFilter>
+  <sourceRootList>
+    <Elem>.</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <remote-sources-mode>LOCAL_SOURCES</remote-sources-mode>
+        <compilerSet>default</compilerSet>
+      </toolsSet>
+      <makefileType>
+        <makeTool>
+          <buildCommandWorkingDir>.</buildCommandWorkingDir>
+          <buildCommand>${MAKE} -f Makefile</buildCommand>
+          <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
+          <executablePath></executablePath>
+          <cTool>
+            <incDir>
+              <pElem>../../src/driver</pElem>
+            </incDir>
+          </cTool>
+          <ccTool>
+            <incDir>
+              <pElem>../../src/tl</pElem>
+              <pElem>../../src/driver</pElem>
+              <pElem>../../lib</pElem>
+              <pElem>../../src/tl/omp/profile</pElem>
+              <pElem>../../src/tl/omp/core</pElem>
+              <pElem>../../src/frontend</pElem>
+              <pElem>../../omp_to_hmpp/common</pElem>
+            </incDir>
+          </ccTool>
+        </makeTool>
+      </makefileType>
+      <item path="../../src/driver/cxx-configfile-lexer.c"
+            ex="false"
+            tool="0"
+            flavor="2">
+      </item>
+      <item path="../../src/driver/cxx-configfile-lexer.l"
+            ex="true"
+            tool="3"
+            flavor="0">
+      </item>
+      <item path="../../src/driver/cxx-configfile-parser.c"
+            ex="false"
+            tool="0"
+            flavor="2">
+        <cTool>
+          <incDir>
+            <pElem>../../lib</pElem>
+            <pElem>../../src/frontend</pElem>
+          </incDir>
+        </cTool>
+      </item>
+      <item path="../../src/driver/cxx-configfile-parser.y"
+            ex="true"
+            tool="3"
+            flavor="0">
+      </item>
+      <item path="../../src/driver/cxx-configfile.c" ex="false" tool="0" flavor="2">
+        <cTool>
+          <incDir>
+            <pElem>../../lib</pElem>
+            <pElem>../../src/frontend</pElem>
+          </incDir>
+        </cTool>
+      </item>
+      <item path="../../src/driver/cxx-configoptions.c"
+            ex="false"
+            tool="0"
+            flavor="2">
+        <cTool>
+          <incDir>
+            <pElem>../../lib</pElem>
+            <pElem>../../src/frontend</pElem>
+          </incDir>
+        </cTool>
+      </item>
+      <item path="../../src/driver/cxx-configoptions.gperf"
+            ex="true"
+            tool="3"
+            flavor="0">
+      </item>
+      <item path="../../src/driver/cxx-debugflags.c" ex="false" tool="0" flavor="2">
+      </item>
+      <item path="../../src/driver/cxx-debugflags.gperf"
+            ex="true"
+            tool="3"
+            flavor="0">
+      </item>
+      <item path="../../src/driver/cxx-driver-utils.c" ex="false" tool="0" flavor="2">
+        <cTool>
+          <incDir>
+            <pElem>../../lib</pElem>
+            <pElem>../../src/frontend</pElem>
+          </incDir>
+        </cTool>
+      </item>
+      <item path="../../src/driver/cxx-driver.c" ex="false" tool="0" flavor="2">
+        <cTool>
+          <incDir>
+            <pElem>../../lib</pElem>
+            <pElem>../../src/frontend</pElem>
+          </incDir>
+        </cTool>
+      </item>
+      <item path="../../src/driver/cxx-embed.c" ex="false" tool="0" flavor="2">
+        <cTool>
+          <incDir>
+            <pElem>../../lib</pElem>
+            <pElem>../../src/frontend</pElem>
+          </incDir>
+        </cTool>
+      </item>
+      <item path="../../src/driver/cxx-fileextensions.c"
+            ex="false"
+            tool="0"
+            flavor="2">
+      </item>
+      <item path="../../src/driver/cxx-fileextensions.gperf"
+            ex="true"
+            tool="3"
+            flavor="0">
+      </item>
+      <item path="../../src/driver/cxx-multifile.c" ex="false" tool="0" flavor="2">
+        <cTool>
+          <incDir>
+            <pElem>../../lib</pElem>
+            <pElem>../../src/frontend</pElem>
+          </incDir>
+        </cTool>
+      </item>
+      <item path="../../src/driver/cxx-parameters.c" ex="false" tool="0" flavor="2">
+      </item>
+      <item path="../../src/driver/cxx-profile.c" ex="false" tool="0" flavor="2">
+        <cTool>
+          <incDir>
+            <pElem>../../lib</pElem>
+            <pElem>../../src/frontend</pElem>
+          </incDir>
+        </cTool>
+      </item>
+      <item path="a2.c" ex="true" tool="0" flavor="0">
+      </item>
+      <item path="corectinline.c" ex="true" tool="0" flavor="0">
+      </item>
+      <item path="inline.cpp" ex="true" tool="1" flavor="0">
+      </item>
+      <item path="newfile1.c" ex="true" tool="0" flavor="0">
+      </item>
+      <item path="traverse.cpp" ex="true" tool="1" flavor="0">
+      </item>
+      <item path="traverse.hpp" ex="true" tool="3" flavor="0">
+      </item>
+    </conf>
+  </confs>
+</configurationDescriptor>

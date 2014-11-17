@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Ignore this test if no STM
+
+if [ -z "" ];
+then
+
+cat  <<EOF
+test_ignore=yes
+EOF
+
+fi
+
+source /home/sdruix/mcxx/tests/config/mercurium-libraries
+
+cat <<EOF
+MCC="/home/sdruix/mcxx/src/driver/mcxx --output-dir=/home/sdruix/mcxx/tests --profile=stmcxx --config-dir=/home/sdruix/mcxx/config --verbose"
+
+test_CXX="\${MCC}"
+
+test_CXXFLAGS=
+
+test_nolink=yes
+EOF

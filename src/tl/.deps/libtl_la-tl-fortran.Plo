@@ -1,0 +1,5 @@
+libtl_la-tl-fortran.lo: tl-fortran.cpp tl-fortran.hpp ../../config.h
+
+tl-fortran.hpp:
+
+../../config.h:

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ "no" = "no" ];
+then
+
+cat <<EOF
+test_ignore=yes
+EOF
+
+fi
+
+cat <<EOF
+compile_versions=API_none
+EOF
+
+source /home/jonah/Projects/mcxx/tests/config/mercurium-libraries
+
+cat <<EOF
+MCC="/home/jonah/Projects/mcxx/src/driver/mcxx --output-dir=/home/jonah/Projects/mcxx/tests --profile=smpss-cc --config-file=/home/jonah/Projects/mcxx/config/config.superscalar -I/home/jonah/Projects/mcxx/../../master --verbose"
+
+test_CC_API_3="\${MCC}"
+test_CC_API_4="\${MCC}"
+test_CC_API_5="\${MCC}"
+
+test_CFLAGS=--gcc
+
+test_nolink=yes
+EOF

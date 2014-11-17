@@ -1,0 +1,584 @@
+libtl_la-tl-lexer.lo: tl-lexer.cpp ../../config.h \
+ ../../src/frontend/cxx-utils.h /usr/include/stdlib.h \
+ /usr/include/features.h /usr/include/stdc-predef.h \
+ /usr/include/i386-linux-gnu/sys/cdefs.h \
+ /usr/include/i386-linux-gnu/bits/wordsize.h \
+ /usr/include/i386-linux-gnu/gnu/stubs.h \
+ /usr/include/i386-linux-gnu/gnu/stubs-32.h \
+ /usr/lib/gcc/i686-linux-gnu/4.4.7/include/stddef.h \
+ /usr/include/i386-linux-gnu/bits/waitflags.h \
+ /usr/include/i386-linux-gnu/bits/waitstatus.h /usr/include/endian.h \
+ /usr/include/i386-linux-gnu/bits/endian.h \
+ /usr/include/i386-linux-gnu/bits/byteswap.h \
+ /usr/include/i386-linux-gnu/bits/types.h \
+ /usr/include/i386-linux-gnu/bits/typesizes.h \
+ /usr/include/i386-linux-gnu/bits/byteswap-16.h /usr/include/xlocale.h \
+ /usr/include/i386-linux-gnu/sys/types.h /usr/include/time.h \
+ /usr/include/i386-linux-gnu/sys/select.h \
+ /usr/include/i386-linux-gnu/bits/select.h \
+ /usr/include/i386-linux-gnu/bits/sigset.h \
+ /usr/include/i386-linux-gnu/bits/time.h \
+ /usr/include/i386-linux-gnu/bits/select2.h \
+ /usr/include/i386-linux-gnu/sys/sysmacros.h \
+ /usr/include/i386-linux-gnu/bits/pthreadtypes.h /usr/include/alloca.h \
+ /usr/include/i386-linux-gnu/bits/stdlib-bsearch.h \
+ /usr/include/i386-linux-gnu/bits/stdlib-float.h \
+ /usr/include/i386-linux-gnu/bits/stdlib.h /usr/include/stdio.h \
+ /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
+ /usr/lib/gcc/i686-linux-gnu/4.4.7/include/stdarg.h \
+ /usr/include/i386-linux-gnu/bits/stdio_lim.h \
+ /usr/include/i386-linux-gnu/bits/sys_errlist.h \
+ /usr/include/i386-linux-gnu/bits/stdio.h \
+ /usr/include/i386-linux-gnu/bits/stdio2.h /usr/include/signal.h \
+ /usr/include/i386-linux-gnu/bits/signum.h \
+ /usr/include/i386-linux-gnu/bits/siginfo.h \
+ /usr/include/i386-linux-gnu/bits/sigaction.h \
+ /usr/include/i386-linux-gnu/bits/sigcontext.h \
+ /usr/include/i386-linux-gnu/bits/sigstack.h \
+ /usr/include/i386-linux-gnu/sys/ucontext.h \
+ /usr/include/i386-linux-gnu/bits/sigthread.h \
+ ../../src/driver/cxx-driver.h ../../src/frontend/cxx-process.h \
+ ../../src/driver/cxx-driver-decls.h ../../src/frontend/cxx-macros.h \
+ ../../src/frontend/cxx-scope-decls.h ../../lib/red_black_tree.h \
+ ../../lib/libutils-common.h ../../src/frontend/libmcxx-common.h \
+ ../../src/frontend/cxx-macros.h ../../src/frontend/cxx-ast-decls.h \
+ ../../src/frontend/cxx-buildscope-decls.h \
+ ../../src/frontend/cxx-scope-decls.h \
+ ../../src/frontend/cxx-gccsupport-decls.h \
+ ../../src/frontend/cxx-typeenviron-decls.h \
+ ../../src/frontend/cxx-entrylist-decls.h \
+ ../../src/frontend/cxx-type-decls.h ../../src/frontend/cxx-cexpr-decls.h \
+ ../../lib/extstruct.h ../../lib/red_black_tree.h \
+ ../../src/frontend/cxx-entity-specs.h \
+ ../../src/frontend/cxx-scopelink-decls.h \
+ ../../src/frontend/cxx-buildscope-decls.h ../../src/frontend/cxx-ast.h \
+ ../../src/frontend/cxx-asttype.h \
+ ../../src/frontend/cxx-scopelink-decls.h ../../src/frontend/cxx-scope.h \
+ ../../src/frontend/cxx-scopelink.h ../../src/driver/cxx-driver-decls.h \
+ ../../src/driver/cxx-parameters.h ../../lib/uniquestr.h \
+ ../../lib/string_utils.h tl-lexer.hpp tl-objectlist.hpp tl-common.hpp \
+ /usr/include/c++/4.4/vector /usr/include/c++/4.4/bits/stl_algobase.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/c++config.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/os_defines.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/cpu_defines.h \
+ /usr/include/c++/4.4/cstddef /usr/include/c++/4.4/bits/functexcept.h \
+ /usr/include/c++/4.4/exception_defines.h \
+ /usr/include/c++/4.4/bits/cpp_type_traits.h \
+ /usr/include/c++/4.4/ext/type_traits.h \
+ /usr/include/c++/4.4/ext/numeric_traits.h \
+ /usr/include/c++/4.4/bits/stl_pair.h /usr/include/c++/4.4/bits/move.h \
+ /usr/include/c++/4.4/bits/concept_check.h \
+ /usr/include/c++/4.4/type_traits \
+ /usr/include/c++/4.4/tr1_impl/type_traits \
+ /usr/include/c++/4.4/bits/stl_iterator_base_types.h \
+ /usr/include/c++/4.4/bits/stl_iterator_base_funcs.h \
+ /usr/include/c++/4.4/bits/stl_iterator.h \
+ /usr/include/c++/4.4/debug/debug.h /usr/include/c++/4.4/bits/allocator.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/c++allocator.h \
+ /usr/include/c++/4.4/ext/new_allocator.h /usr/include/c++/4.4/new \
+ /usr/include/c++/4.4/exception /usr/include/c++/4.4/exception_ptr.h \
+ /usr/include/c++/4.4/bits/stl_construct.h \
+ /usr/include/c++/4.4/bits/stl_uninitialized.h \
+ /usr/include/c++/4.4/bits/stl_vector.h \
+ /usr/include/c++/4.4/initializer_list \
+ /usr/include/c++/4.4/bits/stl_bvector.h \
+ /usr/include/c++/4.4/bits/vector.tcc /usr/include/c++/4.4/sstream \
+ /usr/include/c++/4.4/istream /usr/include/c++/4.4/ios \
+ /usr/include/c++/4.4/iosfwd /usr/include/c++/4.4/bits/stringfwd.h \
+ /usr/include/c++/4.4/bits/postypes.h /usr/include/c++/4.4/cwchar \
+ /usr/include/i386-linux-gnu/bits/wchar.h \
+ /usr/include/i386-linux-gnu/bits/wchar2.h \
+ /usr/include/c++/4.4/tr1_impl/cwchar \
+ /usr/include/c++/4.4/bits/char_traits.h /usr/include/c++/4.4/cstdint \
+ /usr/include/stdint.h /usr/include/c++/4.4/tr1_impl/cstdint \
+ /usr/include/c++/4.4/bits/localefwd.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/c++locale.h \
+ /usr/include/c++/4.4/clocale /usr/include/locale.h \
+ /usr/include/i386-linux-gnu/bits/locale.h /usr/include/c++/4.4/cctype \
+ /usr/include/ctype.h /usr/include/c++/4.4/tr1_impl/cctype \
+ /usr/include/c++/4.4/bits/ios_base.h \
+ /usr/include/c++/4.4/ext/atomicity.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/gthr.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/gthr-default.h \
+ /usr/include/pthread.h /usr/include/sched.h \
+ /usr/include/i386-linux-gnu/bits/sched.h \
+ /usr/include/i386-linux-gnu/bits/timex.h \
+ /usr/include/i386-linux-gnu/bits/setjmp.h /usr/include/unistd.h \
+ /usr/include/i386-linux-gnu/bits/posix_opt.h \
+ /usr/include/i386-linux-gnu/bits/environments.h \
+ /usr/include/i386-linux-gnu/bits/confname.h /usr/include/getopt.h \
+ /usr/include/i386-linux-gnu/bits/unistd.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/atomic_word.h \
+ /usr/include/c++/4.4/bits/locale_classes.h /usr/include/c++/4.4/string \
+ /usr/include/c++/4.4/bits/ostream_insert.h \
+ /usr/include/c++/4.4/cxxabi-forced.h \
+ /usr/include/c++/4.4/bits/stl_function.h \
+ /usr/include/c++/4.4/backward/binders.h \
+ /usr/include/c++/4.4/bits/basic_string.h \
+ /usr/include/c++/4.4/ext/string_conversions.h \
+ /usr/include/c++/4.4/cstdlib /usr/include/c++/4.4/tr1_impl/cstdlib \
+ /usr/include/c++/4.4/cstdio /usr/include/c++/4.4/tr1_impl/cstdio \
+ /usr/include/c++/4.4/cerrno /usr/include/errno.h \
+ /usr/include/i386-linux-gnu/bits/errno.h /usr/include/linux/errno.h \
+ /usr/include/i386-linux-gnu/asm/errno.h /usr/include/asm-generic/errno.h \
+ /usr/include/asm-generic/errno-base.h \
+ /usr/include/c++/4.4/bits/basic_string.tcc \
+ /usr/include/c++/4.4/bits/locale_classes.tcc \
+ /usr/include/c++/4.4/streambuf /usr/include/c++/4.4/bits/streambuf.tcc \
+ /usr/include/c++/4.4/bits/basic_ios.h \
+ /usr/include/c++/4.4/bits/locale_facets.h /usr/include/c++/4.4/cwctype \
+ /usr/include/wctype.h /usr/include/c++/4.4/tr1_impl/cwctype \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/ctype_base.h \
+ /usr/include/c++/4.4/bits/streambuf_iterator.h \
+ /usr/include/c++/4.4/i686-linux-gnu/./bits/ctype_inline.h \
+ /usr/include/c++/4.4/bits/locale_facets.tcc \
+ /usr/include/c++/4.4/bits/basic_ios.tcc /usr/include/c++/4.4/ostream \
+ /usr/include/c++/4.4/bits/ostream.tcc \
+ /usr/include/c++/4.4/bits/istream.tcc \
+ /usr/include/c++/4.4/bits/sstream.tcc /usr/include/c++/4.4/utility \
+ /usr/include/c++/4.4/bits/stl_relops.h \
+ /usr/include/c++/4.4/tr1_impl/utility /usr/include/c++/4.4/algorithm \
+ /usr/include/c++/4.4/bits/stl_algo.h \
+ /usr/include/c++/4.4/bits/algorithmfwd.h \
+ /usr/include/c++/4.4/bits/stl_heap.h \
+ /usr/include/c++/4.4/bits/stl_tempbuf.h tl-object.hpp \
+ /usr/include/c++/4.4/iostream /usr/include/c++/4.4/typeinfo \
+ ../../src/frontend/cxx-tltype.h ../../src/frontend/cxx-ast.h \
+ ../../src/frontend/cxx-typeutils.h \
+ ../../src/frontend/cxx-solvetemplate.h ../../src/frontend/cxx-typeunif.h \
+ ../../src/frontend/cxx-typeunif-decls.h tl-refptr.hpp tl-functor.hpp \
+ tl-predicate.hpp tl-lexer-tokens.hpp ../../src/frontend/c99-parser.h \
+ ../../src/frontend/cxx-parser.h ../../src/frontend/cxx-lexer.h \
+ /usr/include/string.h /usr/include/i386-linux-gnu/bits/string3.h
+
+../../config.h:
+
+../../src/frontend/cxx-utils.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/features.h:
+
+/usr/include/stdc-predef.h:
+
+/usr/include/i386-linux-gnu/sys/cdefs.h:
+
+/usr/include/i386-linux-gnu/bits/wordsize.h:
+
+/usr/include/i386-linux-gnu/gnu/stubs.h:
+
+/usr/include/i386-linux-gnu/gnu/stubs-32.h:
+
+/usr/lib/gcc/i686-linux-gnu/4.4.7/include/stddef.h:
+
+/usr/include/i386-linux-gnu/bits/waitflags.h:
+
+/usr/include/i386-linux-gnu/bits/waitstatus.h:
+
+/usr/include/endian.h:
+
+/usr/include/i386-linux-gnu/bits/endian.h:
+
+/usr/include/i386-linux-gnu/bits/byteswap.h:
+
+/usr/include/i386-linux-gnu/bits/types.h:
+
+/usr/include/i386-linux-gnu/bits/typesizes.h:
+
+/usr/include/i386-linux-gnu/bits/byteswap-16.h:
+
+/usr/include/xlocale.h:
+
+/usr/include/i386-linux-gnu/sys/types.h:
+
+/usr/include/time.h:
+
+/usr/include/i386-linux-gnu/sys/select.h:
+
+/usr/include/i386-linux-gnu/bits/select.h:
+
+/usr/include/i386-linux-gnu/bits/sigset.h:
+
+/usr/include/i386-linux-gnu/bits/time.h:
+
+/usr/include/i386-linux-gnu/bits/select2.h:
+
+/usr/include/i386-linux-gnu/sys/sysmacros.h:
+
+/usr/include/i386-linux-gnu/bits/pthreadtypes.h:
+
+/usr/include/alloca.h:
+
+/usr/include/i386-linux-gnu/bits/stdlib-bsearch.h:
+
+/usr/include/i386-linux-gnu/bits/stdlib-float.h:
+
+/usr/include/i386-linux-gnu/bits/stdlib.h:
+
+/usr/include/stdio.h:
+
+/usr/include/libio.h:
+
+/usr/include/_G_config.h:
+
+/usr/include/wchar.h:
+
+/usr/lib/gcc/i686-linux-gnu/4.4.7/include/stdarg.h:
+
+/usr/include/i386-linux-gnu/bits/stdio_lim.h:
+
+/usr/include/i386-linux-gnu/bits/sys_errlist.h:
+
+/usr/include/i386-linux-gnu/bits/stdio.h:
+
+/usr/include/i386-linux-gnu/bits/stdio2.h:
+
+/usr/include/signal.h:
+
+/usr/include/i386-linux-gnu/bits/signum.h:
+
+/usr/include/i386-linux-gnu/bits/siginfo.h:
+
+/usr/include/i386-linux-gnu/bits/sigaction.h:
+
+/usr/include/i386-linux-gnu/bits/sigcontext.h:
+
+/usr/include/i386-linux-gnu/bits/sigstack.h:
+
+/usr/include/i386-linux-gnu/sys/ucontext.h:
+
+/usr/include/i386-linux-gnu/bits/sigthread.h:
+
+../../src/driver/cxx-driver.h:
+
+../../src/frontend/cxx-process.h:
+
+../../src/driver/cxx-driver-decls.h:
+
+../../src/frontend/cxx-macros.h:
+
+../../src/frontend/cxx-scope-decls.h:
+
+../../lib/red_black_tree.h:
+
+../../lib/libutils-common.h:
+
+../../src/frontend/libmcxx-common.h:
+
+../../src/frontend/cxx-macros.h:
+
+../../src/frontend/cxx-ast-decls.h:
+
+../../src/frontend/cxx-buildscope-decls.h:
+
+../../src/frontend/cxx-scope-decls.h:
+
+../../src/frontend/cxx-gccsupport-decls.h:
+
+../../src/frontend/cxx-typeenviron-decls.h:
+
+../../src/frontend/cxx-entrylist-decls.h:
+
+../../src/frontend/cxx-type-decls.h:
+
+../../src/frontend/cxx-cexpr-decls.h:
+
+../../lib/extstruct.h:
+
+../../lib/red_black_tree.h:
+
+../../src/frontend/cxx-entity-specs.h:
+
+../../src/frontend/cxx-scopelink-decls.h:
+
+../../src/frontend/cxx-buildscope-decls.h:
+
+../../src/frontend/cxx-ast.h:
+
+../../src/frontend/cxx-asttype.h:
+
+../../src/frontend/cxx-scopelink-decls.h:
+
+../../src/frontend/cxx-scope.h:
+
+../../src/frontend/cxx-scopelink.h:
+
+../../src/driver/cxx-driver-decls.h:
+
+../../src/driver/cxx-parameters.h:
+
+../../lib/uniquestr.h:
+
+../../lib/string_utils.h:
+
+tl-lexer.hpp:
+
+tl-objectlist.hpp:
+
+tl-common.hpp:
+
+/usr/include/c++/4.4/vector:
+
+/usr/include/c++/4.4/bits/stl_algobase.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/c++config.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/os_defines.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/cpu_defines.h:
+
+/usr/include/c++/4.4/cstddef:
+
+/usr/include/c++/4.4/bits/functexcept.h:
+
+/usr/include/c++/4.4/exception_defines.h:
+
+/usr/include/c++/4.4/bits/cpp_type_traits.h:
+
+/usr/include/c++/4.4/ext/type_traits.h:
+
+/usr/include/c++/4.4/ext/numeric_traits.h:
+
+/usr/include/c++/4.4/bits/stl_pair.h:
+
+/usr/include/c++/4.4/bits/move.h:
+
+/usr/include/c++/4.4/bits/concept_check.h:
+
+/usr/include/c++/4.4/type_traits:
+
+/usr/include/c++/4.4/tr1_impl/type_traits:
+
+/usr/include/c++/4.4/bits/stl_iterator_base_types.h:
+
+/usr/include/c++/4.4/bits/stl_iterator_base_funcs.h:
+
+/usr/include/c++/4.4/bits/stl_iterator.h:
+
+/usr/include/c++/4.4/debug/debug.h:
+
+/usr/include/c++/4.4/bits/allocator.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/c++allocator.h:
+
+/usr/include/c++/4.4/ext/new_allocator.h:
+
+/usr/include/c++/4.4/new:
+
+/usr/include/c++/4.4/exception:
+
+/usr/include/c++/4.4/exception_ptr.h:
+
+/usr/include/c++/4.4/bits/stl_construct.h:
+
+/usr/include/c++/4.4/bits/stl_uninitialized.h:
+
+/usr/include/c++/4.4/bits/stl_vector.h:
+
+/usr/include/c++/4.4/initializer_list:
+
+/usr/include/c++/4.4/bits/stl_bvector.h:
+
+/usr/include/c++/4.4/bits/vector.tcc:
+
+/usr/include/c++/4.4/sstream:
+
+/usr/include/c++/4.4/istream:
+
+/usr/include/c++/4.4/ios:
+
+/usr/include/c++/4.4/iosfwd:
+
+/usr/include/c++/4.4/bits/stringfwd.h:
+
+/usr/include/c++/4.4/bits/postypes.h:
+
+/usr/include/c++/4.4/cwchar:
+
+/usr/include/i386-linux-gnu/bits/wchar.h:
+
+/usr/include/i386-linux-gnu/bits/wchar2.h:
+
+/usr/include/c++/4.4/tr1_impl/cwchar:
+
+/usr/include/c++/4.4/bits/char_traits.h:
+
+/usr/include/c++/4.4/cstdint:
+
+/usr/include/stdint.h:
+
+/usr/include/c++/4.4/tr1_impl/cstdint:
+
+/usr/include/c++/4.4/bits/localefwd.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/c++locale.h:
+
+/usr/include/c++/4.4/clocale:
+
+/usr/include/locale.h:
+
+/usr/include/i386-linux-gnu/bits/locale.h:
+
+/usr/include/c++/4.4/cctype:
+
+/usr/include/ctype.h:
+
+/usr/include/c++/4.4/tr1_impl/cctype:
+
+/usr/include/c++/4.4/bits/ios_base.h:
+
+/usr/include/c++/4.4/ext/atomicity.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/gthr.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/gthr-default.h:
+
+/usr/include/pthread.h:
+
+/usr/include/sched.h:
+
+/usr/include/i386-linux-gnu/bits/sched.h:
+
+/usr/include/i386-linux-gnu/bits/timex.h:
+
+/usr/include/i386-linux-gnu/bits/setjmp.h:
+
+/usr/include/unistd.h:
+
+/usr/include/i386-linux-gnu/bits/posix_opt.h:
+
+/usr/include/i386-linux-gnu/bits/environments.h:
+
+/usr/include/i386-linux-gnu/bits/confname.h:
+
+/usr/include/getopt.h:
+
+/usr/include/i386-linux-gnu/bits/unistd.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/atomic_word.h:
+
+/usr/include/c++/4.4/bits/locale_classes.h:
+
+/usr/include/c++/4.4/string:
+
+/usr/include/c++/4.4/bits/ostream_insert.h:
+
+/usr/include/c++/4.4/cxxabi-forced.h:
+
+/usr/include/c++/4.4/bits/stl_function.h:
+
+/usr/include/c++/4.4/backward/binders.h:
+
+/usr/include/c++/4.4/bits/basic_string.h:
+
+/usr/include/c++/4.4/ext/string_conversions.h:
+
+/usr/include/c++/4.4/cstdlib:
+
+/usr/include/c++/4.4/tr1_impl/cstdlib:
+
+/usr/include/c++/4.4/cstdio:
+
+/usr/include/c++/4.4/tr1_impl/cstdio:
+
+/usr/include/c++/4.4/cerrno:
+
+/usr/include/errno.h:
+
+/usr/include/i386-linux-gnu/bits/errno.h:
+
+/usr/include/linux/errno.h:
+
+/usr/include/i386-linux-gnu/asm/errno.h:
+
+/usr/include/asm-generic/errno.h:
+
+/usr/include/asm-generic/errno-base.h:
+
+/usr/include/c++/4.4/bits/basic_string.tcc:
+
+/usr/include/c++/4.4/bits/locale_classes.tcc:
+
+/usr/include/c++/4.4/streambuf:
+
+/usr/include/c++/4.4/bits/streambuf.tcc:
+
+/usr/include/c++/4.4/bits/basic_ios.h:
+
+/usr/include/c++/4.4/bits/locale_facets.h:
+
+/usr/include/c++/4.4/cwctype:
+
+/usr/include/wctype.h:
+
+/usr/include/c++/4.4/tr1_impl/cwctype:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/ctype_base.h:
+
+/usr/include/c++/4.4/bits/streambuf_iterator.h:
+
+/usr/include/c++/4.4/i686-linux-gnu/./bits/ctype_inline.h:
+
+/usr/include/c++/4.4/bits/locale_facets.tcc:
+
+/usr/include/c++/4.4/bits/basic_ios.tcc:
+
+/usr/include/c++/4.4/ostream:
+
+/usr/include/c++/4.4/bits/ostream.tcc:
+
+/usr/include/c++/4.4/bits/istream.tcc:
+
+/usr/include/c++/4.4/bits/sstream.tcc:
+
+/usr/include/c++/4.4/utility:
+
+/usr/include/c++/4.4/bits/stl_relops.h:
+
+/usr/include/c++/4.4/tr1_impl/utility:
+
+/usr/include/c++/4.4/algorithm:
+
+/usr/include/c++/4.4/bits/stl_algo.h:
+
+/usr/include/c++/4.4/bits/algorithmfwd.h:
+
+/usr/include/c++/4.4/bits/stl_heap.h:
+
+/usr/include/c++/4.4/bits/stl_tempbuf.h:
+
+tl-object.hpp:
+
+/usr/include/c++/4.4/iostream:
+
+/usr/include/c++/4.4/typeinfo:
+
+../../src/frontend/cxx-tltype.h:
+
+../../src/frontend/cxx-ast.h:
+
+../../src/frontend/cxx-typeutils.h:
+
+../../src/frontend/cxx-solvetemplate.h:
+
+../../src/frontend/cxx-typeunif.h:
+
+../../src/frontend/cxx-typeunif-decls.h:
+
+tl-refptr.hpp:
+
+tl-functor.hpp:
+
+tl-predicate.hpp:
+
+tl-lexer-tokens.hpp:
+
+../../src/frontend/c99-parser.h:
+
+../../src/frontend/cxx-parser.h:
+
+../../src/frontend/cxx-lexer.h:
+
+/usr/include/string.h:
+
+/usr/include/i386-linux-gnu/bits/string3.h:

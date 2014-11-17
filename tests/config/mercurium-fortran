@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Basic mercurium generator with Fortran support
+source /home/sdruix/mcxx/tests/config/mercurium
+
+cat <<EOF
+unset test_nolink
+test_noexec=yes
+test_FFLAGS="-y --typecheck --fpc=/home/sdruix/mcxx/src/driver/fortran/.libs/mf03-prescanner ${test_FFLAGS}"
+EOF
+
+if test no != yes;
+then
+
+cat <<EOF
+test_ignore=yes
+EOF
+
+fi

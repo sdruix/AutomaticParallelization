@@ -1,0 +1,649 @@
+Grammar
+
+    0 $accept: config_file $end
+
+    1 config_file: profile_seq
+    2            | /* empty */
+
+    3 profile_seq: profile_seq profile
+    4            | profile
+
+    5 profile: profile_header profile_body
+
+    6 profile_header: '[' "identifier" ']' "end-of-line"
+    7               | '[' "identifier" ':' "identifier" ']' "end-of-line"
+    8               | '[' "identifier" '>' "identifier" ']' "end-of-line"
+
+    9 profile_body: option_line_seq
+   10             | /* empty */
+
+   11 option_line_seq: option_line_seq option_line
+   12                | option_line
+
+   13 option_line: flag_spec option_name '=' option_value "end-of-line"
+   14            | flag_spec "end-of-line"
+
+   15 option_value: "option-value"
+   16             | /* empty */
+
+   17 option_name: "identifier"
+   18            | "identifier" '[' "identifier" ']'
+
+   19 flag_spec: '{' flag_expr '}'
+   20          | '{' '}'
+   21          | /* empty */
+
+   22 flag_expr: flag_or
+
+   23 flag_or: flag_or '|' flag_and
+   24        | flag_and
+
+   25 flag_and: flag_and ',' flag_not
+   26         | flag_and '&' flag_not
+   27         | flag_not
+
+   28 flag_not: '!' flag_atom
+   29         | flag_atom
+
+   30 flag_atom: "identifier"
+   31          | '(' flag_expr ')'
+
+
+Terminals, with rules where they appear
+
+$end (0) 0
+'!' (33) 28
+'&' (38) 26
+'(' (40) 31
+')' (41) 31
+',' (44) 25
+':' (58) 7
+'=' (61) 13
+'>' (62) 8
+'[' (91) 6 7 8 18
+']' (93) 6 7 8 18
+'{' (123) 19 20
+'|' (124) 23
+'}' (125) 19 20
+error (256)
+"identifier" (258) 6 7 8 17 18 30
+"option-value" (259) 15
+"end-of-line" (260) 6 7 8 13 14
+
+
+Nonterminals, with rules where they appear
+
+$accept (19)
+    on left: 0
+config_file (20)
+    on left: 1 2, on right: 0
+profile_seq (21)
+    on left: 3 4, on right: 1 3
+profile (22)
+    on left: 5, on right: 3 4
+profile_header (23)
+    on left: 6 7 8, on right: 5
+profile_body (24)
+    on left: 9 10, on right: 5
+option_line_seq (25)
+    on left: 11 12, on right: 9 11
+option_line (26)
+    on left: 13 14, on right: 11 12
+option_value (27)
+    on left: 15 16, on right: 13
+option_name (28)
+    on left: 17 18, on right: 13
+flag_spec (29)
+    on left: 19 20 21, on right: 13 14
+flag_expr (30)
+    on left: 22, on right: 19 31
+flag_or (31)
+    on left: 23 24, on right: 22 23
+flag_and (32)
+    on left: 25 26 27, on right: 23 24 25 26
+flag_not (33)
+    on left: 28 29, on right: 25 26 27
+flag_atom (34)
+    on left: 30 31, on right: 28 29
+
+
+state 0
+
+    0 $accept: . config_file $end
+    1 config_file: . profile_seq
+    2            | .  [$end]
+    3 profile_seq: . profile_seq profile
+    4            | . profile
+    5 profile: . profile_header profile_body
+    6 profile_header: . '[' "identifier" ']' "end-of-line"
+    7               | . '[' "identifier" ':' "identifier" ']' "end-of-line"
+    8               | . '[' "identifier" '>' "identifier" ']' "end-of-line"
+
+    '['  shift, and go to state 1
+
+    $default  reduce using rule 2 (config_file)
+
+    config_file     go to state 2
+    profile_seq     go to state 3
+    profile         go to state 4
+    profile_header  go to state 5
+
+
+state 1
+
+    6 profile_header: '[' . "identifier" ']' "end-of-line"
+    7               | '[' . "identifier" ':' "identifier" ']' "end-of-line"
+    8               | '[' . "identifier" '>' "identifier" ']' "end-of-line"
+
+    "identifier"  shift, and go to state 6
+
+
+state 2
+
+    0 $accept: config_file . $end
+
+    $end  shift, and go to state 7
+
+
+state 3
+
+    1 config_file: profile_seq .  [$end]
+    3 profile_seq: profile_seq . profile
+    5 profile: . profile_header profile_body
+    6 profile_header: . '[' "identifier" ']' "end-of-line"
+    7               | . '[' "identifier" ':' "identifier" ']' "end-of-line"
+    8               | . '[' "identifier" '>' "identifier" ']' "end-of-line"
+
+    '['  shift, and go to state 1
+
+    $default  reduce using rule 1 (config_file)
+
+    profile         go to state 8
+    profile_header  go to state 5
+
+
+state 4
+
+    4 profile_seq: profile .
+
+    $default  reduce using rule 4 (profile_seq)
+
+
+state 5
+
+    5 profile: profile_header . profile_body
+    9 profile_body: . option_line_seq
+   10             | .  [$end, '[']
+   11 option_line_seq: . option_line_seq option_line
+   12                | . option_line
+   13 option_line: . flag_spec option_name '=' option_value "end-of-line"
+   14            | . flag_spec "end-of-line"
+   19 flag_spec: . '{' flag_expr '}'
+   20          | . '{' '}'
+   21          | .  ["identifier", "end-of-line"]
+
+    '{'  shift, and go to state 9
+
+    "identifier"   reduce using rule 21 (flag_spec)
+    "end-of-line"  reduce using rule 21 (flag_spec)
+    $default       reduce using rule 10 (profile_body)
+
+    profile_body     go to state 10
+    option_line_seq  go to state 11
+    option_line      go to state 12
+    flag_spec        go to state 13
+
+
+state 6
+
+    6 profile_header: '[' "identifier" . ']' "end-of-line"
+    7               | '[' "identifier" . ':' "identifier" ']' "end-of-line"
+    8               | '[' "identifier" . '>' "identifier" ']' "end-of-line"
+
+    ']'  shift, and go to state 14
+    ':'  shift, and go to state 15
+    '>'  shift, and go to state 16
+
+
+state 7
+
+    0 $accept: config_file $end .
+
+    $default  accept
+
+
+state 8
+
+    3 profile_seq: profile_seq profile .
+
+    $default  reduce using rule 3 (profile_seq)
+
+
+state 9
+
+   19 flag_spec: '{' . flag_expr '}'
+   20          | '{' . '}'
+   22 flag_expr: . flag_or
+   23 flag_or: . flag_or '|' flag_and
+   24        | . flag_and
+   25 flag_and: . flag_and ',' flag_not
+   26         | . flag_and '&' flag_not
+   27         | . flag_not
+   28 flag_not: . '!' flag_atom
+   29         | . flag_atom
+   30 flag_atom: . "identifier"
+   31          | . '(' flag_expr ')'
+
+    '!'           shift, and go to state 17
+    '('           shift, and go to state 18
+    "identifier"  shift, and go to state 19
+    '}'           shift, and go to state 20
+
+    flag_expr  go to state 21
+    flag_or    go to state 22
+    flag_and   go to state 23
+    flag_not   go to state 24
+    flag_atom  go to state 25
+
+
+state 10
+
+    5 profile: profile_header profile_body .
+
+    $default  reduce using rule 5 (profile)
+
+
+state 11
+
+    9 profile_body: option_line_seq .  [$end, '[']
+   11 option_line_seq: option_line_seq . option_line
+   13 option_line: . flag_spec option_name '=' option_value "end-of-line"
+   14            | . flag_spec "end-of-line"
+   19 flag_spec: . '{' flag_expr '}'
+   20          | . '{' '}'
+   21          | .  ["identifier", "end-of-line"]
+
+    '{'  shift, and go to state 9
+
+    "identifier"   reduce using rule 21 (flag_spec)
+    "end-of-line"  reduce using rule 21 (flag_spec)
+    $default       reduce using rule 9 (profile_body)
+
+    option_line  go to state 26
+    flag_spec    go to state 13
+
+
+state 12
+
+   12 option_line_seq: option_line .
+
+    $default  reduce using rule 12 (option_line_seq)
+
+
+state 13
+
+   13 option_line: flag_spec . option_name '=' option_value "end-of-line"
+   14            | flag_spec . "end-of-line"
+   17 option_name: . "identifier"
+   18            | . "identifier" '[' "identifier" ']'
+
+    "identifier"   shift, and go to state 27
+    "end-of-line"  shift, and go to state 28
+
+    option_name  go to state 29
+
+
+state 14
+
+    6 profile_header: '[' "identifier" ']' . "end-of-line"
+
+    "end-of-line"  shift, and go to state 30
+
+
+state 15
+
+    7 profile_header: '[' "identifier" ':' . "identifier" ']' "end-of-line"
+
+    "identifier"  shift, and go to state 31
+
+
+state 16
+
+    8 profile_header: '[' "identifier" '>' . "identifier" ']' "end-of-line"
+
+    "identifier"  shift, and go to state 32
+
+
+state 17
+
+   28 flag_not: '!' . flag_atom
+   30 flag_atom: . "identifier"
+   31          | . '(' flag_expr ')'
+
+    '('           shift, and go to state 18
+    "identifier"  shift, and go to state 19
+
+    flag_atom  go to state 33
+
+
+state 18
+
+   22 flag_expr: . flag_or
+   23 flag_or: . flag_or '|' flag_and
+   24        | . flag_and
+   25 flag_and: . flag_and ',' flag_not
+   26         | . flag_and '&' flag_not
+   27         | . flag_not
+   28 flag_not: . '!' flag_atom
+   29         | . flag_atom
+   30 flag_atom: . "identifier"
+   31          | . '(' flag_expr ')'
+   31          | '(' . flag_expr ')'
+
+    '!'           shift, and go to state 17
+    '('           shift, and go to state 18
+    "identifier"  shift, and go to state 19
+
+    flag_expr  go to state 34
+    flag_or    go to state 22
+    flag_and   go to state 23
+    flag_not   go to state 24
+    flag_atom  go to state 25
+
+
+state 19
+
+   30 flag_atom: "identifier" .
+
+    $default  reduce using rule 30 (flag_atom)
+
+
+state 20
+
+   20 flag_spec: '{' '}' .
+
+    $default  reduce using rule 20 (flag_spec)
+
+
+state 21
+
+   19 flag_spec: '{' flag_expr . '}'
+
+    '}'  shift, and go to state 35
+
+
+state 22
+
+   22 flag_expr: flag_or .  [')', '}']
+   23 flag_or: flag_or . '|' flag_and
+
+    '|'  shift, and go to state 36
+
+    $default  reduce using rule 22 (flag_expr)
+
+
+state 23
+
+   24 flag_or: flag_and .  [')', '|', '}']
+   25 flag_and: flag_and . ',' flag_not
+   26         | flag_and . '&' flag_not
+
+    ','  shift, and go to state 37
+    '&'  shift, and go to state 38
+
+    $default  reduce using rule 24 (flag_or)
+
+
+state 24
+
+   27 flag_and: flag_not .
+
+    $default  reduce using rule 27 (flag_and)
+
+
+state 25
+
+   29 flag_not: flag_atom .
+
+    $default  reduce using rule 29 (flag_not)
+
+
+state 26
+
+   11 option_line_seq: option_line_seq option_line .
+
+    $default  reduce using rule 11 (option_line_seq)
+
+
+state 27
+
+   17 option_name: "identifier" .  ['=']
+   18            | "identifier" . '[' "identifier" ']'
+
+    '['  shift, and go to state 39
+
+    $default  reduce using rule 17 (option_name)
+
+
+state 28
+
+   14 option_line: flag_spec "end-of-line" .
+
+    $default  reduce using rule 14 (option_line)
+
+
+state 29
+
+   13 option_line: flag_spec option_name . '=' option_value "end-of-line"
+
+    '='  shift, and go to state 40
+
+
+state 30
+
+    6 profile_header: '[' "identifier" ']' "end-of-line" .
+
+    $default  reduce using rule 6 (profile_header)
+
+
+state 31
+
+    7 profile_header: '[' "identifier" ':' "identifier" . ']' "end-of-line"
+
+    ']'  shift, and go to state 41
+
+
+state 32
+
+    8 profile_header: '[' "identifier" '>' "identifier" . ']' "end-of-line"
+
+    ']'  shift, and go to state 42
+
+
+state 33
+
+   28 flag_not: '!' flag_atom .
+
+    $default  reduce using rule 28 (flag_not)
+
+
+state 34
+
+   31 flag_atom: '(' flag_expr . ')'
+
+    ')'  shift, and go to state 43
+
+
+state 35
+
+   19 flag_spec: '{' flag_expr '}' .
+
+    $default  reduce using rule 19 (flag_spec)
+
+
+state 36
+
+   23 flag_or: flag_or '|' . flag_and
+   25 flag_and: . flag_and ',' flag_not
+   26         | . flag_and '&' flag_not
+   27         | . flag_not
+   28 flag_not: . '!' flag_atom
+   29         | . flag_atom
+   30 flag_atom: . "identifier"
+   31          | . '(' flag_expr ')'
+
+    '!'           shift, and go to state 17
+    '('           shift, and go to state 18
+    "identifier"  shift, and go to state 19
+
+    flag_and   go to state 44
+    flag_not   go to state 24
+    flag_atom  go to state 25
+
+
+state 37
+
+   25 flag_and: flag_and ',' . flag_not
+   28 flag_not: . '!' flag_atom
+   29         | . flag_atom
+   30 flag_atom: . "identifier"
+   31          | . '(' flag_expr ')'
+
+    '!'           shift, and go to state 17
+    '('           shift, and go to state 18
+    "identifier"  shift, and go to state 19
+
+    flag_not   go to state 45
+    flag_atom  go to state 25
+
+
+state 38
+
+   26 flag_and: flag_and '&' . flag_not
+   28 flag_not: . '!' flag_atom
+   29         | . flag_atom
+   30 flag_atom: . "identifier"
+   31          | . '(' flag_expr ')'
+
+    '!'           shift, and go to state 17
+    '('           shift, and go to state 18
+    "identifier"  shift, and go to state 19
+
+    flag_not   go to state 46
+    flag_atom  go to state 25
+
+
+state 39
+
+   18 option_name: "identifier" '[' . "identifier" ']'
+
+    "identifier"  shift, and go to state 47
+
+
+state 40
+
+   13 option_line: flag_spec option_name '=' . option_value "end-of-line"
+   15 option_value: . "option-value"
+   16             | .  ["end-of-line"]
+
+    "option-value"  shift, and go to state 48
+
+    $default  reduce using rule 16 (option_value)
+
+    option_value  go to state 49
+
+
+state 41
+
+    7 profile_header: '[' "identifier" ':' "identifier" ']' . "end-of-line"
+
+    "end-of-line"  shift, and go to state 50
+
+
+state 42
+
+    8 profile_header: '[' "identifier" '>' "identifier" ']' . "end-of-line"
+
+    "end-of-line"  shift, and go to state 51
+
+
+state 43
+
+   31 flag_atom: '(' flag_expr ')' .
+
+    $default  reduce using rule 31 (flag_atom)
+
+
+state 44
+
+   23 flag_or: flag_or '|' flag_and .  [')', '|', '}']
+   25 flag_and: flag_and . ',' flag_not
+   26         | flag_and . '&' flag_not
+
+    ','  shift, and go to state 37
+    '&'  shift, and go to state 38
+
+    $default  reduce using rule 23 (flag_or)
+
+
+state 45
+
+   25 flag_and: flag_and ',' flag_not .
+
+    $default  reduce using rule 25 (flag_and)
+
+
+state 46
+
+   26 flag_and: flag_and '&' flag_not .
+
+    $default  reduce using rule 26 (flag_and)
+
+
+state 47
+
+   18 option_name: "identifier" '[' "identifier" . ']'
+
+    ']'  shift, and go to state 52
+
+
+state 48
+
+   15 option_value: "option-value" .
+
+    $default  reduce using rule 15 (option_value)
+
+
+state 49
+
+   13 option_line: flag_spec option_name '=' option_value . "end-of-line"
+
+    "end-of-line"  shift, and go to state 53
+
+
+state 50
+
+    7 profile_header: '[' "identifier" ':' "identifier" ']' "end-of-line" .
+
+    $default  reduce using rule 7 (profile_header)
+
+
+state 51
+
+    8 profile_header: '[' "identifier" '>' "identifier" ']' "end-of-line" .
+
+    $default  reduce using rule 8 (profile_header)
+
+
+state 52
+
+   18 option_name: "identifier" '[' "identifier" ']' .
+
+    $default  reduce using rule 18 (option_name)
+
+
+state 53
+
+   13 option_line: flag_spec option_name '=' option_value "end-of-line" .
+
+    $default  reduce using rule 13 (option_line)

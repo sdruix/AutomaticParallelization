@@ -1,0 +1,8 @@
+libmcxx_la-cxx-asttype.lo: cxx-asttype.c cxx-asttype.h libmcxx-common.h \
+ cxx-macros.h
+
+cxx-asttype.h:
+
+libmcxx-common.h:
+
+cxx-macros.h:

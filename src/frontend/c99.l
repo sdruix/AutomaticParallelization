@@ -1,0 +1,1652 @@
+/*--------------------------------------------------------------------
+  (C) Copyright 2006-2011 Barcelona Supercomputing Center 
+                          Centro Nacional de Supercomputacion
+  
+  This file is part of Mercurium C/C++ source-to-source compiler.
+  
+  See AUTHORS file in the top level directory for information 
+  regarding developers and contributors.
+  
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 3 of the License, or (at your option) any later version.
+  
+  Mercurium C/C++ source-to-source compiler is distributed in the hope
+  that it will be useful, but WITHOUT ANY WARRANTY; without even the
+  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+  PURPOSE.  See the GNU Lesser General Public License for more
+  details.
+  
+  You should have received a copy of the GNU Lesser General Public
+  License along with Mercurium C/C++ source-to-source compiler; if
+  not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+  Cambridge, MA 02139, USA.
+--------------------------------------------------------------------*/
+
+%{
+/* 
+   This file should be preprocessed with tpp (available in lib)
+   in order to produce c99.l and cxx03.l
+*/
+
+
+
+
+
+
+/*
+   Lexer of ISO/IEC 9899:1999 - C
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <errno.h>
+#include <libgen.h>
+#include "cxx-driver.h"
+#include "cxx-utils.h"
+#include "cxx-lexer.h"
+#include "cxx-ast.h"
+
+#include "c99-parser-internal.h"
+
+
+
+
+
+typedef 
+struct lexer_keyword_tag
+{
+    const char* keyword;
+    int token;
+} lexer_keyword_t;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+static lexer_keyword_t upc_keywords[] =
+{
+    // It is easier to sign these in as normal builtins
+    // { "MYTHREAD", UPC_MYTHREAD },
+    // { "THREADS", UPC_THREADS },
+    // { "UPC_MAX_BLOCKSIZE", UPC_MAX_BLOCKSIZE },
+    { "relaxed", UPC_RELAXED },
+    { "shared", UPC_SHARED },
+    { "strict", UPC_STRICT },
+    { "upc_barrier", UPC_BARRIER },
+    { "upc_blocksizeof", UPC_BLOCKSIZEOF },
+    { "upc_elemsizeof", UPC_ELEMSIZEOF },
+    { "upc_fence", UPC_FENCE },
+    { "upc_forall", UPC_FORALL },
+    { "upc_localsizeof", UPC_LOCALSIZEOF },
+    { "upc_notify", UPC_NOTIFY },
+    { "upc_wait", UPC_WAIT },
+    // Sentinel
+    { NULL, 0 }
+};
+
+
+static lexer_keyword_t cuda_keywords[] =
+{
+    {"__device__" , CUDA_DEVICE},
+    {"__global__", CUDA_GLOBAL},
+    {"__host__", CUDA_HOST},
+    {"__constant__", CUDA_CONSTANT},
+    {"__shared__", CUDA_SHARED},
+    // Sentinel
+    { NULL, 0 }
+};
+
+static int yywrap(void);
+
+static void parse_token_text(void);
+static void parse_token_text_str(const char*);
+
+static int lookup_keyword_in_table(lexer_keyword_t *keyword_table, const char* keyword, char predicate);
+
+struct scan_file_descriptor scanning_now;
+
+static const char* main_input_filename = NULL;
+
+static int pragma_custom_var_list_parentheses = 0;
+
+static const char *current_pragma_prefix = NULL;
+
+static int num_new_lines(const char* c)
+{
+    int result = 0;
+
+    while (*c)
+    {
+        if (*c == '\n') 
+            result++;
+        c++;
+    }
+
+    return result;
+}
+
+static int include_counter = 0;
+
+// static int verbatim_buffer_size = 0;
+// static const char *verbatim_buffer = NULL;
+
+static void verbatim_buffer_append(const char* c);
+static void verbatim_buffer_free(void);
+static const char* verbatim_buffer_get(void);
+
+static const char* return_pragma_prefix_longest_match(const char* prefix, 
+        const char* lexed_directive,
+        pragma_directive_kind_t* kind);
+
+
+%}
+
+ /* Lexical conventions A.2 */
+ /* A.2.1 */
+hexquad         {hexdigit}{hexdigit}{hexdigit}{hexdigit}
+ /* A.2.2 */
+uchar           (\\u{hexquad}|\\U{hexquad}{hexquad})
+ /* A.2.12 */
+nondigit        ([_a-zA-Z]|uchar)
+ /* A.2.13 */
+digit       [0-9]
+ /* A.2.20 */
+nonzero         [1-9]
+ /* A.2.21 */
+octaldigit      [0-7]
+ /* A.2.22 */
+hexdigit        [a-fA-F0-9]
+ /* A.2.23 includes GNU extension of long long */
+int_suffix_size ({longsuffix}|{longlongsuffix})
+int_suffix_sign ({unsignedsuffix})
+
+ /* GCC is very flexible with suffixes */
+integersuffix_1   ({int_suffix_size}(({int_suffix_sign}{complexsuffix}?)|({complexsuffix}{int_suffix_sign}?))?)
+integersuffix_2   ({int_suffix_sign}(({int_suffix_size}{complexsuffix}?)|({complexsuffix}{int_suffix_size}?))?)
+integersuffix_3   ({complexsuffix}(({int_suffix_size}{int_suffix_sign}?)|({int_suffix_sign}{int_suffix_size}?))?)
+
+integersuffix ({integersuffix_1}|{integersuffix_2}|{integersuffix_3})
+
+ /* A.2.24 */
+unsignedsuffix  [uU]
+ /* A.2.25 */
+longsuffix  [lL]
+
+ /* GNU Extension */
+longlongsuffix [lL][lL]
+
+ /* Complex GNU Extension */
+complexsuffix [ji]
+
+ /* A.2.28 */
+cchar       ([^\\'\n]|{escape_seq}|(\\[']))
+
+ /* A.2.29 */
+ /* \e is a GNU extension */
+escape_seq      ((\\["'?eabfnrtv\\])|(\\{octaldigit}{1,3})|((\\x)+{hexdigit}+))
+ /* A.2.34 */
+fractconst  (({digit}*\.{digit}+)|({digit}+(\.)?))
+ /* A.2.35 */
+exponent    ([eE][+-]?{digit}+)
+ /* A.2.38 */
+floatingsuffix_std  [flFL]
+ /* GNU extension for complex floating suffix */
+floatingsuffix  ({floatingsuffix_std}|{floatingsuffix_std}{complexsuffix}|{complexsuffix}{floatingsuffix_std}|{complexsuffix})
+ /* A.2.40 */
+schar       ([^\\"\n]|{escape_seq}|(\\["]))
+
+idnondigit  ({nondigit}|{uchar})
+hexprefix   0[xX]
+
+ /* C99 additional */
+hexadecimal_fractional_constant (({hexdigit}*\.{hexdigit}+)|({hexdigit}\.))
+binary_exponent_part ([pP]([+-])?{digit}+)
+
+ /* Identifier */
+identifier {idnondigit}({idnondigit}|{digit})* 
+
+ /* states */
+%x longcomment
+%x linecomment
+%x preprocess
+%x pragma_line
+%x inline_pragma
+%x unknown_pragma
+%x pragma_custom_directive
+%x pragma_custom_clause
+%x pragma_custom_clause_first
+%x pragma_custom_var_list
+
+%x verbatim_text
+%x verbatim_clauses
+%x verbatim_clauses_args
+
+%%
+ /* preprocess */
+
+"#" { 
+    BEGIN(preprocess); 
+}
+
+<preprocess>[ ]*pragma[ ]+ {
+	BEGIN(pragma_line);
+}
+
+<pragma_line>((mcxx)|(mcc))[ ]+verbatim[ ]+start[ ]* {
+    BEGIN(verbatim_clauses);
+    parse_token_text();
+    return VERBATIM_PRAGMA;
+}
+
+<verbatim_clauses>{
+    
+type {
+    parse_token_text();
+    BEGIN(verbatim_clauses_args);
+    return VERBATIM_TYPE;
+}
+
+[ \t] { } 
+
+[\n] {
+    BEGIN(verbatim_text);
+    scanning_now.line_number++;
+}
+
+}
+
+<verbatim_clauses_args>{
+
+[(] {
+    parse_token_text();
+    return '(';
+}
+
+[)] {
+    parse_token_text();
+    BEGIN(verbatim_clauses);
+    return ')';
+}
+
+[ \t] { }
+
+{identifier} { 
+    parse_token_text();
+    return IDENTIFIER;
+}
+
+[\n] 
+{
+    BEGIN(verbatim);
+    scanning_now.line_number++;
+}
+
+}
+
+<verbatim_text>{
+
+[^\n] {
+    verbatim_buffer_append(yytext);
+}
+
+[\n] {
+    verbatim_buffer_append(yytext);
+    scanning_now.line_number++;
+}
+
+#pragma[ ]+((mcxx)|(mcc))[ ]+verbatim[ ]+end[ ]*\n {
+    BEGIN(INITIAL);
+
+    parse_token_text_str(verbatim_buffer_get());
+    verbatim_buffer_free();
+    
+    scanning_now.line_number++;
+    return VERBATIM_TEXT;
+}
+
+}
+
+<pragma_line>{identifier} {
+	// Custom pragmas
+	int i;
+	char found = 0;
+
+	char matched = 0;
+
+	// Ignore gcc and ident
+    if (!matched 
+            && ((strcasecmp(yytext, "gcc") == 0)
+                || (strcasecmp(yytext, "ident") == 0)))
+	{
+        // All the whole line will be handled as an unknown pragma
+		BEGIN(unknown_pragma);
+        // current yytext must be included in the "unknown pragma"
+		yymore();
+		matched = 1;
+	}
+
+	if (!matched)
+	{
+		for (i = 0; i < CURRENT_CONFIGURATION->num_pragma_custom_prefix; i++)
+		{
+			if (strcmp(yytext, CURRENT_CONFIGURATION->pragma_custom_prefix[i]) == 0)
+            {
+                found = 1;
+                break;
+            }
+		}
+
+		if (!found)
+		{
+			fprintf(stderr, "%s:%d: warning: unknown '#pragma %s'\n", 
+					scanning_now.current_filename,
+					scanning_now.line_number,
+					yytext);
+			BEGIN(unknown_pragma);
+			// Ignore this prefix as an unknown pragma
+			yymore();
+			matched = 1;
+		}
+		else
+		{
+			BEGIN(pragma_custom_directive);
+			parse_token_text();
+            current_pragma_prefix = CURRENT_CONFIGURATION->pragma_custom_prefix[i];
+			return PRAGMA_CUSTOM;
+		}
+	}
+}
+
+<unknown_pragma>{
+  /* This will also catch #pragma gcc and #pragma ident */
+
+[^\n]* {
+	parse_token_text();
+	BEGIN(preprocess);
+	return UNKNOWN_PRAGMA;
+}
+
+}
+
+<pragma_custom_directive>{
+
+{identifier}([ \t]+{identifier})* {
+	BEGIN(pragma_custom_clause_first);
+
+    pragma_directive_kind_t directive_kind = PDK_NONE; 
+
+    // This call will unput appropriately what was lexed too much
+    const char* longest_match = return_pragma_prefix_longest_match(
+            current_pragma_prefix, yytext, &directive_kind);
+
+    if (directive_kind == PDK_NONE)
+    {
+        // Give a chance to the empty "directive" since some ill-designed
+        // pragmas might need this
+        directive_kind = lookup_pragma_directive(current_pragma_prefix, "");
+        parse_token_text(); 
+    }
+    else
+    {
+        parse_token_text_str(longest_match);
+    }
+
+
+    int token = 0;
+    switch (directive_kind)
+    {
+        case PDK_DIRECTIVE : 
+            {
+                token = PRAGMA_CUSTOM_DIRECTIVE;
+                break;
+            }
+        case PDK_CONSTRUCT :
+            {
+                token = PRAGMA_CUSTOM_CONSTRUCT;
+                break;
+            }
+        case PDK_NONE :
+            {
+                running_error("%s:%d: error: unknown directive '%s' for pragma '%s'. Maybe you forgot to register it?",
+                        scanning_now.current_filename, 
+                        scanning_now.line_number,
+                        yytext,
+                        current_pragma_prefix);
+            }
+        default:
+            internal_error("Invalid pragma directive kind kind=%d", directive_kind);
+    }
+
+    current_pragma_prefix = NULL;
+    return token;
+}
+
+\n {
+    // This will cause a fail in the parser, but better this way than a silent \n mislexed
+    scanning_now.line_number++;
+	BEGIN(INITIAL);
+	return PRAGMA_CUSTOM_NEWLINE;
+}
+
+[ \t] {
+	// This blank must be eaten and should be mandatory
+}
+
+}
+
+<pragma_custom_clause_first>{
+
+\n {
+    scanning_now.line_number++;
+	BEGIN(INITIAL);
+	return PRAGMA_CUSTOM_NEWLINE;
+}
+
+{identifier} {
+	// Special case for custom clauses
+	BEGIN(pragma_custom_var_list);
+	parse_token_text(); 
+	return PRAGMA_CUSTOM_CLAUSE; 
+}
+
+[ \t] {
+	// This blank must be eaten
+}
+
+[(] {
+        // Parameter
+	pragma_custom_var_list_parentheses = 1;
+    BEGIN(pragma_custom_var_list);
+    return '(';
+}
+
+}
+
+<pragma_custom_clause>{
+
+\n {
+    scanning_now.line_number++;
+	BEGIN(INITIAL);
+	return PRAGMA_CUSTOM_NEWLINE;
+}
+
+{identifier} {
+	// Special case for custom clauses
+	BEGIN(pragma_custom_var_list);
+	parse_token_text(); 
+	return PRAGMA_CUSTOM_CLAUSE; 
+}
+
+[ \t] {
+	// This blank must be eaten
+}
+
+}
+
+<pragma_custom_var_list>{
+
+[(] {
+	parse_token_text();
+	if (pragma_custom_var_list_parentheses == 0)
+    {
+        pragma_custom_var_list_parentheses++;
+        return '(';
+    }
+    else
+    {
+        pragma_custom_var_list_parentheses++;
+        return PRAGMA_CLAUSE_ARG_TEXT;
+    }
+}
+
+[)] {
+	parse_token_text();
+	pragma_custom_var_list_parentheses--;
+	if (pragma_custom_var_list_parentheses == 0)
+	{
+		BEGIN(pragma_custom_clause);
+        return ')';
+	}
+    else
+    {
+        return PRAGMA_CLAUSE_ARG_TEXT;
+    }
+}
+
+[ \t]+ {
+    // Ignore the blank if we are not yet within any parentheses
+	if (pragma_custom_var_list_parentheses > 0)
+    {
+        parse_token_text();
+        return PRAGMA_CLAUSE_ARG_TEXT;
+    }
+}
+
+{identifier} {
+    if (pragma_custom_var_list_parentheses > 0)
+    {
+        parse_token_text();
+        return PRAGMA_CLAUSE_ARG_TEXT;
+    }
+    else
+    {
+        // We are in .
+        // #pragma foo bar . doe
+        // and 'doe' must be lexed as another custom clause
+        BEGIN(pragma_custom_var_list);
+        parse_token_text(); 
+        return PRAGMA_CUSTOM_CLAUSE; 
+    }
+}
+
+\n {
+    // We found a newline
+    if (pragma_custom_var_list_parentheses != 0)
+    {
+        // Well, we found the newline but parentheses were not 
+        // properly nested
+        fprintf(stderr, "%s:%d: warning: unended custom clause. Skipping.\n",
+                scanning_now.current_filename,
+                scanning_now.line_number);
+    }
+    // Head back to initial state and finish this pragma
+    scanning_now.line_number++;
+    BEGIN(INITIAL);
+    return PRAGMA_CUSTOM_NEWLINE;
+}
+
+  /* Catch all rule */
+[^\n] {
+    parse_token_text();
+    return PRAGMA_CLAUSE_ARG_TEXT;
+}
+
+}
+
+<preprocess>[ ]*line[ ]+[[:digit:]]+([ ]+\"{schar}*\")?[^\n]* {
+ const char *p = yytext;
+
+ // Jump initial blanks (if any)
+ while (*p == ' ')
+    p++;
+
+ // Jump "line" string
+ p += strlen("line");
+
+ // Jump blanks
+ while (*p == ' ')
+   p++;
+
+ // Compute line
+ int line_num = 0;
+ while (*p != ' ' 
+         && *p != '\0' // The filename location is optional
+         )
+ {
+     if (isdigit(*p))
+     {
+         line_num = line_num*10 + ((*p) - '0');
+     }
+     else
+     {
+         internal_error("Digit expected here but '%c' (%x) found", *p, *p);
+     }
+     p++;
+ }
+
+   // Update the line number, note that it is line_num - 1 
+   // because \n is not handled here, but in another rule
+ scanning_now.line_number = (line_num - 1);
+
+ // Jump blanks (if any)
+ while (*p == ' ')
+   p++;
+
+ // If there is a filename, parse it
+ if (*p == '"')
+ {
+     // Now we are on the quote "
+     p++;
+ 
+     char filename[256];
+     memset(filename, 0, 256);
+ 
+     char *f = filename;
+ 
+     while (*p != '"')
+     {
+         if (f < &(filename[255]))
+         {
+             (*f) = *p;
+             f++;
+         }
+         p++;
+     }
+
+     // Update the file 
+	scanning_now.current_filename = uniquestr(filename);
+ }
+}
+
+<preprocess>[ ]{digit}+[ ]+["][^"]+["][^\n]* {
+	char* directive = yytext;
+
+	// Jump the blank
+	directive++;
+
+	int line_num = 0;
+	while (*directive != ' ')
+	{
+		if (isdigit(*directive))
+		{
+			line_num = line_num*10 + ((*directive) - '0');
+		}
+		else
+		{
+			internal_error("Digit expected here but '%c' found", *directive);
+		}
+		directive++;
+	}
+
+	// Now directive is over the blank after the digits. Jump the blank
+	directive++;
+
+	// Now we are over the doublequote. Jump it
+	directive++;
+
+	char filename[256];
+	memset(filename, 0, 256);
+
+	char* p = filename;
+
+	while (*directive != '"')
+	{
+        if (p < &(filename[255]))
+        {
+            *p = *directive;
+            p++;
+        }
+		directive++;
+	}
+
+	// Now we have the new number line and the new file name
+
+    // Check include flags from GNU cpp and other preprocessors.
+    // We are on the the doublequote, jump it.
+    directive++;
+
+    // Advance the directive till the next nonblank
+    while (*directive == ' ')
+    {
+        directive++;
+    }
+
+    // Get the flags
+    char start_of_new_file = 0;
+    char return_of_a_file = 0;
+    char system_header_file = 0;
+    char extern_c_block = 0;
+    while (*directive == ' '
+            || isdigit(*directive))
+    {
+        int current_flag = 0;
+        while (isdigit(*directive))
+        {
+            current_flag = current_flag * 10 +  (*directive - '0');
+            directive++;
+        }
+
+        switch (current_flag)
+        {
+            case 1:
+                {
+                    start_of_new_file = 1;
+                    break;
+                }
+            case 2:
+                {
+                    return_of_a_file = 1;
+                    break;
+                }
+            case 3:
+                {
+                    system_header_file = 1;
+                    break;
+                }
+            case 4:
+                {
+                    extern_c_block = 1;
+                    break;
+                }
+            default:
+                // Ignore it
+                break;
+        }
+
+        // Advance the directive till the next nonblank
+        while (*directive == ' ')
+        {
+            directive++;
+        }
+    }
+
+    // if (system_header_file)
+    // {
+    //     char path[256];
+    //     strncpy(path, filename, 255);
+
+    //     char *name_without_path = basename(path);
+    //     strncpy(filename, name_without_path, 255);
+    // }
+
+    if (start_of_new_file 
+            || system_header_file)
+    {
+        if (include_counter == 0)
+        {
+            top_level_include_t *new_top_level_include = calloc(1, sizeof(*new_top_level_include));
+
+            new_top_level_include->included_file = uniquestr(filename);
+
+            if (system_header_file)
+            {
+                new_top_level_include->system_include = 1;
+            }
+
+            P_LIST_ADD(CURRENT_COMPILED_FILE->top_level_include_list,
+                    CURRENT_COMPILED_FILE->num_top_level_includes,
+                    new_top_level_include);
+        }
+    }
+
+    if (start_of_new_file)
+    {
+        include_counter++;
+    }
+
+    if (return_of_a_file)
+    {
+        include_counter = (include_counter > 0) ? (include_counter - 1) : 0;
+    }
+
+    // Update the line number, note that it is line_num - 1 
+    // because \n is not handled here, but in another rule
+	scanning_now.line_number = (line_num - 1);
+    // Update file
+	scanning_now.current_filename = uniquestr(filename);
+}
+
+<preprocess>.       { /* ignore line */  }
+<preprocess>\n  { scanning_now.line_number++; BEGIN(INITIAL); }
+
+ /* _Pragma */
+"_Pragma" { BEGIN(inline_pragma); pragma_custom_var_list_parentheses = 0; }
+<inline_pragma>{
+"(" {
+    pragma_custom_var_list_parentheses++;
+}
+
+")" {
+    pragma_custom_var_list_parentheses--;
+
+    if (pragma_custom_var_list_parentheses == 0)
+        BEGIN(INITIAL);
+}
+
+ /* Ignore it */
+. {
+}
+      
+}
+
+ /* C comments ( 6.4.9 ) */
+
+ /* // comments. // can be splitted across different lines */
+
+"/"(\\\n)*"/"       { 
+    scanning_now.line_number += num_new_lines(yytext); 
+    BEGIN(linecomment); 
+}
+
+ /* escaped new line does not end comment */
+<linecomment>\\\n   { scanning_now.line_number++; }
+<linecomment>.      { /* ignore comment */  }
+<linecomment>\n     { scanning_now.line_number++; BEGIN(INITIAL); }
+
+ /* long C comments. tags can be splitted across diferent lines */
+
+"/"(\\\n)*"*"               { 
+    scanning_now.line_number += num_new_lines(yytext);
+    BEGIN(longcomment); 
+}
+<longcomment>\n             { scanning_now.line_number++; }
+<longcomment>.              { /* ignore comment */ }
+<longcomment>"*"(\\\n)*"/"  { 
+    scanning_now.line_number += num_new_lines(yytext);
+    BEGIN(INITIAL); 
+}
+
+
+ /* A.2.11 */
+"char"          { parse_token_text(); return TOKEN_CHAR; }
+
+
+
+
+
+"_Bool"          { parse_token_text(); return TOKEN_BOOL; }
+
+"short"         { parse_token_text(); return TOKEN_SHORT; }
+"int"           { parse_token_text(); return TOKEN_INT; }
+"long"          { parse_token_text(); return TOKEN_LONG; }
+"signed"        { parse_token_text(); return TOKEN_SIGNED; }
+"__signed"        { parse_token_text(); return TOKEN_SIGNED; }
+"__signed__"        { parse_token_text(); return TOKEN_SIGNED; }
+"unsigned"      { parse_token_text(); return TOKEN_UNSIGNED; }
+"float"         { parse_token_text(); return TOKEN_FLOAT; }
+"double"        { parse_token_text(); return TOKEN_DOUBLE; }
+"void"          { parse_token_text(); return TOKEN_VOID; }
+
+"typedef"       { parse_token_text(); return TYPEDEF; }
+"enum"          { parse_token_text(); return ENUM; } 
+"struct"        { parse_token_text(); return STRUCT; } 
+"auto"          { parse_token_text(); return AUTO; } 
+"register"      { parse_token_text(); return REGISTER; } 
+"static"        { parse_token_text(); return STATIC; } 
+"extern"        { parse_token_text(); return EXTERN; } 
+"inline"        { parse_token_text(); return INLINE; } 
+"const"         { parse_token_text(); return TOKEN_CONST; } 
+"volatile"      { parse_token_text(); return TOKEN_VOLATILE; } 
+"union"         { parse_token_text(); return UNION; } 
+"asm"           { parse_token_text(); return ASM; } 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"sizeof"        { parse_token_text(); return SIZEOF; }
+"case"          { parse_token_text(); return CASE; }
+"default"       { parse_token_text(); return DEFAULT; }
+"if"            { parse_token_text(); return IF; }
+"else"          { parse_token_text(); return ELSE; }
+"switch"        { parse_token_text(); return SWITCH; }
+"while"         { parse_token_text(); return WHILE; }
+"do"            { parse_token_text(); return DO; }
+"for"           { parse_token_text(); return FOR; }
+"break"         { parse_token_text(); return BREAK; }
+"continue"      { parse_token_text(); return CONTINUE; }
+"goto"          { parse_token_text(); return GOTO; }
+"return"        { parse_token_text(); return RETURN; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ /* GNU Extensions */
+"__builtin_va_arg" { parse_token_text(); return BUILTIN_VA_ARG; }
+"__builtin_offsetof" { parse_token_text(); return BUILTIN_OFFSETOF; }
+
+"__builtin_choose_expr" { parse_token_text(); return BUILTIN_CHOOSE_EXPR; }
+"__builtin_types_compatible_p" { parse_token_text(); return BUILTIN_TYPES_COMPATIBLE_P; }
+
+"__extension__" { parse_token_text(); return EXTENSION; }
+"__alignof" { parse_token_text(); return ALIGNOF; }
+"__alignof__" { parse_token_text(); return ALIGNOF; }
+"__ALIGNOF__" { parse_token_text(); return ALIGNOF; }
+"__real" { parse_token_text(); return REAL; }
+"__real__" { parse_token_text(); return REAL; }
+"__imag__" { parse_token_text(); return IMAG; }
+"__label__" { parse_token_text(); return LABEL; }
+"__complex" { parse_token_text(); return COMPLEX; }
+"__complex__" { parse_token_text(); return COMPLEX; }
+"_Complex" { parse_token_text(); return COMPLEX; }
+
+"_Imaginary" { parse_token_text(); return IMAGINARY; }
+
+"typeof" { parse_token_text(); return TYPEOF; }
+"__typeof" { parse_token_text(); return TYPEOF; }
+"__typeof__" { parse_token_text(); return TYPEOF; }
+"restrict" { parse_token_text(); return RESTRICT; /* This should be only for C99 but we will be lax here */ }
+"__restrict" { parse_token_text(); return RESTRICT; }
+"__restrict__" { parse_token_text(); return RESTRICT; }
+"__const" { parse_token_text(); return TOKEN_CONST; }
+"__const__" { parse_token_text(); return TOKEN_CONST; }
+"__attribute" { parse_token_text(); return ATTRIBUTE; }
+"__attribute__" { parse_token_text(); return ATTRIBUTE; }
+"__thread" { parse_token_text(); return THREAD; } 
+"__inline"        { parse_token_text(); return INLINE; } 
+"__inline__"        { parse_token_text(); return INLINE; } 
+"__volatile"        { parse_token_text(); return TOKEN_VOLATILE; } 
+"__volatile__"        { parse_token_text(); return TOKEN_VOLATILE; } 
+"__asm" { parse_token_text(); return ASM; }
+"__asm__" { parse_token_text(); return ASM; }
+ /* XL Compiler extensions */
+ "_Builtin" { parse_token_text(); return XL_BUILTIN_SPEC; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ /* UPC Extensions */
+"relaxed" |
+"shared" |
+"strict" |
+"upc_barrier" |
+"upc_blocksizeof" |
+"upc_elemsizeof" |
+"upc_fence" |
+"upc_forall" |
+"upc_localsizeof" |
+"upc_notify" |
+"upc_wait" {
+    return lookup_keyword_in_table(upc_keywords, yytext, CURRENT_CONFIGURATION->enable_upc);
+}
+
+
+ /* CUDA keywords */
+"__device__" |
+"__global__" |
+"__host__" |
+"__constant__" |
+"__shared__" {
+    return lookup_keyword_in_table(cuda_keywords, yytext, CURRENT_CONFIGURATION->enable_cuda);
+}
+
+ /* mcxx extensions */
+"__construct__" { parse_token_text(); return CONSTRUCT; }
+
+ /* Special tokens for subparsing */
+@EXPRESSION@ { parse_token_text(); return SUBPARSE_EXPRESSION; }
+@EXPRESSION-LIST@ { parse_token_text(); return SUBPARSE_EXPRESSION_LIST; }
+@STATEMENT@ { parse_token_text(); return SUBPARSE_STATEMENT; }
+@DECLARATION@ { parse_token_text(); return SUBPARSE_DECLARATION; }
+@TYPE@ { parse_token_text(); return SUBPARSE_TYPE; }
+@TYPE-LIST@ { parse_token_text(); return SUBPARSE_TYPE_LIST; }
+@ID_EXPRESSION@ { parse_token_text(); return SUBPARSE_ID_EXPRESSION; }
+@OMP_OPERATOR_NAME@ { parse_token_text(); return SUBPARSE_OMP_OPERATOR_NAME; }
+@OMP_UDR_DECLARE@ { parse_token_text(); return SUBPARSE_OMP_UDR_DECLARE; }
+@OMP_UDR_DECLARE_2@ { parse_token_text(); return SUBPARSE_OMP_UDR_DECLARE_2; }
+@OMP_UDR_IDENTITY@ { parse_token_text(); return SUBPARSE_OMP_UDR_IDENTITY; }
+@OMP_UDR_CONSTRUCTOR@ { parse_token_text(); return OMP_UDR_CONSTRUCTOR; }
+
+
+
+ /* Special tokens for prettyprinted comments and preprocessor elements */
+@-C-@[^@]*@-CC-@ { parse_token_text(); return PP_COMMENT; }
+@-P-@[^@]*@-PP-@ { parse_token_text(); return PP_TOKEN; }
+ /* Special tokens for placeholders */
+@STATEMENT-PH::0[xX]{hexdigit}+@ { parse_token_text(); return STATEMENT_PLACEHOLDER; }
+ /* Special tokens for parsing superscalar related things */
+@SUPERSCALAR_DECLARATOR@ { parse_token_text(); return SUBPARSE_SUPERSCALAR_DECLARATOR; }
+@SUPERSCALAR_DECLARATOR_LIST@ { parse_token_text(); return SUBPARSE_SUPERSCALAR_DECLARATOR_LIST; }
+@SUPERSCALAR_EXPRESSION@ { parse_token_text(); return SUBPARSE_SUPERSCALAR_EXPRESSION; }
+
+ /* A plain identifier */
+{identifier} {parse_token_text(); return IDENTIFIER; }
+
+ /* A.2.17 */
+{nonzero}({digit})*{integersuffix}?     { parse_token_text(); return DECIMAL_LITERAL; }
+
+ /* A.2.18 */
+0*{octaldigit}*{integersuffix}?         { parse_token_text(); return OCTAL_LITERAL; }
+
+ /* A.2.19 */
+{hexprefix}{hexdigit}+{integersuffix}?  { parse_token_text(); return HEXADECIMAL_LITERAL; }
+
+ /* A.2.26 */
+L?'{cchar}*'        { parse_token_text(); return CHARACTER_LITERAL; }
+
+ /* A.2.33 */
+{fractconst}{exponent}?{floatingsuffix}?        { parse_token_text();
+return FLOATING_LITERAL; }
+
+ /* C99 additional */
+{hexprefix}{hexadecimal_fractional_constant}{binary_exponent_part}({floatingsuffix})? { 
+    parse_token_text(); 
+    return HEXADECIMAL_FLOAT; 
+}
+
+{hexprefix}{hexdigit}+{binary_exponent_part}({floatingsuffix})? { 
+    parse_token_text(); 
+    return HEXADECIMAL_FLOAT; 
+}
+
+ /* A.2.39 */
+L?\"{schar}*\"      { parse_token_text(); return STRING_LITERAL; }
+
+
+"["         { parse_token_text(); return '['; }
+"]"         { parse_token_text(); return ']'; }
+")"         { parse_token_text(); return ')'; }
+"("         { parse_token_text(); return '('; }
+"->"        { parse_token_text(); return PTR_OP; }
+
+
+
+"++"        { parse_token_text(); return PLUSPLUS; }
+"--"        { parse_token_text(); return MINUSMINUS; }
+"+"         { parse_token_text(); return '+'; }
+"-"         { parse_token_text(); return '-'; }
+"~"         { parse_token_text(); return '~'; }
+"!"         { parse_token_text(); return '!'; }
+"/"         { parse_token_text(); return '/'; }
+"%"         { parse_token_text(); return '%'; }
+"<<"        { parse_token_text(); return LEFT; }
+"<<<"       { 
+     if (CURRENT_CONFIGURATION->enable_cuda)
+     {
+         parse_token_text();
+         return CUDA_KERNEL_LEFT;
+     }
+     REJECT;
+}
+ /* There is no '>>' token in C++ but AB1 followed by '>', see below */
+
+">>"        { parse_token_text(); return RIGHT; }
+">>>"       { 
+    if (CURRENT_CONFIGURATION->enable_cuda)
+    {
+        parse_token_text();
+        return CUDA_KERNEL_RIGHT;
+    }
+    REJECT;
+}
+
+"<="        { parse_token_text(); return LESS_OR_EQUAL; }
+ /* There is no '>=' token in C++ but AB2 followed by '=', see below */
+
+">="        { parse_token_text(); return GREATER_OR_EQUAL; }
+
+"=="        { parse_token_text(); return EQUAL; }
+"!="        { parse_token_text(); return NOT_EQUAL; }
+"^"         { parse_token_text(); return '^'; }
+"|"         { parse_token_text(); return '|'; }
+"&&"        { parse_token_text(); return ANDAND; }
+"||"        { parse_token_text(); return OROR; }
+"="         { parse_token_text(); return '='; }
+"*="        { parse_token_text(); return MUL_ASSIGN; }
+"/="        { parse_token_text(); return DIV_ASSIGN; }
+"%="        { parse_token_text(); return MOD_ASSIGN; }
+"+="        { parse_token_text(); return ADD_ASSIGN; }
+"-="        { parse_token_text(); return SUB_ASSIGN; }
+"<<="       { parse_token_text(); return LEFT_ASSIGN; }
+ /* There is no '>>=' in C++ but AB1 followed by 'AB2' and '=', see below */
+
+">>="       { parse_token_text(); return RIGHT_ASSIGN; }
+
+"&="        { parse_token_text(); return AND_ASSIGN; }
+"^="        { parse_token_text(); return XOR_ASSIGN; }
+"|="        { parse_token_text(); return OR_ASSIGN; }
+
+
+
+";"         { parse_token_text(); return ';'; } 
+":"         { parse_token_text(); return ':'; }
+"."         { parse_token_text(); return '.'; }
+","         { parse_token_text(); return ','; }
+"?"         { parse_token_text(); return '?'; }
+"{"         { parse_token_text(); return '{'; }
+"}"         { parse_token_text(); return '}'; } 
+"<"         { parse_token_text(); return '<'; }
+
+
+
+
+
+
+
+
+">"         { parse_token_text(); return '>'; } 
+
+"&"         { parse_token_text(); return '&'; }
+"*"         { parse_token_text(); return '*'; }
+"\""        { parse_token_text(); return '"'; }
+
+
+
+"..."       { parse_token_text(); return ELLIPSIS; }
+
+".."        { parse_token_text(); return TWO_DOTS; }
+
+[\n]        { scanning_now.line_number++; }
+[ \t\v\f]   {  }
+<*>.           { 
+    /* ignore bad characters */ 
+    if (isgraph(*yytext))
+    {
+        fprintf(stderr, "%s:%d: warning: unknown character '%c' (%#x). Ignoring it.\n", 
+				scanning_now.current_filename, scanning_now.line_number,
+                *yytext, *yytext);
+    }
+    else
+    {
+        fprintf(stderr, "%s:%d: warning: unknown character %#x. Ignoring it.\n", 
+				scanning_now.current_filename, scanning_now.line_number,
+                *yytext);
+    }
+}
+
+
+%%
+
+static int yywrap(void)
+{
+    return 1;
+}
+
+
+
+
+
+#define FLEX_LVAL mc99lval
+
+
+static void parse_token_text(void)
+{
+    FLEX_LVAL.token_atrib.token_line = scanning_now.line_number;
+    FLEX_LVAL.token_atrib.token_file = uniquestr(scanning_now.current_filename);
+    FLEX_LVAL.token_atrib.token_text = uniquestr(yytext);
+}
+
+static void parse_token_text_str(const char* c)
+{
+    FLEX_LVAL.token_atrib.token_line = scanning_now.line_number;
+    FLEX_LVAL.token_atrib.token_file = uniquestr(scanning_now.current_filename);
+    FLEX_LVAL.token_atrib.token_text = uniquestr(c);
+}
+
+
+
+
+
+
+
+
+#define OPEN_FILE_FOR_SCANNING mc99_open_file_for_scanning
+#define PREPARE_STRING_FOR_SCANNING mc99_prepare_string_for_scanning
+#define TL_SOURCE_STRING mc99_tl_source_string
+
+
+char* TL_SOURCE_STRING = "(tl-source-string)";
+
+int PREPARE_STRING_FOR_SCANNING(const char* str)
+{
+    static int num_string = 0;
+	DEBUG_CODE()
+	{
+		fprintf(stderr, "Going to parse string '%s'\n", str);
+	}
+	memset(&scanning_now, 0, sizeof(scanning_now));
+	scanning_now.line_number = 1;
+
+	const char* current_filename = CURRENT_COMPILED_FILE->input_filename;
+
+    char c[256];
+    sprintf(c, "%s%s-%d", TL_SOURCE_STRING, current_filename, num_string);
+    c[255] = '\0';
+    scanning_now.filename = uniquestr(c);
+
+    scanning_now.current_filename = scanning_now.filename;
+
+    num_string++;
+
+	scanning_now.scanning_buffer = yy_scan_string(str);
+
+	// yy_flush_buffer(YY_CURRENT_BUFFER);
+	yy_switch_to_buffer(scanning_now.scanning_buffer);
+
+	return 0;
+}
+
+int OPEN_FILE_FOR_SCANNING(const char* scanned_filename, const char* input_filename)
+{
+	FILE* file;
+
+	file = fopen(scanned_filename, "r");
+
+	if (file == NULL)
+	{
+		running_error("error: cannot open file '%s' (%s)", scanned_filename, strerror(errno));
+	}
+
+	memset(&scanning_now, 0, sizeof(scanning_now));
+	scanning_now.filename = uniquestr(scanned_filename);
+	scanning_now.file_descriptor = file;
+	scanning_now.line_number = 1;
+
+	main_input_filename = uniquestr(input_filename);
+    scanning_now.current_filename = main_input_filename;
+
+	scanning_now.scanning_buffer = yy_create_buffer(file, YY_BUF_SIZE);
+
+	// yy_flush_buffer(YY_CURRENT_BUFFER);
+	yy_switch_to_buffer(scanning_now.scanning_buffer);
+
+	return 0;
+}
+
+
+
+void close_scanned_file(void)
+{
+    if (scanning_now.file_descriptor != NULL)
+    {
+        fclose(scanning_now.file_descriptor);
+    }
+}
+
+static pragma_directive_kind_t lookup_pragma_directive_inner(pragma_directive_set_t* pragma_directive_set, 
+        const char *directive)
+{
+    int j;
+    for (j = 0; j < pragma_directive_set->num_directives; j++)
+    {
+        if (strcmp(pragma_directive_set->directive_names[j], directive) == 0)
+        {
+            return pragma_directive_set->directive_kinds[j];
+        }
+    }
+
+    return PDK_NONE;
+}
+
+pragma_directive_kind_t lookup_pragma_directive(const char* prefix, const char* directive)
+{
+    int i;
+    for (i = 0; i < CURRENT_CONFIGURATION->num_pragma_custom_prefix; i++)
+    {
+        if (strcmp(CURRENT_CONFIGURATION->pragma_custom_prefix[i], prefix) == 0)
+        {
+            pragma_directive_set_t* pragma_directive_set = CURRENT_CONFIGURATION->pragma_custom_prefix_info[i];
+            return lookup_pragma_directive_inner(pragma_directive_set, directive);
+        }
+    }
+
+    return PDK_NONE;
+}
+
+static void register_new_directive_inner(pragma_directive_set_t* pragma_directive_set,
+        const char* directive, pragma_directive_kind_t kind)
+{
+    int num_directives = pragma_directive_set->num_directives;
+    P_LIST_ADD(pragma_directive_set->directive_names,
+            num_directives,
+            uniquestr(directive));
+    P_LIST_ADD(pragma_directive_set->directive_kinds,
+            pragma_directive_set->num_directives,
+            kind);
+}
+
+void register_new_directive(const char* prefix, const char* directive, char is_construct, char bound_to_single_stmt)
+{
+    pragma_directive_kind_t kind = (is_construct ? PDK_CONSTRUCT : PDK_DIRECTIVE);
+
+    if (kind == PDK_CONSTRUCT 
+            && bound_to_single_stmt)
+    {
+        kind = PDK_CONSTRUCT_NOEND;
+    }
+
+    int i;
+    for (i = 0; i < CURRENT_CONFIGURATION->num_pragma_custom_prefix; i++)
+    {
+        if (strcmp(CURRENT_CONFIGURATION->pragma_custom_prefix[i], prefix) == 0)
+        {
+            pragma_directive_set_t* pragma_directive_set = CURRENT_CONFIGURATION->pragma_custom_prefix_info[i];
+
+            int j;
+            for (j = 0; j < pragma_directive_set->num_directives; j++)
+            {
+                if (strcmp(pragma_directive_set->directive_names[j], directive) == 0)
+                {
+                    fprintf(stderr, "Warning, directive or construct "
+                            "'%s' already registered for pragma '%s'"
+                            ", ignoring additional registrations\n",
+                            directive, prefix);
+                    return;
+                }
+            }
+
+            register_new_directive_inner(pragma_directive_set, directive, kind);
+        }
+    }
+}
+
+
+static char* _verbatim_buffer = NULL;
+static int _verbatim_buffer_length = 0;
+static int _verbatim_buffer_capacity = 0;
+
+#define BUFF_SIZE 512
+
+static void verbatim_buffer_append(const char* c)
+{
+    const char* p = c;
+
+    // This may be regarded a bit inefficient but it is safer this way
+    while (*p != '\0')
+    {
+        ERROR_CONDITION((_verbatim_buffer_length > _verbatim_buffer_capacity), 
+                "Verbatim buffer overflow", 0);
+
+        if (_verbatim_buffer_length == _verbatim_buffer_capacity)
+        {
+            // Enlarge verbatim buffer
+            _verbatim_buffer_capacity += BUFF_SIZE;
+            _verbatim_buffer = realloc(_verbatim_buffer, sizeof(char) * _verbatim_buffer_capacity);
+            int i;
+            for (i = _verbatim_buffer_length; i < _verbatim_buffer_capacity; i++)
+            {
+                _verbatim_buffer[i] = '\0';
+            }
+        }
+
+        ERROR_CONDITION(!(_verbatim_buffer_length < _verbatim_buffer_capacity),
+                "Wrong logic in verbatim buffer handling", 0);
+
+        _verbatim_buffer[_verbatim_buffer_length] = *p;
+        _verbatim_buffer_length++;
+
+        p++;
+    }
+}
+
+static void verbatim_buffer_free(void)
+{
+    free(_verbatim_buffer);
+    _verbatim_buffer = NULL;
+    _verbatim_buffer_length = 0;
+    _verbatim_buffer_capacity = 0;
+}
+
+static const char* verbatim_buffer_get(void)
+{
+    return _verbatim_buffer;
+}
+
+// I hate that this is not C90
+static char is_blank(char c)
+{
+    return (c == ' ') || (c == '\t');
+}
+
+static int compute_length_match(const char* lexed_directive,
+        const char* available_directive,
+        const char **discard_source)
+{
+    int num_matches = 0;
+    {
+    char* lexed = strdup(lexed_directive);
+    char* available = strdup(available_directive);
+
+    char *next_lexed_info = NULL;
+    char *next_lexed = strtok_r(lexed, " ", &next_lexed_info);
+    char *next_available_info = NULL;
+    char *next_available = strtok_r(available, "|", &next_available_info);
+
+    while (next_lexed != NULL
+            && next_available != NULL)
+    {
+        if (strcmp(next_lexed, next_available) == 0)
+        {
+            num_matches++;
+            next_lexed = strtok_r(NULL, " ", &next_lexed_info);
+            next_available = strtok_r(NULL, "|", &next_available_info);
+        }
+        else
+        {
+            // Failing one match is enough to discard all of it so we favour
+            // the longest match and discard all partial matches
+            num_matches = 0;
+            break;
+        }
+    }
+
+    free(available);
+    free(lexed);
+    }
+
+    // Compute the length of the discards
+    const char* p = lexed_directive;
+
+    *discard_source = NULL;
+    if (num_matches != 0)
+    {
+        ERROR_CONDITION((*p == ' ') || (*p == '\t'), 
+                "Invalid lexing, there should not be a leading blank", 0);
+
+        // Skip first match
+        while (*p != '\0' 
+                && !is_blank(*p))
+        {
+            p++;
+        }
+
+        int n = num_matches - 1;
+        while ((n > 0)
+                && (*p != '\0'))
+        {
+            // Now advance blanks
+            while ((*p != '\0')
+                    && is_blank(*p))
+            {
+                p++;
+            }
+            // And now, non-blanks
+            while ((*p != '\0')
+                    && !is_blank(*p))
+            {
+                p++;
+            }
+            n--;
+        }
+
+        if (*p != '\0')
+        {
+            *discard_source = p;
+        }
+    }
+
+    return num_matches;
+}
+
+static const char* return_pragma_prefix_longest_match_inner(pragma_directive_set_t* pragma_directive_set,
+        const char* lexed_directive,
+        const char **discard_source,
+        pragma_directive_kind_t* directive_kind)
+{
+    const char* longest_match_so_far = NULL;
+    int length_match = 0;
+
+    int j;
+    for (j = 0; j < pragma_directive_set->num_directives; j++)
+    {
+        const char * current_discard_source = NULL;
+
+        int current_match = compute_length_match(lexed_directive, pragma_directive_set->directive_names[j], 
+                &current_discard_source);
+
+        if (current_match > length_match)
+        {
+            length_match = current_match;
+            longest_match_so_far = pragma_directive_set->directive_names[j];
+            *discard_source = current_discard_source;
+            *directive_kind = pragma_directive_set->directive_kinds[j];
+        }
+    }
+
+    return longest_match_so_far;
+}
+
+static const char* return_pragma_prefix_longest_match(const char* prefix, 
+        const char* lexed_directive,
+        pragma_directive_kind_t* kind)
+{
+    const char* longest_match = NULL;
+    const char* discard_source = NULL;
+
+    int i;
+    for (i = 0; i < CURRENT_CONFIGURATION->num_pragma_custom_prefix; i++)
+    {
+        if (strcmp(CURRENT_CONFIGURATION->pragma_custom_prefix[i], prefix) == 0)
+        {
+            pragma_directive_set_t* pragma_directive_set = CURRENT_CONFIGURATION->pragma_custom_prefix_info[i];
+            longest_match = return_pragma_prefix_longest_match_inner(pragma_directive_set, lexed_directive, 
+                    &discard_source, kind);
+        }
+    }
+
+    if (discard_source != NULL
+            && strlen(discard_source) > 0)
+    {
+        // Discard the characters "too much lexed"
+        const char* end = discard_source;
+
+        while (*end != '\0')
+            end++;
+
+        end--;
+
+        while (end != discard_source)
+        {
+            unput(*end);
+            end--;
+        }
+    }
+
+    return longest_match;
+}
+
+static int lookup_keyword_in_table(lexer_keyword_t *keyword_table, const char* keyword, char predicate)
+{
+    if (!predicate)
+    {
+        parse_token_text();
+        return IDENTIFIER;
+    }
+
+    int i = 0;
+    while (keyword_table[i].keyword != NULL)
+    {
+        if (strcmp(keyword_table[i].keyword, keyword) == 0)
+        {
+            parse_token_text();
+            return keyword_table[i].token;
+        }
+        i++;
+    }
+
+    internal_error("%s:%d: error: unhandled lookup token '%s'", 
+            scanning_now.filename,
+            scanning_now.line_number,
+            keyword);
+}
+
+// Shut up the compiler
+#ifndef YY_NO_INPUT
+#ifdef __cplusplus
+    UNUSED_PARAMETER static int yyinput (void);
+#else
+    UNUSED_PARAMETER static int input  (void);
+#endif
+#endif
