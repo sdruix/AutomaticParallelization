@@ -2,21 +2,17 @@
 #include <unistd.h>
 #include <string.h>
 #include <math.h>
-#include "mpi.h"
 
 
 /* Default problem size. */
 #ifndef NI
-# define NI 4000
+# define NI 10
 #endif
 #ifndef NJ
-# define NJ 4000
+# define NJ 10
 #endif
 #ifndef NK
-# define NK 4000
-#endif
-#ifndef NL
-# define NL 4000
+# define NK 10
 #endif
 
 
@@ -27,8 +23,7 @@ double beta2;
 double C[NI][NJ];
 double A[NI][NK];
 double B[NK][NJ];
-double D[NJ][NL];
-double E[NI][NL];
+
 
 static void init_array() {
   int i, j;
@@ -62,7 +57,6 @@ int main(int argc, char** argv) {
   int ni = NI;
   int nj = NJ;
   int nk = NK;
-  int nl = NL;
 
   /* Initialize array. */
   init_array();
@@ -81,6 +75,5 @@ for (i = 0; i < ni; i++)
     for (k = 0; k < nk; ++k)
       C[i][j] += A[i][k] * B[k][j];
   }
-  double a = C[0][0];
   return 0;
 }
