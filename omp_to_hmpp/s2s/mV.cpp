@@ -33,7 +33,7 @@ return c;
 
 
 int getdir(string dir, vector<string> &files);
-std::string GetFileExtension(const std::string& FileName);
+std::string getFileExtension(const std::string& FileName);
 void doPause();
 void compile(vector<string> files, string cP, string codesDir, string execDir, int pause, int verbose);
 void execute(vector<string> files, string csvP, string errP, string codesDir, string execDir, int rep, int tries, int pause);
@@ -118,7 +118,7 @@ int getdir(string dir, vector<string> &files) {
     return 0;
 }
 
-std::string GetFileExtension(const std::string& FileName) {
+std::string getFileExtension(const std::string& FileName) {
     if (FileName.find_last_of(".") != std::string::npos)
         return FileName.substr(FileName.find_last_of(".") + 1);
     return "";
@@ -794,23 +794,8 @@ int generateVersions(int lvl1, int lvl2, int j, string codesFolder, string filen
     memset(lvl2A, 0, 2*sizeof(int));
     int indx = 3;
     binary(lvl1,indx, lvl1A,4);
-//    cout<<lvl1<<"->";
-//    for(int o=0;o<4;++o){
-//        if(o!=0)
-//            cout<<",";
-//        cout<<lvl1A[o];
-//    }
-//    cout<<endl;
     indx = 1;
-//    cout<<lvl2<<"->";
     binary(lvl2,indx, lvl2A,2);
-//    for(int o1=0;o1<2;++o1){
-//        if(o1!=0)
-//            cout<<",";
-//        cout<<lvl2A[o1];
-//    }
-//    cout<<endl;
-//    cin.get();
 
     int numCombinations =0;
     
@@ -842,7 +827,6 @@ int generateVersions(int lvl1, int lvl2, int j, string codesFolder, string filen
         transformations.close();
         name << transfer[t];
         numCombinations+= doTransform(inlin, extKind,codesFolder, filename, name.str());
-        //std::cin.get();
         numCombinations+= generatePragmaCombinationVersions(inlin, extKind,codesFolder, filename, name.str());
     } 
     delete lvl1A;
@@ -1061,7 +1045,9 @@ void createFolders(string codesFolder, string logFolder, string execFolder) {
     createExecFolder << "mkdir " << codesFolder << "/" << execFolder <<" > /dev/null";
     system(createExecFolder.str().c_str());
 }
-
+inline bool exists(const std::string& name) {
+    return ( access( name.c_str(), F_OK ) != -1 );
+}
 int main(int argc, char *argv[]) {
 
     ofstream groupFile;
@@ -1194,8 +1180,14 @@ int main(int argc, char *argv[]) {
 	cerr<<"-f <filename to convert>"<<endl;
 	exit(-1);
     }
+    
+    if(!exists(filename.c_str())){
+	cerr<<"The filename specified does not exist"<<endl;
+	exit(-1);
+    } 
+    
     int extKind = 0;
-    string extension = GetFileExtension(filename);
+    string extension = getFileExtension(filename);
     if (extension.compare("c") == 0) {
         extKind = 0;
     } else if (extension.compare("cpp") == 0) {
