@@ -1,9 +1,9 @@
 
 
-OpenMP2Parallel
+Automatic Parallelization for heteregenous architectures
 ==========
 
-Custom OpenMP2Parallel + Mercurium Framework installation and configuration for Linux. 
+Custom Source-To-Source Compilers + Mercurium Framework installation and configuration for Linux. 
 
 <br />
 Introduction
