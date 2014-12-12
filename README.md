@@ -1,6 +1,6 @@
 
 
-#Automatic Parallelization for heteregenous architectures
+#Automatic Parallelization for Heteregenous Architectures
 
 
 Custom Source-To-Source Compilers + Mercurium Framework installation and configuration for Linux. 
