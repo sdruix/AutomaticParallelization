@@ -1,79 +1,65 @@
-#include <stdio.h>
-#include <unistd.h>
 #include <string.h>
 #include <math.h>
 
 
 /* Default problem size. */
-#ifndef NI
-# define NI 10
+#ifndef NX
+# define NX 8000
 #endif
-#ifndef NJ
-# define NJ 10
+#ifndef NY
+# define NY 8000
 #endif
-#ifndef NK
-# define NK 10
+#ifndef M_PI
+# define M_PI 5
 #endif
 
-
-double alpha1;
-double beta1;
-double alpha2;
-double beta2;
-double C[NI][NJ];
-double A[NI][NK];
-double B[NK][NJ];
-
+double A[NX][NY];
+double x[NY];
+double y[NY];
+double tmp[NX];
 
 static void init_array() {
   int i, j;
 
-  alpha1 = 32412;
-  beta1 = 2123;
-  alpha2 = 132412;
-  beta2 = 92123;
-  for (i = 0; i < NI; ) {
-    for (j = 0; j < NK; ) {
-      A[i][j] = ((double)i * j) / NI;
+  for (i = 0; i < NX;) {
+    x[i] = i * M_PI;
+    for (j = 0; j < NY;) {
+      A[i][j] = ((double)i * j) / NX;
       j++;
     }
     i++;
   }
-  for (i = 0; i < NK; ) {
-    for (j = 0; j < NJ; ) {
-      B[i][j] = ((double)i * j + 1) / NJ;
-      j++;
-    }
-    i++;
-  }
-  
-  
-  
 }
 
 
+
 int main(int argc, char** argv) {
-  int i, j, k;
-  int ni = NI;
-  int nj = NJ;
-  int nk = NK;
+  int i, j;
+  int nx = NX;
+  int ny = NY;
 
   /* Initialize array. */
   init_array();
-for (i = 0; i < NI; ) {
-    for (j = 0; j < NJ; ) {
-      C[i][j] = ((double)i * j + 2) / NJ;
-      j++;
-    }
-    i++;
+
+#pragma omp parallel check
+{
+  #pragma omp for
+  for (i = 0; i < nx; i++)
+    y[i] = 0;
+  #pragma omp for private (j)
+  for (i = 0; i < ny; i++) {
+    tmp[i] = 0;
+    for (j = 0; j < ny; j++)
+      tmp[i] = tmp[i] + A[i][j] * x[j];
+    for (j = 0; j < ny; j++)
+      y[j] = y[j] + A[i][j] * tmp[i];
   }
 
-#pragma omp parallel for check
-for (i = 0; i < ni; i++)
-  for (j = 0; j < nj; j++) {
-    C[i][j] = 0;
-    for (k = 0; k < nk; ++k)
-      C[i][j] += A[i][k] * B[k][j];
+}
+double total = 0;
+  for (i = 0; i < ny; i++) {
+      total += y[i];
   }
+  printf("%f\n",total);
   return 0;
 }
