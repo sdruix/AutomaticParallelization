@@ -20,14 +20,13 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 
 
 
-[1] J. Balart, A. Duran, M. Gonzalez, X. Martorell, E. Ayguade, and J. Labarta. Nanos mercurium: a research compiler for openmp. In Proceedings of the European Workshop on OpenMP, volume 8, 2004.
+[1] J. Balart, A. Duran, M. Gonzalez, X. Martorell, E. Ayguade, and J. Labarta. [Nanos mercurium: a research compiler for openmp](http://personals.ac.upc.edu/aduran/papers/2004/mercurium_ewomp04.pdf). In Proceedings of the European Workshop on OpenMP, volume 8, 2004.
 
-[2] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2014. OMP2HMPP: HMPP Source Code Generation from Programs with Pragma Extensions. In High Performance Energy Efficient Embedded Systems. ACM.
+[2] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2014. [OMP2HMPP: HMPP Source Code Generation from Programs with Pragma Extensions](http://arxiv.org/abs/1407.6932). In High Performance Energy Efficient Embedded Systems. ACM.
 
 ##Installation
 
-
-*You will need:
+###You will need:
 + flex 2.5.x
 + gperf 3.0.x
 + automake-1.9 (or newer)
