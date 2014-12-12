@@ -29,12 +29,12 @@ Installation
 ============
 
 *You will need:
-⋅⋅*flex 2.5.x
-⋅⋅*gperf 3.0.x
-⋅⋅*automake-1.9 (or newer)
-⋅⋅*autoconf-2.59 (or newer)
-⋅⋅*libtool-1.5.22 (or newer)
-⋅⋅*gcc and g++ (4.4)
+⋅⋅* flex 2.5.x
+⋅⋅* gperf 3.0.x
+⋅⋅* automake-1.9 (or newer)
+⋅⋅* autoconf-2.59 (or newer)
+⋅⋅* libtool-1.5.22 (or newer)
+⋅⋅* gcc and g++ (4.4)
 
 *Installation Intructions:
 
