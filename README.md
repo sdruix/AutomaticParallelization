@@ -28,6 +28,14 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 Installation
 ============
 
+You will need:
+	- flex 2.5.x
+	- gperf 3.0.x
+	- automake-1.9 (or newer)
+	- autoconf-2.59 (or newer)
+	- libtool-1.5.22 (or newer)
+	- gcc and g++ (4.4)
+	- 
 Easy peasy:
 
 
@@ -37,6 +45,7 @@ Easy peasy:
   	4. make
   	5. [sudo] make install
   	6. For OMP2HMPP execution: omp2hmpp [-h] 
+  	
 
 Pay attention to the installation/configuration process because some questions will be asked. Sometimes easy ones as your Github user/email, sometimes more difficult ones as your root credentials to be able to proceed!
 
