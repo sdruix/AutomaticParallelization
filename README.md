@@ -13,7 +13,12 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 
 * **OMP2HMPP**[2], a tool that, automatically translates a high-level C source code(OpenMP) code into HMPP. The generated version rarely will differs from a hand-coded HMPP version, and will provide an important speedup, near 113%, that could be later improved by hand-coded CUDA.
 
+* **Inline**, as part of the OMP2HMPP tool, the implemented Mercurium Plugin is able to do smart inlining of all the selected function calls.
+
 * **OMP2MPI**, currently in development phase...
+
+* **ForLoopNormalization**, the implemented Mercurium Plugin to transform all the for loop found in an input code to a normal form. This source-to-source compiler is intended to simplify next compilation phases. Currently in development phase...
+
 
 
 [1] J. Balart, A. Duran, M. Gonzalez, X. Martorell, E. Ayguade, and J. Labarta. Nanos mercurium: a research compiler for openmp. In Proceedings of the European Workshop on OpenMP, volume 8, 2004.
