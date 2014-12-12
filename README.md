@@ -13,7 +13,7 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 
 * **OMP2HMPP**[2], a tool that, automatically translates a high-level C source code(OpenMP) code into HMPP. The generated version rarely will differs from a hand-coded HMPP version, and will provide an important speedup, near 113%, that could be later improved by hand-coded CUDA.
 
-* **Inline**, as part of the OMP2HMPP tool, the implemented Mercurium Plugin is able to do smart inlining of all the selected function calls.
+..* **Inline**, as part of the OMP2HMPP tool, the implemented Mercurium Plugin is able to do smart inlining of all the selected function calls.
 
 * **OMP2MPI**, currently in development phase...
 
@@ -28,15 +28,15 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 Installation
 ============
 
-You will need:
-	- flex 2.5.x
-	- gperf 3.0.x
-	- automake-1.9 (or newer)
-	- autoconf-2.59 (or newer)
-	- libtool-1.5.22 (or newer)
-	- gcc and g++ (4.4)
-	- 
-Easy peasy:
+*You will need:
+..*flex 2.5.x
+..*gperf 3.0.x
+..*automake-1.9 (or newer)
+..*autoconf-2.59 (or newer)
+..*libtool-1.5.22 (or newer)
+..*gcc and g++ (4.4)
+
+*Installation Intructions:
 
 
 	1. git clone git://github.com/sdruix/OpenMP2Parallel.git ~/.mcxx
