@@ -14,15 +14,18 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 
 * **Inline**, as part of the OMP2HMPP tool, the implemented Mercurium Plugin is able to do smart inlining of all the selected function calls.
 
-* **OMP2MPI**, currently in development phase...
+* **OMP2MPI**[3], automatically generates MPI source code from OpenMP. Allowing that the program exploits non shared-memory architectures such as cluster, or Network-on-Chip based(NoC-based) Multiprocessors-System-onChip (MPSoC). OMP2MPI gives a solution that allow further optimization by an expert that want to achieve better results. Tested set of problems obtains in most of cases with more than 20x of speedup for 64 cores compared to the sequential version and an average speedup over 4x compared to OpenMP. Currently in development phase...
 
-* **ForLoopNormalization**, the implemented Mercurium Plugin to transform all the for loop found in an input code to a normal form. This source-to-source compiler is intended to simplify next compilation phases. Currently in development phase...
+
+* **ForLoopNormalization**[3], the implemented Mercurium Plugin to transform all the for loop found in an input code to a normal form. This source-to-source compiler is intended to simplify next compilation phases. Currently in development phase...
 
 
 
 [1] J. Balart, A. Duran, M. Gonzalez, X. Martorell, E. Ayguade, and J. Labarta. [Nanos mercurium: a research compiler for openmp](http://personals.ac.upc.edu/aduran/papers/2004/mercurium_ewomp04.pdf). In Proceedings of the European Workshop on OpenMP, volume 8, 2004.
 
 [2] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2014. [OMP2HMPP: HMPP Source Code Generation from Programs with Pragma Extensions](http://arxiv.org/abs/1407.6932). In High Performance Energy Efficient Embedded Systems. ACM.
+
+[3] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2015. OMP2MPI: Automatic MPI code generation from OpenMP programs. In High Performance Energy Efficient Embedded Systems. ACM.
 
 ##Installation
 
@@ -42,7 +45,9 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 	3. ./configure [--prefix=path/to/set] --enable-tl-openmp-profile
   	4. make
   	5. [sudo] make install
-  	6. For OMP2HMPP execution: omp2hmpp [-h] 
+  	6a. For OMP2HMPP execution: omp2hmpp [-h] 
+	6b. For OMP2MPI execution: omp2mpi [-h] 
+	6c. For Loop Normalitzation: trans-phase(cc/c++) -h
   	
 ##Comments
 
