@@ -1,5 +1,5 @@
 #include <stdio.h>
-#define N 2000
+#define N 4000
 
 int main()
 {

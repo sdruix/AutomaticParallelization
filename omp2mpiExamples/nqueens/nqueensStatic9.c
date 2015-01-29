@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
     int number_solutions = 0;
     
     int i;
-    n = 8;
+    n = 9;
     
     for (i = 0; i < n; i++)
     {
@@ -39,14 +39,11 @@ int main(int argc, char* argv[])
     int iter;
     int code;
     int queen_rows[MAX_N];
-#pragma omp parallel for reduction(+:number_solutions) schedule(static) private(code) check
+#pragma omp parallel for reduction(+:number_solutions) schedule(static) private(code, queen_rows) check
     for (iter = 0; iter < max_iter; iter++)
     {
-        
         int i;
-        
         //memset(queen_rows, NULL, sizeof(int)*MAX_N);
-        
         code = iter;
         // the index correspond to the queen's number and the queen's collumn
         // we only generate configurations where there's only one queen per collumn
@@ -58,11 +55,11 @@ int main(int argc, char* argv[])
         if (check_acceptable(queen_rows, n))
         {
             number_solutions += 1;
-            for (i = 0; i < n; i++)
-            {
-                queen_rows[i] = NULL;
-		
-            }
+        }
+        for (i = 0; i < n; i++)
+        {
+            queen_rows[i] = NULL;
+
         }
     }
     // get end time

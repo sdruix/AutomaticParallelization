@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
     int number_solutions = 0;
     
     int i;
-    n = 8;
+    n = 9;
     
     for (i = 0; i < n; i++)
     {
@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
     int iter;
     int code;
     int queen_rows[MAX_N];
-#pragma omp parallel for reduction(+:number_solutions) private(code) check
+#pragma omp parallel for reduction(+:number_solutions) private(code, queen_rows) check
     for (iter = 0; iter < max_iter; iter++)
     {
         int i;
@@ -57,11 +57,11 @@ int main(int argc, char* argv[])
         if (check_acceptable(queen_rows, n))
         {
             number_solutions += 1;
-            for (i = 0; i < n; i++)
-            {
-                queen_rows[i] = NULL;
-		
-            }
+        }
+        for (i = 0; i < n; i++)
+        {
+            queen_rows[i] = NULL;
+
         }
     }
     // get end time
