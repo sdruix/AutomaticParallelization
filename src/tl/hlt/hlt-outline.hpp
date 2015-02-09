@@ -331,7 +331,9 @@ namespace TL {
             
             typedef std::unordered_map <std::string,AST_t> iter4io; 
             std::unordered_map<std::string,AST_t> get_parameter_io(Scope scope_of_decls);
+            int get_parameter_ioSpecificIsIteratorDependent(Scope scope_of_decls, std::string name, std::string iterVar);
             ObjectList<Symbol> get_parameter_list();
+            std::string cleanWhiteSpaces(std::string toClean);
 
             //! Creates an Outline object given a single statement
             Source get_reduced_vars_sizes_specific(std::vector<std::string> red_s);

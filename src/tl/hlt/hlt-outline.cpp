@@ -1030,6 +1030,60 @@ std::unordered_map<std::string,TL::AST_t> Outline::get_parameter_io(Scope scope_
     }
     return parameters;
 }
+int Outline::get_parameter_ioSpecificIsIteratorDependent(Scope scope_of_decls, std::string name, std::string iterVar) {
+    AST_t ast = _outline_statements[0].get_ast();
+    
+    TraverseASTFunctor4AssigmentLine expr_traverse(_sl);
+    ObjectList<AST_t> expr_list = ast.depth_subtrees(expr_traverse);
+    int l = 0;
+    for (ObjectList<AST_t>::iterator it = expr_list.begin();
+            it != expr_list.end(); it++, l++) {
+        Expression expr(expr_list[l], _sl);
+        Expression firstOperand = expr.get_first_operand();
+        
+        
+        size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
+        Source cutParam;
+        cutParam << std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
+        while(std::string(cutParam).find_first_of(" ")==0)
+            std::string(cutParam) = std::string(cutParam).substr(1,std::string(cutParam).length());
+        while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length())
+            std::string(cutParam) = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
+        Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+        if(paramSym.get_name().compare(name)==0){
+        
+            if (paramSym.get_type().is_array() || paramSym.get_type().is_pointer() || (paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")<paramSym.get_point_of_declaration().prettyprint(true).length())){// || paramSym.get_type().is_pointer()) {// && std::string(parameters).find(std::string(cutParam)) > 0) {
+                Expression secondOperand = expr.get_second_operand();
+                std::string secondO = secondOperand.prettyprint();
+                while(secondO.find_first_of("[")>=0 && secondO.find_first_of("[")<secondO.length()) {
+                    std::string actIterator = secondO.substr(secondO.find_first_of("[")+1,secondO.length());
+                    actIterator = actIterator.substr(0,actIterator.find_first_of("]"));
+                    actIterator = cleanWhiteSpaces(actIterator);
+                   // std::cout<< name << "-> "<<actIterator <<" =? " <<iterVar <<" on  ("<<secondO<<")"<<std::endl;
+                    
+                   // std::cin.get();
+                    if(actIterator.compare(iterVar)==0)
+                        return 1;
+                    secondO = secondO.substr(secondO.find_first_of("]")+1, secondO.length());
+                            
+                }
+
+            }
+        }
+        
+    }
+    return 0;
+}
+
+std::string Outline::cleanWhiteSpaces(std::string toClean) {
+    while(std::string(toClean).find_first_of(" ")==0){                       
+        toClean = std::string(toClean).substr(1,std::string(toClean).length());
+    }
+    while(std::string(toClean).find_first_of(" ")<std::string(toClean).length()){
+        toClean = std::string(toClean).substr(0,std::string(toClean).length()-1);
+    }
+    return toClean;
+}
 
 void Outline::set_reduction(TL::Source red_str){
     
@@ -1170,9 +1224,7 @@ TL::Source Outline::get_parameter_in(Scope scope_of_decls, Source start, Source 
                                         bool constrain11= (caseFind11 >= 0 && caseFind11 < std::string(outv).length());
                                         bool constrain21= (caseFind21 >= 0 && caseFind21 < std::string(outv).length());
                                         bool fconstrain1 = (!constrain11 && !constrain21);
-                                        //std::cout<<"-"<<std::string(caseFirst1)<<"- in -"<<std::string(outv)<<"-"<<std::endl;
-                                        //std::cout<<"-"<<std::string(caseFirst1)<<"- in -"<<std::string(outv)<<"-"<<std::endl;
-                                        //std::cin.get();
+                                       
                                         if(fconstrain1) {
                                             if (num ==0) {
                                                 parameters << ", " << start;
@@ -1196,12 +1248,7 @@ TL::Source Outline::get_parameter_in(Scope scope_of_decls, Source start, Source 
         }
         
     }
-    // std::cout<<std::string(parameters)<<std::endl;
-    // std::cin.get();
-    
-    
-    //        std::cout<<std::string(parameters)<<std::endl;
-    //        std::cout<<_unchanged_to_in.size()<<std::endl;
+
     for(int y=0;y<_unchanged_to_in.size();++y){
         int finded=0;
         for(int x=0;x<in_params.size();++x){
@@ -1229,62 +1276,7 @@ TL::Source Outline::get_parameter_in(Scope scope_of_decls, Source start, Source 
     }
     
     return parameters;
-    //   int num = 0;
-    //    int j = 0;
-    //    compute_referenced_entities();
-    ////    std::cout << "Param Elements: " << _parameter_passed_symbols.size() <<std::endl;
-    //    Source parameters;
-    //    
-    //    Source outv;
-    //    Source nulls;
-    //    nulls<<"";
-    //    outv = get_parameter_io(scope_of_decls, start, separation, separation);
-    //    if (_parameter_passed_symbols.size() > 0) {
-    //
-    //        for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
-    //                itu != _parameter_passed_symbols.end();
-    //                itu++, j++) {
-    //                Source varName;
-    //                varName << _parameter_passed_symbols[j].get_name();
-    //            if (_parameter_passed_symbols[j].get_type().is_array() || _parameter_passed_symbols[j].get_type().is_pointer() || _parameter_passed_symbols[j].get_type().is_pointer() || (_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && _parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")<_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).length())) {
-    //                
-    //
-    //                Source caseFirst;
-    //                Source caseOthers;
-    //                caseFirst << ", " << start << std::string(varName)<<separation;
-    //                caseOthers << separation << " " << std::string(varName)<<separation;
-    //
-    //                size_t caseFind1 = std::string(outv).find(std::string(caseFirst));
-    //                size_t caseFind2 = std::string(outv).find(std::string(caseOthers));
-    ////                std::cout<<"Search ("
-    ////                        <<std::string(caseFirst) <<") and ("
-    ////                        <<std::string(caseOthers) << ") in ("
-    ////                        <<std::string(outv)<<")"<<std::endl;
-    //                bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(outv).length());
-    //                bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(outv).length());
-    //                if (!(constrain1 || constrain2)) {
-    //                    if (num > 0) {
-    //                        parameters << std::string(separation) << " ";
-    //                    } else {
-    //                        parameters << ", " << std::string(start);
-    //                    }
-    //
-    //                    num++;
-    //                    
-    //                    parameters << std::string(varName);
-    //                    
-    //
-    //                }
-    //            } 
-    //
-    //        }
-    //
-    //        if (num > 0) {
-    //            parameters << std::string(final);
-    //        }
-    //
-    //    }
-    //    return parameters;
+   
 }
 
 TL::Source Outline::get_parameter_in_noch(Scope scope_of_decls, Source start, Source separation, Source final) {
@@ -1364,7 +1356,6 @@ TL::Source Outline::get_parameter_in_noch(Scope scope_of_decls, Source start, So
     }
     if (num > 0) {
         parameters << std::string(final);
-        //        std::cout<<std::string(parameters)<<std::endl;
     }
     return parameters;
     
@@ -2069,75 +2060,7 @@ TL::Source Outline::get_parameter_in_specific(Scope scope_of_decls, Source start
     }
     return parameters;
     
-    //    int num = 0;
-    //    int j = 0;
-    //    compute_referenced_entities();
-    ////    std::cout << "Param Elements: " << _parameter_passed_symbols.size() << "\n";
-    //    Source parameters;
-    //    
-    //    Source outv;
-    //    Source nulls;
-    //    nulls<<"";
-    //    outv = get_parameter_io_specific(scope_of_decls, start, separation, separation,specific_names, nup);
-    ////    for(int i=0;i<specific_names.size();++i){
-    ////        std::cout<<specific_names[i]<<"\n";
-    ////    }
-    ////    std::cout<<"OUTV in specific: "<< std::string(outv)<<std::endl;
-    ////    std::cin.get();
-    //    if (_parameter_passed_symbols.size() > 0) {
-    //
-    //        for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
-    //                itu != _parameter_passed_symbols.end();
-    //                itu++, j++) {
-    //                Source varName;
-    //                varName << _parameter_passed_symbols[j].get_name();
-    //            if (_parameter_passed_symbols[j].get_type().is_array() || _parameter_passed_symbols[j].get_type().is_pointer() || _parameter_passed_symbols[j].get_type().is_pointer() || (_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && _parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")<_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).length())) {
-    //                
-    //
-    //                Source caseFirst;
-    //                Source caseOthers;
-    //                caseFirst << ", " << start << std::string(varName)<<separation;
-    //                caseOthers << separation << " " << std::string(varName)<<separation;
-    //
-    //                size_t caseFind1 = std::string(outv).find(std::string(caseFirst));
-    //                size_t caseFind2 = std::string(outv).find(std::string(caseOthers));
-    ////                std::cout<<"Search ("
-    ////                        <<std::string(caseFirst) <<") and ("
-    ////                       <<std::string(caseOthers) << ") in ("
-    ////                       <<std::string(outv)<<")"<<std::endl;
-    //                bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(outv).length());
-    //                bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(outv).length());
-    //                if (!(constrain1 || constrain2)) {
-    //                    int finded =0;
-    //                    for(int i=0;i<specific_names.size();++i){
-    //                        if(std::string(varName).compare(specific_names[i])==0){
-    //                            finded=1;
-    //                        }
-    //                    }
-    //                    if(finded){
-    //                        if (num > 0) {
-    //                            parameters << std::string(separation) << " ";
-    //                        } else {
-    //                            parameters << ", " << std::string(start);
-    //                        }
-    //
-    //                        num++;
-    //
-    //                        parameters << std::string(varName);
-    //                    }
-    //                    
-    //
-    //                }
-    //            } 
-    //
-    //        }
-    //
-    //        if (num > 0) {
-    //            parameters << std::string(final);
-    //        }
-    //
-    //    }
-    //    return parameters;
+  
 }
 TL::Source Outline::get_parameter_addr_specific(Scope scope_of_decls,std::vector<std::string> specific_names){
     int num = 0;
