@@ -45,11 +45,13 @@ private:
     void pragma_postorder(PragmaCustomConstruct construct);
     bool checkFor(PragmaCustomConstruct construct);
     int get_size_of_array(string name, string declaration);
+    vector<infoVar> fill_vars_info(std::unordered_map <std::string,AST_t> params, TL::HLT::Outline outlineAux, PragmaCustomConstruct construct, Source initVar, Scope functionScope, Scope globalScope);
     Source modifyReductionOperation(infoVar reducedVar, AST_t constructAST, PragmaCustomConstruct construct);
     AST_t _translation_unit;
     ScopeLink _scope_link;
     vector<infoVar> _reducedVars;
     vector<infoVar> _ioVars;
+    vector<infoVar> _inVars;
     int _initialized;
     AST_t _initAST;
     int _num_transformed_blocks;
@@ -93,6 +95,8 @@ private:
     typedef unordered_map <string, var_use> Mymap; 
     unordered_map <string, var_use> _smart_use_table;
     std::unordered_map <std::string,AST_t> _ioParams;
+    std::unordered_map <std::string,AST_t> _inParams;
+    
     //****************************
     DTO _dto;
     std::vector<std::string> p_l_s;
