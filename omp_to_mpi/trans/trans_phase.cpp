@@ -114,12 +114,12 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             
             _ioParams = outlineAux.get_parameter_io(construct.get_scope());
             _inParams = outlineAux.get_parameter_in(construct.get_scope());
-//            cout<<"InVars:"<<endl;
-//            typedef std::unordered_map <std::string,AST_t> iter4in; 
-//            for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
-//                cout<<it->first<<": "<<it->second.prettyprint()<<endl;
-//            }
-//            cin.get();
+            //            cout<<"InVars:"<<endl;
+            //            typedef std::unordered_map <std::string,AST_t> iter4in; 
+            //            for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
+            //                cout<<it->first<<": "<<it->second.prettyprint()<<endl;
+            //            }
+            //            cin.get();
             //_inParams =
             
             Source commented_loop;
@@ -307,9 +307,10 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 cout<< "Array"<<endl;
                 
                 
-                int l=0;
-                _ioVars = fill_vars_info(_ioParams, outlineAux,  construct, initVar, functionScope, globalScope); 
-                _inVars = fill_vars_info(_inParams, outlineAux,  construct, initVar, functionScope, globalScope); 
+
+                _inVars = fill_vars_info(_inParams, outlineAux,  construct, initVar, functionScope, globalScope, 0); 
+                _ioVars = fill_vars_info(_ioParams, outlineAux,  construct, initVar, functionScope, globalScope, 1); 
+                
                 // cout<<conditionToWork<<endl;
                 //cin.get();
                 stringstream maxSTemp;
@@ -1108,7 +1109,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
     
 }
 
-vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::string,AST_t> params, TL::HLT::Outline outlineAux, PragmaCustomConstruct construct, Source initVar, Scope functionScope, Scope globalScope){
+vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::string,AST_t> params, TL::HLT::Outline outlineAux, PragmaCustomConstruct construct, Source initVar, Scope functionScope, Scope globalScope, int iNOUT){
     vector<infoVar> vars;
     typedef std::unordered_map <std::string,AST_t> iter4vars; 
     for (iter4vars::const_iterator it = params.begin(); it != params.end(); ++it) {
@@ -1188,9 +1189,13 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
         
         if(!isReducedVar(std::string(newR.name)) 
                 && !isPrivateVar(std::string(newR.name)) 
-                && isIOVar(std::string(newR.name)) ){
+                ){
+            if((iNOUT && isIOVar(std::string(newR.name))) 
+                    || (!iNOUT && isINVar(std::string(newR.name)))
+                    ) {
+                 vars.push_back(newR);
+            }
             
-            vars.push_back(newR);
             //cout<<"IOVAR: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar)<<endl;
             //cin.get();
         }
@@ -1201,6 +1206,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
     }
     return vars;
 }
+
 
 int TransPhase::isReducedVar(string name) {
     for(int i = 0; i<_reducedVars.size();++i){
@@ -1221,14 +1227,7 @@ int TransPhase::isPrivateVar(string name) {
 }
 
 int TransPhase::isIOVar(string name) {
-    //        cout<< "Construct is "<<_construct_inside_bucle <<" inside bucle"<<endl;
-    //        
-    //        cout<<name<<" :  "
-    //                "\n- FRCPU: "<< _smart_use_table[name].row_first_read_cpu.row
-    //                << "\n- FWCPU: "<<_smart_use_table[name].row_first_write_cpu.row
-    //                << "\n- LWCPU: "<<_smart_use_table[name].row_last_write_cpu.row
-    //                << "\n- LRCPU: "<<_smart_use_table[name].row_last_read_cpu.row<<endl;
-    //        cin.get();
+
     if(_smart_use_table[name].row_first_read_cpu.row>0) {
         if((_smart_use_table[name].row_first_write_cpu.row<=_smart_use_table[name].row_first_read_cpu.row))
             return 1;
@@ -1238,6 +1237,13 @@ int TransPhase::isIOVar(string name) {
                 return 1;
     }
     
+    return 0;
+}
+int TransPhase::isINVar(string name) {
+    //cout<<"Checking: "<<name<< " "<<_smart_use_table[name].row_last_write_cpu.row<<endl;
+    //cin.get();
+    if(_smart_use_table[name].row_last_write_cpu.row>0) 
+        return 1;   
     return 0;
 }
 
@@ -1441,7 +1447,7 @@ void TransPhase::assignMasterWork(lastAst ast2Work) {
                     int f = 0;
                     for(int i = 0; i<_lastTransformInfo.size(); ++i) {
                         if(fSym.get_name().compare(_lastTransformInfo[i]._lastFunctionNameList) == 0) {
-                            masterWork << "}" << addCommaIfNeeded(expr_list[l].prettyprint())<<" if(myid==0) {\n";
+                            masterWork << "}" << addCommaIfNeeded(expr_list[l].prettyprint())<<" if(myid == 0) {\n";
                             expr_list[l].remove_in_list();
                             lastLine = expr_list[l].get_line();
                             f = 1;
@@ -1569,10 +1575,13 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
     ObjectList<AST_t> expr_list = workingAst.depth_subtrees(expr_traverse);
     for (ObjectList<AST_t>::iterator it = expr_list.begin();it != expr_list.end(); it++, l++) {
         
+        int insideMaster = is_inside_master(expr_list[l],scopeL, line, 0);
+        
+        
         f=0; 
         Expression expr(expr_list[l], scopeL);
         std::string ppExpr = expr.prettyprint();
-
+        
         //
         lastAst = expr.get_ast();
         if(hmppOrig!=2 && hmppOrig!=3) {
@@ -1590,6 +1599,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
         
         if(line!=outline_num_line) {
             if((expr.is_assignment() || expr.is_operation_assignment()) && f==0) {
+               
                 f=1; 
                 if(hmppOrig == 2) 
                     _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
@@ -1616,12 +1626,14 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     if(line<outline_num_line) {
                         if(!hmppOrig || hmppOrig == 2) {
                             if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                if(insideMaster)
                                 _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst);
                             }
                         } else {
                             
                             if(inside) {
                                 if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                    if(insideMaster)
                                     _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst);
                                 }
                             }
@@ -1846,6 +1858,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                         if(line<outline_num_line) {
                             if(!hmppOrig || hmppOrig == 2) {
                                 if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                    if(insideMaster)
                                     _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst);
                                 }
                                 if(_smart_use_table[actWord].row_last_read_cpu.row < line || _smart_use_table[actWord].row_last_read_cpu.row == 0) {
@@ -1855,6 +1868,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                 
                                 if(inside) {
                                     if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                        if(insideMaster)
                                         _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst);
                                     }
                                 }
@@ -1872,6 +1886,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                 
                                 if(inside) {
                                     if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                        if(insideMaster)
                                         _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst); 
                                     }
                                 }
@@ -1898,6 +1913,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                             
                             if(inside) {
                                 if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                    if(insideMaster)
                                     _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst); 
                                 }
                             }
@@ -1905,6 +1921,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     } else {
                         if(!hmppOrig || hmppOrig == 2) {
                             if(_smart_use_table[actWord].row_first_write_cpu.row > line || _smart_use_table[actWord].row_first_write_cpu.row == 0) {
+                                if(insideMaster)
                                 _smart_use_table[actWord].row_first_write_cpu = fill_use(line,actAst); 
                             }
                             if(_smart_use_table[actWord].row_first_read_cpu.row > line || _smart_use_table[actWord].row_first_read_cpu.row == 0) {
@@ -1914,6 +1931,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                             
                             if(inside) {
                                 if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                    if(insideMaster)
                                     _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst); 
                                 }
                             }
@@ -1935,6 +1953,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
             regmatch_t matchesEqual[1]; //A list of the matches in the string (a list of 1)
             //cout<<"PP: " << ppExpr<<endl;
             if (f==0 && regexec(&expEqual, ppExpr.c_str(), 1, matchesEqual, 0) == 0){
+                 
                 //cout<<"PP1: " << ppExpr<<endl;
                 if(hmppOrig == 2)  
                     _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
@@ -1943,14 +1962,19 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     k=0;
                     vector<string> sub_strings;
                     for (ObjectList<Symbol>::iterator it = prmters.begin();it != prmters.end(); it++,k++) {
-                        //cout<<"Looking 4: "<<prmters[k].get_name()<<endl;
+                        if(insideMaster) {
+                        cout <<expr_list[l].prettyprint()<< " is inside master work"<<endl;
+                        
+                        }
+                        cout<<"Looking 4: "<<prmters[k].get_name()<<endl;
                         // if(prmters[k].get_type().is_array() || (prmters[k].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && prmters[k].get_point_of_declaration().prettyprint(true).find_first_of("[")<prmters[k].get_point_of_declaration().prettyprint(true).length())) {
-                        stringstream pattern, pattern2;
+                        stringstream pattern, pattern2,pattern3;
                         pattern<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[ \r\t\n\f]*[\r\t\n\f]*";
                         pattern2<<prmters[k].get_name()<<"\\s*\\[[\\d+]*[a-z]*\\]";
+                        pattern3<<"[^a-zA-Z0-9 ]*"<<prmters[k].get_name()<<"[^a-zA-Z0-9= ]*";
                         //                            std::cout<<"P: "<<pattern.str()<<endl;
                         int rv;
-                        regex_t exp, exp2; //Our compiled expression
+                        regex_t exp, exp2, exp3; //Our compiled expression
                         
                         rv = regcomp(&exp, pattern.str().c_str(), REG_EXTENDED);
                         if (rv != 0) {
@@ -1960,22 +1984,29 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                         if (rv != 0) {
                             printf("regcomp failed with %d\n", rv);
                         }
+                         rv = regcomp(&exp3, pattern3.str().c_str(), REG_EXTENDED);
+                        if (rv != 0) {
+                            printf("regcomp failed with %d\n", rv);
+                        }
                         regmatch_t matches[1]; //A list of the matches in the string (a list of 1)
-                        if(regexec(&exp, ppExpr.c_str(), 1, matches, 0) == 0 || regexec(&exp2, ppExpr.c_str(), 1, matches, 0) == 0) {
-                            
+                        if(regexec(&exp, ppExpr.c_str(), 1, matches, 0) == 0 || 
+                                regexec(&exp2, ppExpr.c_str(), 1, matches, 0) == 0 || 
+                                regexec(&exp3, ppExpr.c_str(), 1, matches, 0) == 0) {                    
                             std::string actWord = prmters[k].get_name();
-                           // cout<<actWord<<" found"<<endl;
+                            // cout<<actWord<<" found"<<endl;
                             if(ppExpr.find(prmters[k].get_name())<ppExpr.find("=")) {
                                 
                                 if(line<outline_num_line) {
                                     if(!hmppOrig || hmppOrig==2){
                                         if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                            if(insideMaster)
                                             _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst); 
                                         }
                                     } else {
                                         
                                         if(inside) {
                                             if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                                if(insideMaster)
                                                 _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst); 
                                             }
                                         }
@@ -1997,6 +2028,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                     } else {
                                         if(inside) {
                                             if(_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) {
+                                                if(insideMaster)
                                                 _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst);
                                             }
                                         }
@@ -2053,6 +2085,8 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
     }
     return lastAst;
 }
+
+
 
 ObjectList<Source> TransPhase::splitMathExpression(Scope sC,std::string secondO)
 {
@@ -2200,6 +2234,60 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
         _for_num = -1;
         return 0;
     }
+}
+
+int TransPhase::is_inside_master(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct) {
+    
+    TraverseASTFunctor4LocateIf expr_traverseIf(scopeL);
+    ObjectList<AST_t> expr_listIf = _file_tree.depth_subtrees(expr_traverseIf);
+    int lF=0;
+
+//    cout<<"Looking 4 expression: "<<ast2check.prettyprint() <<"("<<exprLine<<")"<<endl;
+    int numIF = 0;
+    for (ObjectList<AST_t>::iterator it = expr_listIf.begin();it != expr_listIf.end(); it++, lF++) {
+        Expression exprI(ast2check, scopeL);
+        IfStatement iS(expr_listIf[lF],scopeL);
+        AST_t ifAST;
+        ifAST = iS.get_then_body().get_ast();
+        if(iS.get_condition().prettyprint().compare("myid == 0")==0) {
+//            cout<<"Master Work if found"<<endl;
+            Expression exprF(expr_listIf[lF], scopeL);
+            
+            FunctionDefinition fdF(exprF.get_enclosing_function());
+            FunctionDefinition fdI(exprI.get_enclosing_function());
+            
+            string nameF = fdF.get_function_name().get_symbol().get_name();
+            string nameI = fdI.get_function_name().get_symbol().get_name();
+            
+//            cout <<"nF: -"<<nameF<<"- vs nI: -"<<nameI<<"-"<<endl;
+            if (nameF.compare(nameI)==0){
+                numIF++;
+                
+                
+                TraverseASTFunctor4LocateUse expr_traverseUse(scopeL);
+                ObjectList<AST_t> expr_listUse = ifAST.depth_subtrees(expr_traverseUse);
+                int lU = 0;
+                for (ObjectList<AST_t>::iterator it = expr_listUse.begin();it != expr_listUse.end(); it++, lU++) {
+                    Expression exprL(expr_listUse[lU], scopeL);
+                    int checkExprLine =get_real_line(exprL.get_enclosing_function().get_function_body().get_ast(), scopeL, exprI.get_ast(), 0, 0);
+                    checkExprLine+=numIF;
+//                    cout<<"Checking vs expression: "<<expr_listUse[lU].prettyprint()<<"("<<checkExprLine<<")"<<endl;
+                    if(ast2check.prettyprint().compare(expr_listUse[lU].prettyprint())==0) {
+                        if(exprLine == checkExprLine) {
+                            return 1;
+                            
+                        }
+                    }
+                }
+                
+                
+            }
+        }
+        
+    }
+     
+    return 0;
+    
 }
 
 int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int update, int searching_construct) {
