@@ -35,8 +35,8 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _RTAG = "RTAG";
     _WTAG = "WTAG";
     _FTAG = "FTAG";
-    _withMemoryLimitation = 0;
-    _oldMPIStyle = 0;
+    _withMemoryLimitation = 1;
+    _oldMPIStyle = 1;
     _secureWrite = 0;
 }
 
