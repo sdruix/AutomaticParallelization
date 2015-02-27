@@ -40,7 +40,7 @@ private:
     void finalize();
     string addCommaIfNeeded(string arrayToCheck);
     int iteratedVarCorrespondstoAnyVarIdx(string initVar, ObjectList<Source> iter);
-    Source findPrincipalIterator(string varUse, string name);
+    ObjectList<Source> findPrincipalIterator(string varUse, string name);
     AST_t getForContextofConstruct(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct);
     string cleanWhiteSpaces(string toClean);
     void pragma_postorder(PragmaCustomConstruct construct);

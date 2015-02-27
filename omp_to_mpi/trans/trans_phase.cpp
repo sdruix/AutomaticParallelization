@@ -35,8 +35,8 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _RTAG = "RTAG";
     _WTAG = "WTAG";
     _FTAG = "FTAG";
-    _withMemoryLimitation = 1;
-    _oldMPIStyle = 1;
+    _withMemoryLimitation = 0;
+    _oldMPIStyle = 0;
     _secureWrite = 0;
 }
 
@@ -729,6 +729,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
                             stringstream varSent, size, iterators;
+                            
                             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
                                 varSent << nameCopy;
                                 varSent <<"[0]";
@@ -2070,11 +2071,16 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
         newR.name << it->first;
         for (int i=0;i<it->second.size();++i){
             AST_t actAST = it->second[i];
-            if(iNOUT)
-                newR.iterVar.push_back(findPrincipalIterator(actAST.prettyprint(), it->first));
-            else{
+            ObjectList<Source> iterators;
+            if(iNOUT){
+                iterators = findPrincipalIterator(actAST.prettyprint(), it->first);
+                for(int j=0;j<iterators.size();++j)
+                    newR.iterVar.push_back(iterators[j]);
+            }else{
                 string second = actAST.prettyprint().substr(actAST.prettyprint().find_first_of("=")+1,actAST.prettyprint().length());
-                newR.iterVar.push_back(findPrincipalIterator(second, it->first));
+                iterators = findPrincipalIterator(second, it->first);
+                for(int j=0;j<iterators.size();++j)
+                    newR.iterVar.push_back(iterators[j]);
             }
         }
         //Is iterator variable dependant
@@ -2149,15 +2155,17 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
         //cout<<"T: "<<std::string(newR.type)<<endl;
         //
         if(!isReducedVar(std::string(newR.name))  && !isPrivateVar(std::string(newR.name))){
-            for(int i=0;i<newR.iterVar.size();++i)
-                cout<<"Test as: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
+           
+                //cout<<"Test as: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
             //if(iNOUT && isIOVar(std::string(newR.name))) {
             if(iNOUT) {
                 vars.push_back(newR);
-                //                cout<<"IOVAR: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar)<<endl;
+                 for(int i=0;i<newR.iterVar.size();++i)
+                   cout<<"IOVAR: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
             } else if (!iNOUT) {
                 vars.push_back(newR);
-                //                cout<<"INVAR: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar)<<endl;
+                              for(int i=0;i<newR.iterVar.size();++i)
+                   cout<<"INVAR: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
             }
             
             
@@ -2314,25 +2322,25 @@ Source TransPhase::modifyReductionOperation(infoVar reducedVar, AST_t constructA
     
     return constructAST.prettyprint();
 }
-Source TransPhase::findPrincipalIterator(string varUse, string name) {
+ObjectList<Source> TransPhase::findPrincipalIterator(string varUse, string name) {
     regex_t expEqual; //Our compiled expression
     stringstream equal;
     string sizeS = "1";
     equal << "\\("<<name<<"\\s*"<<"\\["<<"\\s*"<<"[a-z]*"<<"\\s*"<<"\\]"<<"\\)";
-    
+    ObjectList<Source> iteratorS;
     //cout <<varUse.prettyprint() <<endl;
     if (regcomp(&expEqual, equal.str().c_str(), 0) != 0) {
         exit(EXIT_FAILURE);
     }
     size_t     nmatch = 2;
     regmatch_t matchesEqual[2]; //A list of the matches in the string (a list of 1)
-    
-    if (regexec(&expEqual, varUse.c_str(), nmatch, matchesEqual, 0) == 0){
+    cout<<"V: "<<varUse<<endl;
+    while (regexec(&expEqual, varUse.c_str(), nmatch, matchesEqual, 0) == 0){
         sizeS = varUse.substr(matchesEqual[0].rm_so + name.length()+1, varUse.length());
         sizeS = sizeS.substr(0, sizeS.find_first_of("]"));
+        iteratorS.push_back(sizeS);
+        varUse = varUse.substr(matchesEqual[0].rm_so + name.length()+1, varUse.length());          
     }
-    Source iteratorS;
-    iteratorS << sizeS;
     return iteratorS;
 }
 int TransPhase::get_size_of_array(string name, string declaration) {
@@ -3441,7 +3449,9 @@ int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int
     return line;
 }
 int TransPhase::iteratedVarCorrespondstoAnyVarIdx(string initVar, ObjectList<TL::Source> iter) {
+    cout<<"-"<<initVar<<"-"<<endl;
     for(int i=0;i<iter.size();++i) {
+        cout<<"vs -"<<std::string(iter[i])<<"-"<<endl;
         if(std::string(iter[i]).compare(initVar)==0)
             return 1;
     }
@@ -3457,7 +3467,7 @@ Source TransPhase::generateMPIVariableMessagesSend(vector<infoVar> vars, Source 
             string upperType = std::string(vars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
             stringstream varSent, size;
-            
+            cout<<"-----------"<<endl;
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, vars[i].iterVar) || vars[i].size.size()<1) {
                 varSent << std::string(_inVars[i].name)<<"["<<offset<<"]";
                 size << "partSize";
@@ -3474,6 +3484,8 @@ Source TransPhase::generateMPIVariableMessagesSend(vector<infoVar> vars, Source 
                 mpiMessages << "MPI_Send(&"<<vars[i].name<<", 1, MPI_"<<upperType<<","<<dest<<","<<_ATAG<<",MPI_COMM_WORLD);";
             //}
             }
+            if(std::string(_inVars[i].name).compare("B")==0)
+                cin.get();
             
         }
     } else {
