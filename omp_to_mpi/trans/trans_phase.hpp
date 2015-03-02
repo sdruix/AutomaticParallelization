@@ -83,6 +83,7 @@ private:
     string _ATAG;
     string _FTAG;
     string _WTAG;
+    string _SWTAG;
     vector<lastAst> _lastTransformInfo;
     //*******************
     struct use{
