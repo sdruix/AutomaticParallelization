@@ -141,10 +141,10 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             //                 
             cout<<"Context Analized"<<endl;
             cout<<"Getting out params"<<endl;
-            //            cout<<"HI"<<endl;
+//                        cout<<"HI"<<endl;
             _ioParams = outlineAux.get_parameter_io(construct.get_scope());
-            //            cout<<"BYE"<<endl;
-            //            cin.get();
+//                        cout<<"BYE"<<endl;
+//                        cin.get();
             cout<<"This block has "<<_ioParams.size()<<" OUT variables"<<endl;
             cout<<"Getting in params"<<endl;
             _inParams = outlineAux.get_parameter_in(construct.get_scope());
@@ -376,6 +376,13 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             }
         }
         
+        cout<<"Filling IN vars info"<<endl;
+        _inVars = fill_vars_info(_inParams, outlineAux,  construct, initVar, functionScope, globalScope, 0); 
+        cout <<"** IN VARS **"<<endl;
+        for(int i =0;i<_inVars.size();++i){
+            cout<<std::string(_inVars[i].name)<<endl;
+        }
+        
         cout<<"Filling OUT vars info"<<endl;
         _ioVars = fill_vars_info(_ioParams, outlineAux,  construct, initVar, functionScope, globalScope, 1); 
         cout <<"** OUT VARS **"<<endl;
@@ -383,12 +390,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             cout<<std::string(_ioVars[i].name)<<endl;
         }
         
-        cout<<"Filling IN vars info"<<endl;
-        _inVars = fill_vars_info(_inParams, outlineAux,  construct, initVar, functionScope, globalScope, 0); 
-        cout <<"** IN VARS **"<<endl;
-        for(int i =0;i<_inVars.size();++i){
-            cout<<std::string(_inVars[i].name)<<endl;
-        }
+        
         // 
         
         cout<<"Creating initializations"<<endl;
@@ -726,6 +728,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     for(int i = 0; i<_inVars.size(); ++i){
                         //if(isINVar(std::string(_inVars[i].name)) && !_withMemoryLimitation) {
                         if(!_withMemoryLimitation) {
+                            _uploadedVars.push_back(std::string(_inVars[i].name));
                             Source numberOfPointers;
                             string nameCopy = std::string(_inVars[i].name)+"_MPICOPY";
                             
@@ -736,6 +739,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             stringstream varSent, size, iterators;
                             
                             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
+                                
                                 varSent << nameCopy;
                                 varSent <<"[0]";
                                 for(int x=0; x<_inVars[i].size.size();++x) {
@@ -746,7 +750,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                         size<<" * " <<_inVars[i].size[x];
                                         iterators <<"["<<_inVars[i].size[x]<<"]";
                                     } else {
-                                        iterators <<"[partSize+1]";
+                                        iterators <<"[partSize]";
                                     }
                                 }
                                 
@@ -757,7 +761,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                 for(int x = 0;x<_inVars[i].size.size();++x) {
                                     if(x == 0) {
                                         ss << _inVars[i].size[x];
-                                        iterators <<"[partSize+1]";
+                                        iterators <<"[partSize]";
                                     } else {
                                         ss << "* "<<_inVars[i].size[x];                                
                                         iterators <<"["<<_inVars[i].size[x]<<"]";
@@ -809,7 +813,39 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                 mpiVariantStructurePart2 << "MPI_Send(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<",0,"<<_ATAG<<",MPI_COMM_WORLD);";
                             }
                         }
+                    } else {
+                        for(int i = 0; i<_ioVars.size(); ++i){
+                            string upperType = std::string(_ioVars[i].type);
+                            std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+//                                                    cout<<std::string(_ioVars[i].name)<<" size "<<_ioVars[i].size.size()<<endl;
+//                                                    cin.get();
+                            if(_ioVars[i].size.size()>0) {
+
+                                string nameCopy = std::string(_ioVars[i].name)+"_MPICOPY";
+
+                                stringstream varSent, size;
+                                if(iteratedVarCorrespondstoAnyVarIdx(initVar, _ioVars[i].iterVar) || _ioVars[i].size.size()<1) {
+                                    varSent << nameCopy;
+                                    size << "partSize";
+                                    varSent<<"[0]";
+                                    for(int x=0; x<_ioVars[i].size.size();++x) {
+                                        if(x>0)
+                                            size<<" * " <<_ioVars[i].size[x];
+                                    }
+
+
+                                    if(functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_array() || functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_pointer()) {
+                                        mpiVariantStructurePart2<<"MPI_Send(&"<<varSent.str()<<", "<<size.str()<<", MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD);";
+                                    } else {
+                                        mpiVariantStructurePart2<<"MPI_Send(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD);";
+                                    }
+                                }
+                            } else {
+                                mpiVariantStructurePart2<< "MPI_Send(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD);";    
+                            }
+                        }
                     }
+                  
                 } else {
                     
                     mpiVariantStructurePart4<<"while(1){"
@@ -838,7 +874,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                         size<<" * " <<_inVars[i].size[x];
                                         iterators <<"["<<_inVars[i].size[x]<<"]";
                                     } else {
-                                        iterators <<"[partSize+1]";
+                                        iterators <<"[partSize]";
                                     }
                                 }
                                 
@@ -948,37 +984,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 //mpiFixStructurePart2 << generateMPIVariableMessagesSend(_ioVars,initVar,functionScope,"0","offset",1);
 //                if(!_withMemoryLimitation){
-//                    for(int i = 0; i<_ioVars.size(); ++i){
-//                        string upperType = std::string(_ioVars[i].type);
-//                        std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
-//                        //                        cout<<std::string(_ioVars[i].name)<<" size "<<_ioVars[i].size.size()<<endl;
-//                        //                        cin.get();
-//                        if(_ioVars[i].size.size()>0) {
-//                            
-//                            string nameCopy = std::string(_ioVars[i].name)+"_MPICOPY2";
-//                            
-//                            stringstream varSent, size;
-//                            if(std::string(_ioVars[i].iterVar).compare(initVar) ==0 || _ioVars[i].size.size()<1) {
-//                                varSent << nameCopy;
-//                                size << "partSize";
-//                                varSent<<"[0]";
-//                                for(int x=0; x<_ioVars[i].size.size();++x) {
-//                                    if(x>0)
-//                                        size<<" * " <<_ioVars[i].size[x];
-//                                }
-//                                
-//                            
-//                                if(functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_array() || functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_pointer()) {
-//                                    mpiFixStructurePart2<<"MPI_Send(&"<<varSent.str()<<", "<<size.str()<<", MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD);";
-//                                } else {
-//                                    mpiFixStructurePart2<<"MPI_Send(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD);";
-//                                }
-//                            }
-//                        } else {
-//                            mpiFixStructurePart2<< "MPI_Send(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD);";    
-//                        }
-//                    }
-//                }
+
                 for(int i = 0; i<_reducedVars.size(); ++i){
                     string upperType = std::string(_reducedVars[i].type);
                     std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
@@ -997,8 +1003,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             
             
         }else if(checkDirective(construct,"barrier")) {
-            cout<<"barrier"<<endl;
-            cin.get();
+//            cout<<"barrier"<<endl;
+//            cin.get();
             Source newSource;
             newSource << "int thisIsANoopVariable2ReplacePreviousOpenMPDirective"<<_num_transformed_blocks<<";";
             construct.get_ast().replace_with(newSource.parse_statement(construct.get_ast(),_scope_link));
@@ -1374,6 +1380,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
             
             firstO = expr_list[l].prettyprint().substr(0,expr_list[l].prettyprint().find_first_of("="));
             secondO = expr_list[l].prettyprint().substr(expr_list[l].prettyprint().find_first_of("=")+1, expr_list[l].prettyprint().length());
+            
             //            cout<<"---------------------------"<<endl;
             cout<<expr_list[l].prettyprint()<<endl;
             //            cout<<"1srt: "<<firstO<<endl;
@@ -1406,6 +1413,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 case '-':
                 case '/':
                 case '*':
+                     
                     operands.push_back(firstO);
                     break;
             }
@@ -1730,8 +1738,10 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                     }
                 }          
             } 
-
+            if(line.find_first_of(";")>= 0 && line.find_first_of(";")<line.length())
+                line = line.substr(0,line.find_first_of(";"));    
             newExprSource  << secureWrite << mpiReads <<"("<<line<<")"<<";" <<"\n"<< mpiWrites;
+            
         } else if((expr_list[l].prettyprint().find_first_of("++")>= 0 && expr_list[l].prettyprint().find_first_of("++")<expr_list[l].prettyprint().length()) 
                 || (expr_list[l].prettyprint().find_first_of("--")>= 0 && expr_list[l].prettyprint().find_first_of("--")<expr_list[l].prettyprint().length())){
             string exprString =  expr_list[l].prettyprint();
@@ -1750,8 +1760,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 exprString = exprString.substr(0,exprString.length()-2);
                 p = 1;
                 operatorAS = "++";
-            }
-            if(exprString.find("--")==0) {
+            } else if(exprString.find("--")==0) {
                 exprString = exprString.substr(2,exprString.length());
                 operatorAS = "--";
             } else if(exprString.find("--")==(exprString.length()-2)) {
@@ -1874,8 +1883,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                     exprString = replaceAll(exprString, s2change, rectifiedVarName);
                     
                     if(_withMemoryLimitation || !isUploadedVar(std::string(_inVars[findedR].name))) {
-                        cout<<expr_list[l].prettyprint()<<endl;
-                        cin.get();
+//                        cout<<expr_list[l].prettyprint()<<endl;
+//                        cin.get();
                         if(p)
                             newExprSource  << secureWrite << operandMPIReads <<"("<<exprString<<operatorAS<<");" <<"\n"<< operandMPIWrites;
                         else
@@ -1957,7 +1966,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
     
     
     astPrettyprint = construct_ast.prettyprint();
-    cout<<astPrettyprint<<endl;
+//    cout<<astPrettyprint<<endl;
     //    
     return astPrettyprint;
 }
@@ -2010,27 +2019,37 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                 for(int j=0;j<iterators.size();++j)
                     newR.iterVar.push_back(iterators[j]);
                 for(int x=0;x<_inVars.size();++x) {
+                    
                     if(std::string(newR.name).compare(std::string(_inVars[x].name))==0) {
+                        cout<<"Filling "<<std::string(newR.name)<<endl;
                         for(int y=0;y<_inVars[x].iterVar.size();++y) {
                             int finded =0;
+                            cout<<"Checking if has iterator: "<<std::string(_inVars[x].iterVar[y])<<endl;
                             for(int z = 0; z<newR.iterVar.size();++z) {
-                                if(std::string(newR.iterVar[z]).compare(std::string(_inVars[x].iterVar[y]))==0)
+                                cout<<"vs "<<std::string(newR.iterVar[z])<<endl;
+                                if(std::string(newR.iterVar[z]).compare(std::string(_inVars[x].iterVar[y]))==0) {
                                     finded =1;
+                                } 
                             }
-                            if(!finded)
-                            newR.iterVar.push_back(_inVars[x].iterVar[y]);
+                            if(!finded) {
+                                cout<<"has to be included"<<endl;
+                                newR.iterVar.push_back(_inVars[x].iterVar[y]);
+                            } else {
+                                cout<<"is in "<<std::string(newR.name)<<endl;
+                            }
                             
                         }
                         
-                        _ioVars[x].iterVar = newR.iterVar;
+                        _inVars[x].iterVar = newR.iterVar;
                     }
                 }
-            }else{
+            } else {
                 string second = actAST.prettyprint().substr(actAST.prettyprint().find_first_of("=")+1,actAST.prettyprint().length());
                 iterators = findPrincipalIterator(second, it->first);
                 for(int j=0;j<iterators.size();++j)
                     newR.iterVar.push_back(iterators[j]);
                 for(int x=0;x<_ioVars.size();++x) {
+                    cout<<"H2I"<<endl;
                     if(std::string(newR.name).compare(std::string(_ioVars[x].name))==0) {
                         for(int y=0;y<_ioVars[x].iterVar.size();++y) {
                             int finded =0;
@@ -2039,7 +2058,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                                     finded =1;
                             }
                             if(!finded)
-                            newR.iterVar.push_back(_ioVars[x].iterVar[y]);
+                                newR.iterVar.push_back(_ioVars[x].iterVar[y]);
                             
                         }
                         
@@ -2309,6 +2328,7 @@ ObjectList<Source> TransPhase::findPrincipalIterator(string varUse, string name)
     while (regexec(&expEqual, varUse.c_str(), nmatch, matchesEqual, 0) == 0){
         sizeS = varUse.substr(matchesEqual[0].rm_so + name.length()+1, varUse.length());
         sizeS = sizeS.substr(0, sizeS.find_first_of("]"));
+        sizeS = replaceAll(sizeS," ", "");
         iteratorS.push_back(sizeS);
         varUse = varUse.substr(matchesEqual[0].rm_so + name.length()+1, varUse.length());          
     }
@@ -3038,8 +3058,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                         actWord = ppExpr.substr(2,ppExpr.length());
                     } else if(ppExpr.find("++")==(ppExpr.length()-2)) {
                         actWord = ppExpr.substr(0,ppExpr.length()-2);
-                    }
-                    if(ppExpr.find("--")==0) {
+                    } else if(ppExpr.find("--")==0) {
                         actWord = ppExpr.substr(2,ppExpr.length());
                     } else if(ppExpr.find("--")==(ppExpr.length()-2)) {
                         actWord = actWord.substr(0,ppExpr.length()-2);
@@ -3457,8 +3476,8 @@ Source TransPhase::generateMPIVariableMessagesSend(vector<infoVar> vars, Source 
                 mpiMessages << "MPI_Send(&"<<vars[i].name<<", 1, MPI_"<<upperType<<","<<dest<<","<<_ATAG<<",MPI_COMM_WORLD);";
             //}
             }
-            if(std::string(_inVars[i].name).compare("B")==0)
-                cin.get();
+//            if(std::string(_inVars[i].name).compare("B")==0)
+//                cin.get();
             
         }
     } else {
@@ -3572,7 +3591,7 @@ Source TransPhase::handleMemory(string source) {
             memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[n].size.size()<<",MPI_INT,"<<source<<", "<<_WTAG<<", MPI_COMM_WORLD, &stat);";
         }
         
-        for(int x=0; x<_ioVars[x].size.size();++x) {
+        for(int x=0; x<_ioVars[n].size.size();++x) {
             dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
         }
         memorySource << "MPI_Recv(&"<<_ioVars[n].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_WTAG<<", MPI_COMM_WORLD,&stat);";
