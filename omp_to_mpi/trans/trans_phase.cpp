@@ -37,7 +37,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _FTAG = "FTAG";
     _SWTAG = "SWTAG";
     _withMemoryLimitation = 1;
-    _oldMPIStyle = 0;
+    _oldMPIStyle = 1;
     _secureWrite = 0;
 }
 
@@ -3534,13 +3534,13 @@ Source TransPhase::handleMemory(string source) {
     }        
      memorySource<<"} } else if(stat.MPI_TAG == "<<_SWTAG<<") {"
             "switch (partSize) {";
-    for (int i = 0; i< _ioVars.size();++i){
+    for (int n = 0; n< _ioVars.size();++n){
         //if(_ioVars[i].size.size()>0) {
         Source dimensions;
-        string upperType = std::string(_ioVars[i].type);
+        string upperType = std::string(_ioVars[n].type);
         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
         //if(_ioVars[i].size.size()>0) {
-        memorySource<< "case  "<<i<<": ";
+        memorySource<< "case  "<<n<<": ";
 
         memorySource<<"do {"
                 <<"MPI_Recv(&partSize, 1, MPI_INT, "<<source<<", MPI_ANY_TAG, MPI_COMM_WORLD, &stat);"
@@ -3568,14 +3568,14 @@ Source TransPhase::handleMemory(string source) {
         memorySource<<"} } }while(stat.MPI_TAG != WTAG);";
                     
         
-        if(_ioVars[i].size.size()>0) {
-            memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_WTAG<<", MPI_COMM_WORLD, &stat);";
+        if(_ioVars[n].size.size()>0) {
+            memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[n].size.size()<<",MPI_INT,"<<source<<", "<<_WTAG<<", MPI_COMM_WORLD, &stat);";
         }
         
-        for(int x=0; x<_ioVars[i].size.size();++x) {
+        for(int x=0; x<_ioVars[x].size.size();++x) {
             dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
         }
-        memorySource << "MPI_Recv(&"<<_ioVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_WTAG<<", MPI_COMM_WORLD,&stat);";
+        memorySource << "MPI_Recv(&"<<_ioVars[n].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_WTAG<<", MPI_COMM_WORLD,&stat);";
         
         
         memorySource << "break;";
