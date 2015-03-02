@@ -374,6 +374,14 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 _privateVars.push_back(argument.prettyprint());
             }
         }
+        
+        cout<<"Filling OUT vars info"<<endl;
+        _ioVars = fill_vars_info(_ioParams, outlineAux,  construct, initVar, functionScope, globalScope, 1); 
+        cout <<"** OUT VARS **"<<endl;
+        for(int i =0;i<_ioVars.size();++i){
+            cout<<std::string(_ioVars[i].name)<<endl;
+        }
+        
         cout<<"Filling IN vars info"<<endl;
         _inVars = fill_vars_info(_inParams, outlineAux,  construct, initVar, functionScope, globalScope, 0); 
         cout <<"** IN VARS **"<<endl;
@@ -381,12 +389,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             cout<<std::string(_inVars[i].name)<<endl;
         }
         // 
-        cout<<"Filling OUT vars info"<<endl;
-        _ioVars = fill_vars_info(_ioParams, outlineAux,  construct, initVar, functionScope, globalScope, 1); 
-        cout <<"** OUT VARS **"<<endl;
-        for(int i =0;i<_ioVars.size();++i){
-            cout<<std::string(_ioVars[i].name)<<endl;
-        }
+        
         cout<<"Creating initializations"<<endl;
         if(!_initialized) {
             
@@ -2065,7 +2068,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
     cout<<"-------------------------"<<endl;
     for (iter4vars::const_iterator it = params.begin(); it != params.end(); ++it) {
         
-        cout<<"Studying "<<it->first<<" variable"<<endl;
+        //cout<<"Studying "<<it->first<<" variable"<<endl;
         //cout<<it->first<<endl;
         infoVar newR;
         newR.name << it->first;
@@ -2076,11 +2079,44 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                 iterators = findPrincipalIterator(actAST.prettyprint(), it->first);
                 for(int j=0;j<iterators.size();++j)
                     newR.iterVar.push_back(iterators[j]);
+                for(int x=0;x<_inVars.size();++x) {
+                    if(std::string(newR.name).compare(std::string(_inVars[x].name))==0) {
+                        for(int y=0;y<_inVars[x].iterVar.size();++y) {
+                            int finded =0;
+                            for(int z = 0; z<newR.iterVar.size();++z) {
+                                if(std::string(newR.iterVar[z]).compare(std::string(_inVars[x].iterVar[y]))==0)
+                                    finded =1;
+                            }
+                            if(!finded)
+                            newR.iterVar.push_back(_inVars[x].iterVar[y]);
+                            
+                        }
+                        
+                        _ioVars[x].iterVar = newR.iterVar;
+                    }
+                }
             }else{
                 string second = actAST.prettyprint().substr(actAST.prettyprint().find_first_of("=")+1,actAST.prettyprint().length());
                 iterators = findPrincipalIterator(second, it->first);
                 for(int j=0;j<iterators.size();++j)
                     newR.iterVar.push_back(iterators[j]);
+                for(int x=0;x<_ioVars.size();++x) {
+                    if(std::string(newR.name).compare(std::string(_ioVars[x].name))==0) {
+                        for(int y=0;y<_ioVars[x].iterVar.size();++y) {
+                            int finded =0;
+                            for(int z = 0; z<newR.iterVar.size();++z) {
+                                if(std::string(newR.iterVar[z]).compare(std::string(_ioVars[x].iterVar[y]))==0)
+                                    finded =1;
+                            }
+                            if(!finded)
+                            newR.iterVar.push_back(_ioVars[x].iterVar[y]);
+                            
+                        }
+                        
+                        _ioVars[x].iterVar = newR.iterVar;
+                    }
+                }
+                
             }
         }
         //Is iterator variable dependant
@@ -2158,14 +2194,19 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
            
                 //cout<<"Test as: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
             //if(iNOUT && isIOVar(std::string(newR.name))) {
+            
             if(iNOUT) {
                 vars.push_back(newR);
-                 for(int i=0;i<newR.iterVar.size();++i)
-                   cout<<"IOVAR: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
+                cout<<"OUTVAR: "<<std::string(newR.name)<<" iterated by :";
+                for(int i=0;i<newR.iterVar.size();++i)
+                   cout<<", "<<std::string(newR.iterVar[i]);
+                cout<<endl;
             } else if (!iNOUT) {
                 vars.push_back(newR);
-                              for(int i=0;i<newR.iterVar.size();++i)
-                   cout<<"INVAR: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
+                cout<<"INVAR: "<<std::string(newR.name)<<" iterated by :";
+                for(int i=0;i<newR.iterVar.size();++i)
+                   cout<<", "<<std::string(newR.iterVar[i]);
+                cout<<endl;
             }
             
             
@@ -2334,7 +2375,7 @@ ObjectList<Source> TransPhase::findPrincipalIterator(string varUse, string name)
     }
     size_t     nmatch = 2;
     regmatch_t matchesEqual[2]; //A list of the matches in the string (a list of 1)
-    cout<<"V: "<<varUse<<endl;
+//    cout<<"V: "<<varUse<<endl;
     while (regexec(&expEqual, varUse.c_str(), nmatch, matchesEqual, 0) == 0){
         sizeS = varUse.substr(matchesEqual[0].rm_so + name.length()+1, varUse.length());
         sizeS = sizeS.substr(0, sizeS.find_first_of("]"));
@@ -2571,7 +2612,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
         }
         int insideMaster = 0;
         cout<<"Studied expression("<<l<<"/"<<expr_list.size()<<")"<<endl;
-        cout<<ppExpr<<endl;
+//        cout<<ppExpr<<endl;
         if(line < outline_num_line)
             insideMaster = is_inside_master(expr_list[l],scopeL, line, 0);
         //Check if is inside Master(slave does not have the updated value) or next reads/writes 
@@ -3449,9 +3490,9 @@ int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int
     return line;
 }
 int TransPhase::iteratedVarCorrespondstoAnyVarIdx(string initVar, ObjectList<TL::Source> iter) {
-    cout<<"-"<<initVar<<"-"<<endl;
+//    cout<<"-"<<initVar<<"-"<<endl;
     for(int i=0;i<iter.size();++i) {
-        cout<<"vs -"<<std::string(iter[i])<<"-"<<endl;
+//        cout<<"vs -"<<std::string(iter[i])<<"-"<<endl;
         if(std::string(iter[i]).compare(initVar)==0)
             return 1;
     }
