@@ -68,6 +68,7 @@ private:
     int _construct_num_loop;
     int _construct_inside_bucle;
     int _secureWrite;
+    int _workWithCopiesOnSlave;
     vector<string> _uploadedVars;
     AST_t _construct_loop;
     ObjectList<string> _privateVars;
@@ -120,7 +121,7 @@ private:
     AST_t _for_ast, _for_internal_ast_last, _for_internal_ast_first, _file_tree;
     void assignMasterWork(lastAst ast2Work);
     use fill_use(int line, AST_t actAst);
-    int get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int update, int searching_construct);
+    int get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int update, int searching_construct, int initialConstruct);
     AST_t get_first_ast(AST_t ast, ScopeLink scopeL);
     AST_t get_last_ast(AST_t ast, ScopeLink scopeL);
     int is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct);
