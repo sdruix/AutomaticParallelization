@@ -36,10 +36,10 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _WTAG = "WTAG";
     _FTAG = "FTAG";
     _SWTAG = "SWTAG";
-    _withMemoryLimitation = 0;
+    _withMemoryLimitation = 1;
     _oldMPIStyle = 0;
     _secureWrite = 0;
-    _workWithCopiesOnSlave = 0;
+    _workWithCopiesOnSlave = 1;
 }
 
 void TransPhase::run(DTO& dto) {
@@ -1317,27 +1317,29 @@ void TransPhase::putBarrier(int minLine, int staticC, int block_line, PragmaCust
     lastAst lA;
     if(minLine != std::numeric_limits<int>::max() && staticC!=2) {
         
-        Source barrier;
-        barrier << "MPI_Barrier(MPI_COMM_WORLD);";
-        AST_t barrierAST = barrier.parse_global(function_body.get_ast(), function_body.get_scope_link());
-//        cout<<minLine<<": "<<minAST.prettyprint()<<endl;
-        if(minLine == block_line) {
-//            cout<<"1"<<endl;
-            minAST.append(barrierAST);
-        } else {
-//            cout<<"2"<<endl;
-            minAST.prepend(barrierAST);
-        }
+//        Source barrier;
+//        barrier << "MPI_Barrier(MPI_COMM_WORLD);";
+//        AST_t barrierAST = barrier.parse_global(function_body.get_ast(), function_body.get_scope_link());
+////        cout<<minLine<<": "<<minAST.prettyprint()<<endl;
+//        if(minLine == block_line) {
+////            cout<<"1"<<endl;
+//            minAST.append(barrierAST);
+//        } else {
+////            cout<<"2"<<endl;
+//            minAST.prepend(barrierAST);
+//        }
         if(_construct_inside_bucle) {
 //            cout<<"3"<<endl;
             lA._wherePutFinal=_construct_loop;  
 
         } else {
 //            cout<<"4"<<endl;
-            lA._wherePutFinal=barrierAST;  
+            lA._wherePutFinal = minAST;
+            //lA._wherePutFinal=barrierAST;  
 
         }
-        lA._lastModifiedAST=barrierAST;  
+        lA._lastModifiedAST = minAST;
+       // lA._lastModifiedAST=barrierAST;  
 
     } else {
         if(_construct_inside_bucle) {
@@ -2139,15 +2141,15 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                     }
                 }
             } else {
-                 cout<<"HI"<<endl;
+//                 cout<<"HI"<<endl;
                 string second = actAST.prettyprint().substr(actAST.prettyprint().find_first_of("=")+1,actAST.prettyprint().length());
-                cout<<"HI2"<<endl;
+//                cout<<"HI2"<<endl;
                 iterators = findPrincipalIterator(second, it->first);
-               cout<<"HI3"<<endl;
+//               cout<<"HI3"<<endl;
                 for(int j=0;j<iterators.size();++j)
                     newR.iterVar.push_back(iterators[j]);
                 for(int x=0;x<_ioVars.size();++x) {
-                    cout<<"H2I"<<endl;
+//                    cout<<"H2I"<<endl;
                     if(std::string(newR.name).compare(std::string(_ioVars[x].name))==0) {
                         for(int y=0;y<_ioVars[x].iterVar.size();++y) {
                             int finded =0;
@@ -2166,7 +2168,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                 
             }
         }
-        cout<<"HI4"<<endl;
+//        cout<<"HI4"<<endl;
         //Is iterator variable dependant
         
         //newR.iterVarInOperation = outlineAux.get_parameter_ioSpecificIsIteratorDependent(construct.get_scope(),it->first,std::string(initVar));
@@ -2465,7 +2467,7 @@ bool TransPhase::checkDirective(PragmaCustomConstruct construct, string directiv
 void TransPhase::finalize() {
     
     Source fin;
-    fin << "MPI_Finalize();";
+    fin << "(t2 = MPI_Wtime()); MPI_Finalize();";
     AST_t finAST = fin.parse_statement(_translation_unit,_scope_link);
     for (int i=0; i < _lastTransformInfo.size(); ++i) {
         if(i+1<_lastTransformInfo.size()) {
@@ -2497,7 +2499,7 @@ void TransPhase::assignMasterWork(lastAst ast2Work) {
     AST_t masterWorkAST, ast2follow;
     masterWork << "if (myid == 0) {\n"; 
     if(fD.get_function_symbol().get_name().compare("main")==0) {
-        masterWork<< "t2 = MPI_Wtime();"<<"printf(\"MPI_Wtime measured: %1.2f\\n\", t2-t1);";
+        masterWork<<"printf(\"MPI_Wtime measured: %1.2f\\n\", t2-t1);";
     }
     int lastLine = 0;
     for (int l = 0;l < expr_list.size(); l++) {
