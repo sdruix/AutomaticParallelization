@@ -36,7 +36,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _WTAG = "WTAG";
     _FTAG = "FTAG";
     _SWTAG = "SWTAG";
-    _withMemoryLimitation = 1;
+    _withMemoryLimitation = 0;
     _oldMPIStyle = 1;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
@@ -2668,7 +2668,9 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
         int insideMaster = 0;
         cout<<"Studied expression("<<l<<"/"<<expr_list.size()<<")"<<endl;
 //        cout<<ppExpr<<endl;
-        
+//        cout<<"L: "<<line<<endl;
+//        cout<<"OL: "<<outline_num_line<<endl;
+//        cin.get();
         if(line < outline_num_line)
             insideMaster = is_inside_master(expr_list[l],scopeL, line, 0);
         //Check if is inside Master(slave does not have the updated value) or next reads/writes 
@@ -3600,13 +3602,13 @@ int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int
 
                             ObjectList<AST_t> expr_list2 = test.get_statement().get_ast().depth_subtrees(expr_traverse2);
                 //            if(searching_construct) {
-                            cout<<actLineAST.prettyprint()<<endl;
-                            if(expr_list2.size()>1) {
-                                line+=expr_list2.size();
+//                            cout<<actLineAST.prettyprint()<<endl;
+//                            if(expr_list2.size()>1) {
+//                                line+=expr_list2.size();
 //                                cout<<"Incrementing line in: "<<expr_list2.size()<<endl;
 
                 //            }
-                            }
+//                            }
                             
                     }
                 }
