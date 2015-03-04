@@ -37,9 +37,10 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _FTAG = "FTAG";
     _SWTAG = "SWTAG";
     _withMemoryLimitation = 1;
-    _oldMPIStyle = 0;
+    _oldMPIStyle = 1;
     _secureWrite = 0;
-    _workWithCopiesOnSlave = 1;
+    _workWithCopiesOnSlave = 0;
+    _smartUploadDownload = 0;
 }
 
 void TransPhase::run(DTO& dto) {
@@ -2243,15 +2244,15 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
         if(!isReducedVar(std::string(newR.name))  && !isPrivateVar(std::string(newR.name))){
            
                 //cout<<"Test as: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
-            //if(iNOUT && isIOVar(std::string(newR.name))) {
-            if(iNOUT) {
+            if (iNOUT && (isIOVar(std::string(newR.name)) || !_smartUploadDownload)) {
+            //if(iNOUT) {
                 vars.push_back(newR);
                 cout<<"OUTVAR: "<<std::string(newR.name)<<" iterated by :";
                 for(int i=0;i<newR.iterVar.size();++i)
                    cout<<", "<<std::string(newR.iterVar[i]);
                 cout<<endl;
-            //} else if (!iNOUT && isINVar(std::string(newR.name))) {
-            } else if (!iNOUT) {
+            } else if (!iNOUT && (isINVar(std::string(newR.name)) || !_smartUploadDownload)) {
+            //} else if (!iNOUT) {
                 vars.push_back(newR);
                 cout<<"INVAR: "<<std::string(newR.name)<<" iterated by :";
                 for(int i=0;i<newR.iterVar.size();++i)
@@ -2667,6 +2668,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
         int insideMaster = 0;
         cout<<"Studied expression("<<l<<"/"<<expr_list.size()<<")"<<endl;
 //        cout<<ppExpr<<endl;
+        
         if(line < outline_num_line)
             insideMaster = is_inside_master(expr_list[l],scopeL, line, 0);
         //Check if is inside Master(slave does not have the updated value) or next reads/writes 
@@ -2926,7 +2928,53 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     
                     AST_t nouse =fill_smart_use_table(test.get_ast(), scopeL, sC, outline_num_line, prmters, hmpp, line, actAst);
                 }
+                if(ppExpr.find("MPI_Send")==0) {
+                    //cout<<ppExpr<<endl;
+                    string actWord = ppExpr.substr(0,ppExpr.find_first_of(","));
+                    actWord = actWord.substr(actWord.find_first_of("&")+1, actWord.length());
+                    if(actWord.find("[")>=0 && actWord.find("[")<actWord.length())
+                        actWord = actWord.substr(0,actWord.find_first_of("["));
+                    actWord = cleanWhiteSpaces(actWord);
+                   // cout<<actWord;
+                    //cin.get();
+                    f=1;
+                    if(line<outline_num_line) {
+                        if(!hmppOrig || hmppOrig == 2) {
+                            if((_smart_use_table[actWord].row_last_read_cpu.row < line || _smart_use_table[actWord].row_last_read_cpu.row == 0) && isParam(actWord)) {
+                                _smart_use_table[actWord].row_last_read_cpu = fill_use(line,actAst);
+                            }
+                        } 
+                    }
+                }
+                if(ppExpr.find("MPI_Recv")==0) {
+                    //cout<<ppExpr<<endl;
+                    string actWord = ppExpr.substr(0,ppExpr.find_first_of(","));
+                    actWord = actWord.substr(actWord.find_first_of("&")+1, actWord.length());
+                    if(actWord.find("[")>=0 && actWord.find("[")<actWord.length())
+                        actWord = actWord.substr(0,actWord.find_first_of("["));
+                    actWord = cleanWhiteSpaces(actWord);
+                   // cout<<actWord;
+                    //cin.get();
+                    f=1;
+                    if(line<outline_num_line) {
+                        if(!hmppOrig || hmppOrig == 2) {
+                            if((_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) && isParam(actWord)) {
+                                if(insideMaster)
+                                    _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst);
+                            }
+                        } else {
+
+                            if(inside) {
+                                if((_smart_use_table[actWord].row_last_write_cpu.row < line || _smart_use_table[actWord].row_last_write_cpu.row == 0) && isParam(actWord)) {
+                                    if(insideMaster)
+                                        _smart_use_table[actWord].row_last_write_cpu = fill_use(line,actAst);
+                                }
+                            }
+                        }
+                    }
+                }
                 if(expr.is_function_call()&& f==0){
+                    
                     f=1;
                     if(hmppOrig == 2) 
                         _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
@@ -3460,11 +3508,16 @@ int TransPhase::is_inside_master(AST_t ast2check, ScopeLink scopeL, int exprLine
                 for (ObjectList<AST_t>::iterator it = expr_listUse.begin();it != expr_listUse.end(); it++, lU++) {
                     Expression exprL(expr_listUse[lU], scopeL);
                     
-                    //                    cout<<"Checking vs expression: "<<expr_listUse[lU].prettyprint()<<"("<<checkExprLine<<")"<<endl;
+                    //cout<<"Checking vs expression: "<<expr_listUse[lU].prettyprint()<<"("<<checkExprLine<<")"<<endl;
                     if(ast2check.prettyprint().compare(expr_listUse[lU].prettyprint())==0) {
                         int checkExprLine =get_real_line(exprL.get_enclosing_function().get_function_body().get_ast(), scopeL, exprI.get_ast(), 0, 0,0);
-                        checkExprLine+=numIF;
+                        checkExprLine+=numIF+(_num_transformed_blocks-1);
+//                        cout<<"1: "<<expr_listUse[lU].prettyprint()<<" - "<<exprLine<<endl;
+//                        cout<<"2: "<<ast2check.prettyprint()<<" - "<<checkExprLine<<endl;
+//                        cin.get();
                         if(exprLine == checkExprLine) {
+                            
+                            //cin.get();
                             return 1;
                             
                         }

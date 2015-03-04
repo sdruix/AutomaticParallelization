@@ -138,6 +138,7 @@ private:
     string transformConstructAST(PragmaCustomConstruct construct, ScopeLink scopeL, Scope sC, Source initVar);
     int _withMemoryLimitation;
     int _oldMPIStyle;
+    int _smartUploadDownload;
     int isParam(string p2check);
     void useOldStyle(int staticC, Source mpiVariantStructurePart1, Source mpiVariantStructurePart2, Source mpiVariantStructurePart3, 
                             string maxS, Source initVar, Scope functionScope, Source initValue, 
@@ -162,7 +163,22 @@ private:
 //                cout<<a.prettyprint().find("++")<<endl;
 //                cout<<a.prettyprint().length()-3<<endl;
 //                cin.get();
-
+            if(a.prettyprint().find("MPI_")>= 0 && a.prettyprint().find("MPI_")<a.prettyprint().length()){
+                std::istringstream f(a.prettyprint());
+                std::string line;    
+                int lines=0;
+                while (std::getline(f, line)) {
+                    lines++;
+                }
+                
+                if(lines==1){
+//                    cout<<a.prettyprint()<<endl;
+//                    cin.get();
+                    retBool = true;
+                    return ast_traversal_result_helper(retBool,false);
+                }
+                
+            }
             if (Expression::predicate(a)) {
                 Expression expr(a, _slLU);
 //                cout<<"as. "<<a.prettyprint()<<endl;
