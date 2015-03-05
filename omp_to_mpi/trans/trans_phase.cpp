@@ -36,11 +36,13 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _WTAG = "WTAG";
     _FTAG = "FTAG";
     _SWTAG = "SWTAG";
-    _withMemoryLimitation = 0;
+    _FRTAG = "FRTAG";
+    _withMemoryLimitation = 1;
     _oldMPIStyle = 1;
     _secureWrite = 0;
-    _workWithCopiesOnSlave = 0;
+    _workWithCopiesOnSlave = 1;
     _smartUploadDownload = 0;
+    _fullArrayReads = 0;
 }
 
 void TransPhase::run(DTO& dto) {
@@ -405,6 +407,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     "const int "<<_RTAG<<" = 2;"
                     "const int "<<_WTAG<<" = 3;"
                     "const int "<<_SWTAG<<" = 4;"
+                    "const int "<<_FRTAG<<" = 5;"
                     ;
             _maxManagedVarsCoor = 0;
             for(int j = 0; j<_inVars.size();++j) {  
@@ -714,7 +717,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 Source mpiVariantStructurePart4, mpiVariantStructurePart5, mpiVariantStructurePart6;
                 
-                cout<<"Generating MPI Slave code"<<endl;
+                cout<<"Generating MPI Slave code"<<endl;;
                 if(staticC!=0) {
                     if(_inVars.size()!=0){
                     mpiVariantStructurePart4 
@@ -722,7 +725,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             <<";} else {offset = (" << maxS << "/ (size-1) * (myid-1))+"<<initValue<<";}";
                     }
                     mpiVariantStructurePart4 << "while(1){"
-                            << "MPI_Recv(&partSize, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);";
+                            << "MPI_Recv(&partSize, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);"
+                            << "int idxForReadWriteSwitch;";
                     for(int i = 0; i<_inVars.size(); ++i){
                         //if(isINVar(std::string(_inVars[i].name)) && !_withMemoryLimitation) {
                         if(!_withMemoryLimitation) {
@@ -881,6 +885,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     mpiVariantStructurePart4<<"while(1){"
                             "MPI_Recv(&offset, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);";
                     mpiVariantStructurePart6 << "MPI_Recv(&partSize, 1, MPI_INT, 0, "<<_ATAG<<", MPI_COMM_WORLD, &stat);";
+                    
+                    mpiVariantStructurePart6 << "int idxForReadWriteSwitch;";
                     for(int i = 0; i<_inVars.size(); ++i){
                         //if(isINVar(std::string(_inVars[i].name)) && !_withMemoryLimitation) {
                         if(!_withMemoryLimitation) {
@@ -1027,7 +1033,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                         <<"if(stat.MPI_TAG == "<<_ATAG<<") {"
                         ;
 //                if(_withMemoryLimitation) {
-                    mpiFixStructurePart2 <<mpiVariantStructurePart6<<"for("<<initType<<" "<<initVar<<" = offset; "<<initVar<<"<offset+partSize;++"<<initVar<<")";
+                    
 //                } else {
 //                    mpiFixStructurePart2 <<mpiVariantStructurePart6<< "for("<<initType<<" "<<initVar<<" = 0; "<<initVar<<"<partSize;++"<<initVar<<")";
 //                }
@@ -1041,6 +1047,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 //
                 completeLoopsInAST(construct.get_ast(), function_def.get_function_body().get_scope_link());
                 constructASTS = transformConstructAST(construct, function_def.get_function_body().get_scope_link(), functionScope, initVar); 
+                mpiFixStructurePart2 <<mpiVariantStructurePart6<<_aditionalLines<<"for("<<initType<<" "<<initVar<<" = offset; "<<initVar<<"<offset+partSize;++"<<initVar<<")";
                 mpiFixStructurePart2 <<"{"<<constructASTS<<"}"<<mpiVariantStructurePart2;
                 
                 //mpiFixStructurePart2 << generateMPIVariableMessagesSend(_ioVars,initVar,functionScope,"0","offset",1);
@@ -1527,24 +1534,12 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                     //                    }
                     int knowedVariable = 0;
                     if(!hasChanges) {
-                        int f = 0;
-                        for(int k = 0; k<newVariables.size();++k){
-                            if(newVariables[k].compare("idxForReadWriteSwitch")==0) {
-                                f = 1;
-                                break;
-                            }
-                        }
-                        if(!f && !knowedVariable) {
-                            variableInit << "int idxForReadWriteSwitch;";
-                            newVariables.push_back("idxForReadWriteSwitch");
-                        }
-                        
-                        operandMPIWrites <<" idxForReadWriteSwitch ="<<finded<<";\n";
+                        operandMPIWrites <<" (idxForReadWriteSwitch ="<<finded<<");\n";
                     } else {
-                        operandMPIWrites <<" idxForReadWriteSwitch ="<<finded<<";\n";
+                        operandMPIWrites <<" (idxForReadWriteSwitch ="<<finded<<");\n";
                     }
                     if(_secureWrite)
-                            operandMPISecureWrite <<" idxForReadWriteSwitch ="<<finded<<";\n";
+                            operandMPISecureWrite <<" (idxForReadWriteSwitch ="<<finded<<");\n";
                     if(isLastWrite) {
                         if(_secureWrite) {
                             operandMPISecureWrite << "MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_SWTAG<<", MPI_COMM_WORLD);\n ";
@@ -1636,8 +1631,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                         } else {
                             
                             if(_secureWrite)
-                                secureWrite << "if ("<<firstIterator<<">partSize"<<"){"<<operandMPISecureWrite<<"}";
-                            mpiWrites << "if ("<<firstIterator<<">partSize"<<"){"<<operandMPIWrites<<"} else {("<<variableCopyName<<"="<<rectifiedVarName<<");}";
+                                secureWrite << "if ("<<firstIterator<<">offset + partSize"<<" || "<<firstIterator<<"<offset){"<<operandMPISecureWrite<<"}";
+                            mpiWrites << "if ("<<firstIterator<<">offset + partSize"<<" || "<<firstIterator<<"<offset){"<<operandMPIWrites<<"} else {("<<variableCopyName<<"="<<rectifiedVarName<<");}";
                         }
                     } else {
                         hasChanges = 1;
@@ -1672,7 +1667,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 Source operandMPIReads;
                                             
                 if(std::string(operands[e]).find_first_of("[")>= 0 && std::string(operands[e]).find_first_of("[")<std::string(operands[e]).length()) {
-                     
+                    string firstIterator; 
                     string actArg = std::string(operands[e]).substr(0,std::string(operands[e]).find_first_of("["));
                     string iterators = std::string(operands[e]).substr(std::string(operands[e]).find_first_of("[")+1, std::string(operands[e]).length());
                     actArg = cleanWhiteSpaces(actArg);
@@ -1687,7 +1682,31 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                     }
                     if(finded>-1) {
                           
-                        Source variableNewName, variableDeclaration;
+                        Source variableNewName, variableDeclaration, dimensions;
+                        int isInRange = 0;
+                        string rangeInitialValue = "0";
+                        string rangeFinishValue = "1";
+                        AST_t forIterated;
+                        firstIterator = iterators.substr(0,iterators.find_first_of("]"));
+                        firstIterator = cleanWhiteSpaces(firstIterator);
+                        int minLine = expr_list[l].get_line();
+                        for(int i = 0;i<_ioParams[actArg].size();++i){
+                            if(_ioParams[actArg][i].get_line()<minLine)
+                                minLine = _ioParams[actArg][i].get_line();
+                        }
+//                        cout<<"MinLine = "<<minLine<<endl;
+//                        cout<<"Read Line = "<<expr_list[l].get_line()<<endl;
+//                        cin.get();
+                        if(_fullArrayReads && isUploadedVar(actArg) && std::string(initVar).compare(std::string(firstIterator)) != 0 
+                                && expr_list[l].get_line()>=minLine && (isINVar(actArg)|| !_smartUploadDownload)) {
+                            
+                           
+                            isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg);
+                            rangeInitialValue = _rI;
+                            rangeFinishValue = _rF;
+                            forIterated = _forIter;
+                            cout<<"inRange: "<<std::string(operands[e])<<endl;
+                        }
                         variableNewName <<actArg;
                         variableDeclaration << std::string(_inVars[finded].type)<<" ";
                         string upperType = std::string(_inVars[finded].type);
@@ -1711,30 +1730,16 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                         //                                break;
                         //                            }
                         //                        }
+                        
                         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
                         int n = 0, knowedVariable=0;
                         if(!hasChanges) {
                             
-                            int f = 0;
-                            for(int k = 0; k<newVariables.size();++k){
-                                cout<<"E: "<<newVariables[k]<<endl;
-                                if(newVariables[k].compare("idxForReadWriteSwitch")==0) {
-                                    f = 1;
-                                    break;
-                                }
-                            }
-                            cout<<f<<" , "<<knowedVariable<<endl;
-                            if(!f && !knowedVariable) {
-                                variableInit << "int idxForReadWriteSwitch;";
-                                newVariables.push_back("idxForReadWriteSwitch");
-                            }
-                            operandMPIReads <<" idxForReadWriteSwitch ="<<finded<<";\n";
+                            operandMPIReads <<" (idxForReadWriteSwitch ="<<finded<<");\n";
                         } else {
-                            operandMPIReads <<" idxForReadWriteSwitch ="<<finded<<";\n";
+                            operandMPIReads <<" (idxForReadWriteSwitch ="<<finded<<");\n";
                         }
-                        if(isFirstRead) {
-                            operandMPIReads << "MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_RTAG<<", MPI_COMM_WORLD); \n";
-                        }
+                       
                         string  allIter = std::string(operands[e]).substr(std::string(operands[e]).find_first_of("["), std::string(operands[e]).length());
                         if(allIter.find(";")>=0 && allIter.find(";")<allIter.length())
                             allIter = allIter.substr(0,allIter.find(";"));
@@ -1747,13 +1752,18 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 break;
                             }
                             if(isFirstRead) {
-                                operandMPIReads << "(coordVector"
+                                if(!_fullArrayReads || !isInRange) {
+                                    operandMPIReads << "(coordVector"
                                         <<_num_transformed_blocks
                                         <<"["
                                         <<n
                                         <<
                                         "] = "
                                         <<actIt<<");\n";
+                                } else {
+                                    if(n>0)
+                                        dimensions <<"* "<<_inVars[finded].size[n];
+                                }
                             }
                             if(iterators.find("[")>=0 && iterators.find("[")<iterators.length())
                                 iterators = iterators.substr(iterators.find_first_of("[")+1, iterators.length());
@@ -1764,6 +1774,13 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             n++;
                             //cout<<"Continue with: "<<iterators<<endl;
                             //
+                        }
+                         
+                        if(isFirstRead) {
+                            if(_fullArrayReads && !knowedVariable && isInRange)
+                                operandMPIReads << "MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_FRTAG<<", MPI_COMM_WORLD); \n";
+                            else
+                                operandMPIReads << "MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_RTAG<<", MPI_COMM_WORLD); \n";
                         }
                         
                         string rectifiedVarName = rectifyName(std::string(variableNewName));
@@ -1779,36 +1796,94 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             variableInit << variableDeclaration<< rectifiedVarName<<";\n";
                             newVariables.push_back(rectifiedVarName);
                         }
-                        if(isFirstRead) {
+                        if(isFirstRead && (!_fullArrayReads || !isInRange)) {
                             operandMPIReads <<"MPI_Send(&coordVector"<<_num_transformed_blocks<<","<<n<<", MPI_INT, 0, "<<_RTAG<<", MPI_COMM_WORLD);";
                             operandMPIReads <<"MPI_Recv(&"<<rectifiedVarName<<", 1, MPI_"<<upperType<<", 0, "<<_RTAG<<", MPI_COMM_WORLD, &stat);\n";
                         }
+                       cout<<expr_list[l].prettyprint()<<endl;    
                         if(!knowedVariable) {
                             hasChanges =1;
-                                thisHasChanges = 1;
-                                
+                            thisHasChanges = 1;
+                            
                             if(_withMemoryLimitation || !isUploadedVar(actArg)) {
                                 mpiReads << operandMPIReads;                                                     
                             } else {
+                                
                                 Source variableCopyName;
                                 string firstIterator = allIter.substr(0,allIter.find_first_of("]"));
                                 firstIterator = firstIterator.substr(firstIterator.find_first_of("[")+1,firstIterator.length());
-                                if(_workWithCopiesOnSlave)
+                                if(_workWithCopiesOnSlave) {
                                     variableCopyName << actArg<<"_MPICOPY["<<firstIterator<<"-offset]";
-                                else
+                                } else {
                                     variableCopyName << actArg<<"["<<firstIterator<<"]";
-                                copyVariables.push_back(std::string(variableCopyName));
-                                string restIters = "";
-                                if((allIter.find_last_of("]"))!=allIter.length()) {
-                                    restIters = allIter.substr(allIter.find_first_of("]")+1,allIter.length());
-                                    restIters = restIters.substr(0,restIters.find_last_of("]")+1);
                                 }
-                                
-                                variableCopyName <<restIters;
-                                mpiReads << "if ("<<firstIterator<<">partSize"<<"){"<<operandMPIReads<<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}";
+                                if(_fullArrayReads && isInRange) {
+                                     
+                                    Source preRead;
+                                    Source postRead;
+                                    preRead << "(coordVector"
+                                        <<_num_transformed_blocks
+                                        <<"[0] = "
+                                        <<rangeInitialValue<<");\n";
+                                    preRead << "(coordVector"
+                                        <<_num_transformed_blocks
+                                        <<"[1] = (offset > "<<rangeFinishValue<<") ? ("<<rangeFinishValue<<" - "<<rangeInitialValue<<") : (offset -"<<rangeInitialValue<<")"
+                                        <<");\n";
+                                    preRead <<"if (("<<rangeInitialValue<<") < offset&& coordVector"
+                                        <<_num_transformed_blocks<<"[1] > 0) {"
+                                            <<operandMPIReads 
+                                            <<"MPI_Send(&coordVector"<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_RTAG<<", MPI_COMM_WORLD);"
+                                            <<"MPI_Recv(&"<<actArg<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_RTAG<<", MPI_COMM_WORLD, &stat);\n"
+                                            <<"}";
+                                    postRead << "(coordVector"
+                                        <<_num_transformed_blocks
+                                        <<"[0] = ((offset + partSize) > ("<<rangeInitialValue<<")) ? (offset + partSize) : ("<<rangeInitialValue<<")"
+                                        <<");\n";
+                                    postRead << "(coordVector"
+                                        <<_num_transformed_blocks
+                                        <<"[1] = ((offset + partSize) > ("<<rangeInitialValue<<")) ? ("<<rangeFinishValue<<" - (offset + partSize) ) : ("<<rangeFinishValue<<" - "<<rangeInitialValue<<")"
+                                        <<");\n";
+                                    
+                                    postRead <<"if (("<<rangeFinishValue<<") > offset+partSize && coordVector"
+                                        <<_num_transformed_blocks<<"[1] > 0) {"
+                                            <<operandMPIReads 
+                                            <<"MPI_Send(&coordVector"<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_RTAG<<", MPI_COMM_WORLD);"
+                                            <<"MPI_Recv(&"<<actArg<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_RTAG<<", MPI_COMM_WORLD, &stat);\n"
+                                            <<"}";
+                                    Source read;
+                                    read << preRead << postRead;
+//                                    cout<< "R: "<<std::string(read)<<endl;
+//                                    cin.get();
+                                   
+                                    if(!_outsideAditionalReads) {
+                                        cout<<forIterated.get_line()<<endl;
+                                        cout<<construct_ast.get_line()<<endl;
+//                                        cout<<"append"<<endl;
+                                        AST_t readAST;
+                                        readAST = read.parse_statement(construct.get_scope(),construct.get_enclosing_function().get_scope_link());
+                                        forIterated.prepend(readAST);
+                                         
+                                    } else {
+                                        _aditionalLines << read;
+//                                       cout<<"Will be outside construct"<<endl;
+                                    }
+                                   
+//                                    cin.get();  
+                                } else {
+                                    copyVariables.push_back(std::string(variableCopyName));
+                                    string restIters = "";
+                                    if((allIter.find_last_of("]"))!=allIter.length()) {
+                                        restIters = allIter.substr(allIter.find_first_of("]")+1,allIter.length());
+                                        restIters = restIters.substr(0,restIters.find_last_of("]")+1);
+                                    }
+
+                                    variableCopyName <<restIters;
+                                    mpiReads << "if ("<<firstIterator<<">offset + partSize"<<" || "<<firstIterator<<"<offset){"<<operandMPIReads<<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}";
+                                }
                             }
                             
-                            line = replaceAll(line, operands[e], rectifiedVarName);
+                            if(!_fullArrayReads || !isInRange)
+                                line = replaceAll(line, operands[e], rectifiedVarName);
                             
                         } else {
                             Source variableCopyName;
@@ -1885,21 +1960,11 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
             if(findedW>-1) {
                 variableNewName <<actArg;
                 if(!hasChanges) {
-                    int f = 0;
-                    for(int k = 0; k<newVariables.size();++k){
-                        if(newVariables[k].compare("idxForReadWriteSwitch")==0) {
-                            f = 1;
-                            break;
-                        }
-                    }
-                    if(!f) {
-                        variableInit << "int idxForReadWriteSwitch;";
-                        newVariables.push_back("idxForReadWriteSwitch");
-                    }
+                    
                     
                 } 
                if(_secureWrite) {
-                    secureWrite <<" idxForReadWriteSwitch ="<<findedW<<";\n";
+                    secureWrite <<" (idxForReadWriteSwitch ="<<findedW<<");\n";
                     secureWrite << "MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_SWTAG<<", MPI_COMM_WORLD);\n ";
                 }
                
@@ -1961,8 +2026,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 thisHasChanges = 1;
                 if(!knowedVariable) {
                     
-                    operandMPIReads <<" idxForReadWriteSwitch ="<<findedR<<";\n";
-                    operandMPIWrites <<" idxForReadWriteSwitch ="<<findedW<<";\n";
+                    operandMPIReads <<" (idxForReadWriteSwitch ="<<findedR<<");\n";
+                    operandMPIWrites <<" (idxForReadWriteSwitch ="<<findedW<<");\n";
                     operandMPIWrites << "MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_WTAG<<", MPI_COMM_WORLD);\n ";
                     operandMPIReads << "MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_RTAG<<", MPI_COMM_WORLD);\n ";
                     if(_ioVars[findedW].size.size()>0) {
@@ -2006,7 +2071,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                         else
                             exprS =operatorAS+exprString+";";
                         Source condition;
-                        condition << "if ("<<firstIterator<<">partSize"<<"){";
+                        condition << "if ("<<firstIterator<<">offset + partSize"<<" || "<<firstIterator<<"<offset){";
                         newExprSource  << condition <<operandMPIReads <<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}"
                                 <<"("<<exprString<<operatorAS<<");" <<"\n"
                                 << condition << operandMPIWrites <<"} else {("<<variableCopyName<<"="<<rectifiedVarName<<");}";
@@ -2071,7 +2136,110 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
     //    
     return astPrettyprint;
 }
+int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName) {
 
+    TraverseASTFunctor4LocateFor expr_traverseFor(scopeL);
+    ObjectList<AST_t> expr_listFor = astWhereSearch.depth_subtrees(expr_traverseFor);
+    int lF = 0;
+    int minLine = ast.get_line();
+    for(int i = 0;i<_ioParams[variableName].size();++i){
+        if(_ioParams[variableName][i].get_line()<minLine)
+            minLine = _ioParams[variableName][i].get_line();
+    }
+    cout<<"MinLine = "<<minLine<<endl;
+    _outsideAditionalReads = 1;
+    for (ObjectList<AST_t>::iterator it = expr_listFor.begin();it != expr_listFor.end(); it++, lF++) { 
+        if(ForStatement::predicate(expr_listFor[lF])) {
+            Statement s(expr_listFor[lF],scopeL);
+            ForStatement fS(s);
+            string inductionVar = fS.get_induction_variable().prettyprint();
+//            cout<<fS.get_iterating_init()<<endl;
+//            cout<<fS.get_iterating_condition().prettyprint()<<endl;
+//            cout<<inductionVar<<endl;
+//            cin.get();
+            
+            if(inductionVar.compare(principalIt) == 0) {
+                
+                TraverseASTFunctor4LocateUse expr_traverseUse(scopeL);
+                ObjectList<AST_t> expr_listUse = fS.get_loop_body().get_ast().depth_subtrees(expr_traverseUse);
+                int l = 0;
+                int finded = 0;
+                for (ObjectList<AST_t>::iterator it2 = expr_listUse.begin();it2 != expr_listUse.end(); it2++, l++) { 
+                    if(ast.prettyprint().compare(expr_listUse[l].prettyprint())==0 && ast.get_line() == expr_listUse[l].get_line()) {
+                        finded = 1;
+                        //falta check si son la mateixa linea
+                    }
+                }
+                if(finded) {
+                    if(expr_listUse[l].get_line()>minLine) {
+                        _forIter = expr_listFor[lF];
+                        _outsideAditionalReads = 0;
+                        cout<<"Read afterMinLine on "<<expr_listUse[l].get_line()<<endl;
+                        cin.get();
+                    }
+//                    cout<< fS.prettyprint()<<endl;
+//                    cin.get();
+                    Source initS;
+                    AST_t init = fS.get_iterating_init();
+                    Expression exprInit(init, fS.get_scope_link());
+            
+                    initS << exprInit.prettyprint();
+                    string tempInitValue = std::string(initS).substr(std::string(initS).find_first_of("=")+1,std::string(initS).length());
+                    if(tempInitValue.find_first_of(";")>=0 && tempInitValue.find_first_of(";")<tempInitValue.length()) {
+//                        cout<<"; found"<<endl;
+                        tempInitValue = tempInitValue.substr(0,tempInitValue.find_first_of(";"));
+                    }
+                    tempInitValue = cleanWhiteSpaces(tempInitValue);
+                    string varToWork;
+                    Expression condition = fS.get_iterating_condition();
+                    string conditionToWork = condition.prettyprint();
+            
+            
+                    if(conditionToWork.find_first_of(";")>=0 && conditionToWork.find_first_of(";")<conditionToWork.length()){
+                        conditionToWork.substr(0,conditionToWork.find_first_of(";")-1);
+                    }
+                    if(conditionToWork.find_first_of("=")>=0 && conditionToWork.find_first_of("=")<conditionToWork.length()){
+                        varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("="));
+                        conditionToWork = conditionToWork.substr(conditionToWork.find_first_of("=")+1,conditionToWork.length());
+
+                    }
+                    if(conditionToWork.find_first_of("<")>=0 && conditionToWork.find_first_of("<")<conditionToWork.length()){
+                        varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("<"));
+                        conditionToWork =conditionToWork.substr(conditionToWork.find_first_of("<")+1,conditionToWork.length());
+
+                    }
+                    if(conditionToWork.find_first_of(">")>=0 && conditionToWork.find_first_of(">")<conditionToWork.length()){
+                        varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("<"));
+                        conditionToWork =conditionToWork.substr(conditionToWork.find_first_of(">")+1,conditionToWork.length());
+
+                    }
+                    varToWork = cleanWhiteSpaces(varToWork);
+                    if(varToWork.compare(principalIt)!=0){
+                        cerr << "Complex for not supported"<<endl;
+                        exit(-1);
+                    }
+                    conditionToWork =  cleanWhiteSpaces(conditionToWork);
+                    _rI = tempInitValue;
+                    _rF = conditionToWork;
+                    
+//                    cout<< _rI<< endl;
+//                    cout<< _rF<< endl;
+//                    cout<< _forIter.prettyprint()<< endl;
+//                    cin.get();
+                    return 1;
+                }
+//                _forIter = fS.get_ast();
+//                _rF = "100";
+            } else {
+//            
+                return isInForIteratedBy(principalIt, ast, fS.get_loop_body().get_ast(), scopeL, variableName);
+//
+            }
+        }
+    }
+
+    return 0;
+}
 int TransPhase::isUploadedVar(string name){
     for (int i=0;i<_uploadedVars.size();++i)
         if(_uploadedVars[i].compare(name)==0) {
@@ -3766,7 +3934,7 @@ Source TransPhase::handleMemory(string source) {
 
                     //}
                 }
-        memorySource<<"} } }while(stat.MPI_TAG != WTAG);";
+        memorySource<<"} } }while(stat.MPI_TAG != "<<_WTAG<<");";
                     
         
         if(_ioVars[n].size.size()>0) {
@@ -3782,7 +3950,30 @@ Source TransPhase::handleMemory(string source) {
         memorySource << "break;";
         //}
         //}
-    }         
+    }
+    if(_fullArrayReads) {
+    memorySource<<"} } else if(stat.MPI_TAG == "<<_FRTAG<<") {"
+            "switch (partSize) {";
+        for (int i = 0; i< _inVars.size();++i){
+            //if(_inVars[i].size.size()>0) {
+            Source dimensions;
+            string upperType = std::string(_inVars[i].type);
+            std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            //if(_inVars[i].size.size()>0) {
+            memorySource<< "case  "<<i<<": ";
+            if(_inVars[i].size.size()>0) {
+                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD, &stat);";
+            }
+            for(int x=1; x<_inVars[i].size.size();++x) {
+                dimensions<<" * "<<std::string(_inVars[i].size[x]);
+            }
+            memorySource << "MPI_Send(&"<<_inVars[i].name<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<", MPI_"<<upperType<<", "<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD);";
+            memorySource << "break;";
+            //}
+
+            //}
+        }
+    }
     memorySource<<"} }";           
     
     return memorySource;

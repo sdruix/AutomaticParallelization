@@ -69,6 +69,8 @@ private:
     int _construct_inside_bucle;
     int _secureWrite;
     int _workWithCopiesOnSlave;
+    Source _aditionalLines;
+    int _outsideAditionalReads;
     vector<string> _uploadedVars;
     AST_t _construct_loop;
     ObjectList<string> _privateVars;
@@ -85,6 +87,7 @@ private:
     string _FTAG;
     string _WTAG;
     string _SWTAG;
+    string _FRTAG;        
     vector<lastAst> _lastTransformInfo;
     //*******************
     struct use{
@@ -136,9 +139,14 @@ private:
     string replaceAll(std::string str, const std::string& from, const std::string& to);
     AST_t fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, int outline_num_line, ObjectList<Symbol> prmters , int hmppOrig, int offset, AST_t prevAST);
     string transformConstructAST(PragmaCustomConstruct construct, ScopeLink scopeL, Scope sC, Source initVar);
+    int isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName);
     int _withMemoryLimitation;
     int _oldMPIStyle;
     int _smartUploadDownload;
+    int _fullArrayReads;
+    string _rI;
+    string _rF;
+    AST_t _forIter;
     int isParam(string p2check);
     void useOldStyle(int staticC, Source mpiVariantStructurePart1, Source mpiVariantStructurePart2, Source mpiVariantStructurePart3, 
                             string maxS, Source initVar, Scope functionScope, Source initValue, 
