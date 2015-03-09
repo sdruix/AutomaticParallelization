@@ -40,7 +40,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _withMemoryLimitation = 1;
     _oldMPIStyle = 1;
     _secureWrite = 0;
-    _workWithCopiesOnSlave = 1;
+    _workWithCopiesOnSlave = 0;
     _smartUploadDownload = 0;
     _fullArrayReads = 0;
 }
@@ -730,7 +730,11 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     for(int i = 0; i<_inVars.size(); ++i){
                         //if(isINVar(std::string(_inVars[i].name)) && !_withMemoryLimitation) {
                         if(!_withMemoryLimitation) {
-                            _uploadedVars.push_back(std::string(_inVars[i].name));
+                            uploadInfo up;
+                            up.name = std::string(_inVars[i].name);
+                            up.start = "offset";
+                            up.end = "offset + partSize";
+                            _uploadedVars.push_back(up);
                             Source numberOfPointers;
                             string nameCopy= std::string(_inVars[i].name);
                             if(_workWithCopiesOnSlave)
@@ -899,7 +903,11 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
                             stringstream varSent, size, iterators;
                             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar) || _inVars[i].size.size()<1) {
-                                _uploadedVars.push_back(std::string(_inVars[i].name));
+                                uploadInfo up;
+                                up.name = std::string(_inVars[i].name);
+                                up.start = "offset";
+                                up.end = "offset + partSize";
+                                _uploadedVars.push_back(up);
                             
                             
                                 varSent << nameCopy;
@@ -1697,9 +1705,13 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
 //                        cout<<"MinLine = "<<minLine<<endl;
 //                        cout<<"Read Line = "<<expr_list[l].get_line()<<endl;
 //                        cin.get();
+                        int numUploadedVar = 0;
                         if(_fullArrayReads && isUploadedVar(actArg) && std::string(initVar).compare(std::string(firstIterator)) != 0 
                                 && expr_list[l].get_line()>=minLine && (isINVar(actArg)|| !_smartUploadDownload)) {
-                            
+                            for(int x = 0; x<_uploadedVars.size();++x){
+                                if(_uploadedVars[x].name.compare(actArg)==0)
+                                    numUploadedVar = x;
+                            }
                            
                             isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg);
                             rangeInitialValue = _rI;
@@ -1819,6 +1831,10 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 }
                                 if(_fullArrayReads && isInRange) {
                                      
+                                    if(!_outsideAditionalReads) {
+                                        _uploadedVars[numUploadedVar].start = "offset";
+                                        _uploadedVars[numUploadedVar].end = "offset+partSize";
+                                    }
                                     Source preRead;
                                     Source postRead;
                                     preRead << "(coordVector"
@@ -1827,35 +1843,41 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         <<rangeInitialValue<<");\n";
                                     preRead << "(coordVector"
                                         <<_num_transformed_blocks
-                                        <<"[1] = (offset > "<<rangeFinishValue<<") ? ("<<rangeFinishValue<<" - "<<rangeInitialValue<<") : (offset -"<<rangeInitialValue<<")"
-                                        <<");\n";
-                                    preRead <<"if (("<<rangeInitialValue<<") < offset&& coordVector"
+                                            <<"[1] = ("<<_uploadedVars[numUploadedVar].start<<" > "<<rangeFinishValue<<") ? ("
+                                            <<rangeFinishValue<<" - "<<rangeInitialValue<<") : ("<<_uploadedVars[numUploadedVar].start
+                                            <<" -"<<rangeInitialValue<<")"
+                                            <<");\n";
+                                    preRead <<"if (("<<rangeInitialValue<<") < "<<_uploadedVars[numUploadedVar].start<<" && coordVector"
                                         <<_num_transformed_blocks<<"[1] > 0) {"
                                             <<operandMPIReads 
-                                            <<"MPI_Send(&coordVector"<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_RTAG<<", MPI_COMM_WORLD);"
-                                            <<"MPI_Recv(&"<<actArg<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_RTAG<<", MPI_COMM_WORLD, &stat);\n"
+                                            <<"MPI_Send(&coordVector"<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_FRTAG<<", MPI_COMM_WORLD);"
+                                            <<"MPI_Recv(&"<<actArg<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_FRTAG<<", MPI_COMM_WORLD, &stat);\n"
                                             <<"}";
                                     postRead << "(coordVector"
                                         <<_num_transformed_blocks
-                                        <<"[0] = ((offset + partSize) > ("<<rangeInitialValue<<")) ? (offset + partSize) : ("<<rangeInitialValue<<")"
-                                        <<");\n";
+                                            <<"[0] = (("<<_uploadedVars[numUploadedVar].end<<") > ("<<rangeInitialValue<<")) ? ("
+                                            <<_uploadedVars[numUploadedVar].end<<") : ("<<rangeInitialValue<<")"
+                                            <<");\n";
                                     postRead << "(coordVector"
                                         <<_num_transformed_blocks
-                                        <<"[1] = ((offset + partSize) > ("<<rangeInitialValue<<")) ? ("<<rangeFinishValue<<" - (offset + partSize) ) : ("<<rangeFinishValue<<" - "<<rangeInitialValue<<")"
-                                        <<");\n";
+                                            <<"[1] = (("<<_uploadedVars[numUploadedVar].end<<") > ("<<rangeInitialValue<<")) ? ("
+                                            <<rangeFinishValue<<" - ("<<_uploadedVars[numUploadedVar].end<<") ) : ("<<rangeFinishValue<<" - "<<rangeInitialValue<<")"
+                                            <<");\n";
                                     
-                                    postRead <<"if (("<<rangeFinishValue<<") > offset+partSize && coordVector"
+                                    postRead <<"if (("<<rangeFinishValue<<") > "<<_uploadedVars[numUploadedVar].end<<" && coordVector"
                                         <<_num_transformed_blocks<<"[1] > 0) {"
                                             <<operandMPIReads 
-                                            <<"MPI_Send(&coordVector"<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_RTAG<<", MPI_COMM_WORLD);"
-                                            <<"MPI_Recv(&"<<actArg<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_RTAG<<", MPI_COMM_WORLD, &stat);\n"
+                                            <<"MPI_Send(&coordVector"<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_FRTAG<<", MPI_COMM_WORLD);"
+                                            <<"MPI_Recv(&"<<actArg<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_FRTAG<<", MPI_COMM_WORLD, &stat);\n"
                                             <<"}";
+                                    
                                     Source read;
                                     read << preRead << postRead;
 //                                    cout<< "R: "<<std::string(read)<<endl;
 //                                    cin.get();
-                                   
+                                    
                                     if(!_outsideAditionalReads) {
+                                        
                                         cout<<forIterated.get_line()<<endl;
                                         cout<<construct_ast.get_line()<<endl;
 //                                        cout<<"append"<<endl;
@@ -1864,6 +1886,12 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         forIterated.prepend(readAST);
                                          
                                     } else {
+                                        Source start, end;
+                                        start << "((offset > "<<rangeInitialValue<<") ? "<<rangeInitialValue<<" : offset)";
+                                        end << "(((offset + partSize) < "<<rangeFinishValue<<") ? "<<rangeFinishValue<<" : (offset + partSize))";
+                      
+                                        _uploadedVars[numUploadedVar].start = std::string(start);
+                                        _uploadedVars[numUploadedVar].end = std::string(end);
                                         _aditionalLines << read;
 //                                       cout<<"Will be outside construct"<<endl;
                                     }
@@ -2242,7 +2270,7 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
 }
 int TransPhase::isUploadedVar(string name){
     for (int i=0;i<_uploadedVars.size();++i)
-        if(_uploadedVars[i].compare(name)==0) {
+        if(_uploadedVars[i].name.compare(name)==0) {
 //            cout<<name<<" is Uploaded var"<<endl;
             return 1;
         }

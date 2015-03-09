@@ -25,6 +25,11 @@ using namespace std;
 
 
 class TransPhase : public PragmaCustomCompilerPhase {
+    struct uploadInfo {
+        string name;
+        string start;
+        string end;
+    };
     struct infoVar {
         Source name;
         Source operation;
@@ -71,7 +76,7 @@ private:
     int _workWithCopiesOnSlave;
     Source _aditionalLines;
     int _outsideAditionalReads;
-    vector<string> _uploadedVars;
+    vector<uploadInfo> _uploadedVars;
     AST_t _construct_loop;
     ObjectList<string> _privateVars;
     string _lastFunctionName;
