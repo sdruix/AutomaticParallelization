@@ -38,13 +38,13 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _SWTAG = "SWTAG";
     _FRTAG = "FRTAG";
     _FWTAG = "FWTAG";
-    _withMemoryLimitation = 0;
-    _oldMPIStyle = 0;
+    _withMemoryLimitation = 1;
+    _oldMPIStyle = 1;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
-    _smartUploadDownload = 1;
-    _fullArrayReads = 1;
-    _fullArrayWrites = 1;
+    _smartUploadDownload = 0;
+    _fullArrayReads = 0;
+    _fullArrayWrites = 0;
 }
 
 void TransPhase::run(DTO& dto) {
@@ -4124,7 +4124,8 @@ Source TransPhase::handleMemory(string source) {
         memorySource << "break;";
         //}
         //}
-    }        
+    }
+    
      memorySource<<"} } else if(stat.MPI_TAG == "<<_SWTAG<<") {"
             "switch (partSize) {";
     for (int n = 0; n< _ioVars.size();++n){
@@ -4134,31 +4135,33 @@ Source TransPhase::handleMemory(string source) {
         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
         //if(_ioVars[i].size.size()>0) {
         memorySource<< "case  "<<n<<": ";
+            if(_inVars.size()>0){
+                memorySource<<"do {"
+                        <<"MPI_Recv(&partSize, 1, MPI_INT, "<<source<<", MPI_ANY_TAG, MPI_COMM_WORLD, &stat);"
+                        <<"if (stat.MPI_TAG == RTAG) {"
+                        <<"switch (partSize) {";
+                        for (int i = 0; i< _inVars.size();++i){
+                            //if(_inVars[i].size.size()>0) {
+                            Source dimensions;
+                            string upperType = std::string(_inVars[i].type);
+                            std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                            //if(_inVars[i].size.size()>0) {
+                            memorySource<< "case  "<<i<<": ";
+                            if(_inVars[i].size.size()>0) {
+                                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_RTAG<<", MPI_COMM_WORLD, &stat);";
+                            }
+                            for(int x=0; x<_inVars[i].size.size();++x) {
+                                dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
+                            }
+                            memorySource << "MPI_Send(&"<<_inVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_RTAG<<", MPI_COMM_WORLD);";
+                            memorySource << "break;";
+                            //}
 
-        memorySource<<"do {"
-                <<"MPI_Recv(&partSize, 1, MPI_INT, "<<source<<", MPI_ANY_TAG, MPI_COMM_WORLD, &stat);"
-                <<"if (stat.MPI_TAG == RTAG) {"
-                <<"switch (partSize) {";
-                for (int i = 0; i< _inVars.size();++i){
-                    //if(_inVars[i].size.size()>0) {
-                    Source dimensions;
-                    string upperType = std::string(_inVars[i].type);
-                    std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
-                    //if(_inVars[i].size.size()>0) {
-                    memorySource<< "case  "<<i<<": ";
-                    if(_inVars[i].size.size()>0) {
-                        memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_RTAG<<", MPI_COMM_WORLD, &stat);";
-                    }
-                    for(int x=0; x<_inVars[i].size.size();++x) {
-                        dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
-                    }
-                    memorySource << "MPI_Send(&"<<_inVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_RTAG<<", MPI_COMM_WORLD);";
-                    memorySource << "break;";
-                    //}
-
-                    //}
+                            //}
                 }
-        memorySource<<"} } }while(stat.MPI_TAG != "<<_WTAG<<");";
+            memorySource <<"} }";
+        }
+        memorySource<<" }while(stat.MPI_TAG != "<<_WTAG<<");";
                     
         
         if(_ioVars[n].size.size()>0) {
@@ -4175,7 +4178,7 @@ Source TransPhase::handleMemory(string source) {
         //}
         //}
     }
-    if(_fullArrayReads) {
+    if(_fullArrayReads && _inVars.size()>0) {
         memorySource<<"} } else if(stat.MPI_TAG == "<<_FRTAG<<") {"
             "switch (partSize) {";
         for (int i = 0; i< _inVars.size();++i){
@@ -4198,7 +4201,7 @@ Source TransPhase::handleMemory(string source) {
             //}
         }
     }
-    if(_fullArrayWrites) {
+    if(_fullArrayWrites && _ioVars.size()>0) {
         memorySource<<"} } else if(stat.MPI_TAG == "<<_FWTAG<<") {"
             "switch (partSize) {";
         for (int i = 0; i< _ioVars.size();++i){
