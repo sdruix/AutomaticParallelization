@@ -38,13 +38,13 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _SWTAG = "SWTAG";
     _FRTAG = "FRTAG";
     _FWTAG = "FWTAG";
-    _withMemoryLimitation = 1;
-    _oldMPIStyle = 1;
+    _withMemoryLimitation = 0;
+    _oldMPIStyle = 0;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
-    _smartUploadDownload = 0;
-    _fullArrayReads = 0;
-    _fullArrayWrites = 0;
+    _smartUploadDownload = 1;
+    _fullArrayReads = 1;
+    _fullArrayWrites = 1;
 }
 
 void TransPhase::run(DTO& dto) {
@@ -4080,66 +4080,82 @@ Source TransPhase::generateMPIVariableMessagesSend(vector<infoVar> vars, Source 
 
 Source TransPhase::handleMemory(string source) {
     Source memorySource;
-    
-    memorySource << "if(stat.MPI_TAG == "<<_RTAG<<") {"
-            "switch (partSize) {";
-    for (int i = 0; i< _inVars.size();++i){
-        //if(_inVars[i].size.size()>0) {
-        Source dimensions;
-        string upperType = std::string(_inVars[i].type);
-        std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
-        //if(_inVars[i].size.size()>0) {
-        memorySource<< "case  "<<i<<": ";
-        if(_inVars[i].size.size()>0) {
-            memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_RTAG<<", MPI_COMM_WORLD, &stat);";
+    int elseNeeded = 0;
+    if(_inVars.size()>0) {
+        elseNeeded = 1;
+        memorySource << "if(stat.MPI_TAG == "<<_RTAG<<") {\n"
+                "switch (partSize) {\n";
+        for (int i = 0; i< _inVars.size();++i){
+            //if(_inVars[i].size.size()>0) {
+            Source dimensions;
+            string upperType = std::string(_inVars[i].type);
+            std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            //if(_inVars[i].size.size()>0) {
+            memorySource<< "case  "<<i<<": \n";
+            if(_inVars[i].size.size()>0) {
+                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_RTAG<<", MPI_COMM_WORLD, &stat);\n";
+            }
+            for(int x=0; x<_inVars[i].size.size();++x) {
+                dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
+            }
+            memorySource << "MPI_Send(&"<<_inVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_RTAG<<", MPI_COMM_WORLD);\n";
+            memorySource << "break;\n";
+            //}
+
+            //}
+            memorySource<<"}\n }";
         }
-        for(int x=0; x<_inVars[i].size.size();++x) {
-            dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
-        }
-        memorySource << "MPI_Send(&"<<_inVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_RTAG<<", MPI_COMM_WORLD);";
-        memorySource << "break;";
-        //}
-        
-        //}
     }
-    memorySource<<"} } else if(stat.MPI_TAG == "<<_WTAG<<") {"
-            "switch (partSize) {";
-    for (int i = 0; i< _ioVars.size();++i){
-        //if(_ioVars[i].size.size()>0) {
-        Source dimensions;
-        string upperType = std::string(_ioVars[i].type);
-        std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
-        //if(_ioVars[i].size.size()>0) {
-        memorySource<< "case  "<<i<<": ";
-        if(_ioVars[i].size.size()>0) {
-            memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_WTAG<<", MPI_COMM_WORLD, &stat);";
+    if(_ioVars.size()>0) {
+        if(elseNeeded)
+            memorySource<<"else "; 
+        elseNeeded = 1;
+        memorySource<<"if(stat.MPI_TAG == "<<_WTAG;
+        if(_inVars.size()==0) {
+            memorySource<<" || stat.MPI_TAG == "<<_SWTAG;
         }
-        
-        for(int x=0; x<_ioVars[i].size.size();++x) {
-            dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
+                memorySource<<") {\n switch (partSize) {\n";
+        for (int i = 0; i< _ioVars.size();++i){
+            //if(_ioVars[i].size.size()>0) {
+            Source dimensions;
+            string upperType = std::string(_ioVars[i].type);
+            std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            //if(_ioVars[i].size.size()>0) {
+            memorySource<< "case  "<<i<<": \n";
+            if(_ioVars[i].size.size()>0) {
+                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_WTAG<<", MPI_COMM_WORLD, &stat);\n";
+            }
+
+            for(int x=0; x<_ioVars[i].size.size();++x) {
+                dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
+            }
+            memorySource << "MPI_Recv(&"<<_ioVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_WTAG<<", MPI_COMM_WORLD,&stat);\n";
+
+
+            memorySource << "break;\n";
+            //}
+            //}
         }
-        memorySource << "MPI_Recv(&"<<_ioVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_WTAG<<", MPI_COMM_WORLD,&stat);";
-        
-        
-        memorySource << "break;";
-        //}
-        //}
+        memorySource<<"}\n }";
     }
-    
-     memorySource<<"} } else if(stat.MPI_TAG == "<<_SWTAG<<") {"
-            "switch (partSize) {";
-    for (int n = 0; n< _ioVars.size();++n){
-        //if(_ioVars[i].size.size()>0) {
-        Source dimensions;
-        string upperType = std::string(_ioVars[n].type);
-        std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
-        //if(_ioVars[i].size.size()>0) {
-        memorySource<< "case  "<<n<<": ";
-            if(_inVars.size()>0){
-                memorySource<<"do {"
-                        <<"MPI_Recv(&partSize, 1, MPI_INT, "<<source<<", MPI_ANY_TAG, MPI_COMM_WORLD, &stat);"
-                        <<"if (stat.MPI_TAG == RTAG) {"
-                        <<"switch (partSize) {";
+    if(_ioVars.size()>0 && _inVars.size()>0){
+        if(elseNeeded)
+            memorySource<<"else "; 
+        elseNeeded = 1;
+        memorySource<<"if(stat.MPI_TAG == "<<_SWTAG<<") {\n"
+                "switch (partSize) {\n";
+        for (int n = 0; n< _ioVars.size();++n){
+            //if(_ioVars[i].size.size()>0) {
+            Source dimensions;
+            string upperType = std::string(_ioVars[n].type);
+            std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            //if(_ioVars[i].size.size()>0) {
+            memorySource<< "case  "<<n<<": \n";
+            if(_inVars.size()>0) {
+                memorySource<<"do {\n"
+                        <<"MPI_Recv(&partSize, 1, MPI_INT, "<<source<<", MPI_ANY_TAG, MPI_COMM_WORLD, &stat);\n"
+                        <<"if (stat.MPI_TAG == RTAG) {\n"
+                        <<"switch (partSize) {\n";
                         for (int i = 0; i< _inVars.size();++i){
                             //if(_inVars[i].size.size()>0) {
                             Source dimensions;
@@ -4148,84 +4164,94 @@ Source TransPhase::handleMemory(string source) {
                             //if(_inVars[i].size.size()>0) {
                             memorySource<< "case  "<<i<<": ";
                             if(_inVars[i].size.size()>0) {
-                                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_RTAG<<", MPI_COMM_WORLD, &stat);";
+                                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_RTAG<<", MPI_COMM_WORLD, &stat);\n";
                             }
                             for(int x=0; x<_inVars[i].size.size();++x) {
                                 dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
                             }
-                            memorySource << "MPI_Send(&"<<_inVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_RTAG<<", MPI_COMM_WORLD);";
-                            memorySource << "break;";
+                            memorySource << "MPI_Send(&"<<_inVars[i].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_RTAG<<", MPI_COMM_WORLD);\n";
+                            memorySource << "break;\n";
                             //}
 
                             //}
-                }
-            memorySource <<"} }";
+                        }
+                memorySource<<"}\n }\n }while(stat.MPI_TAG != "<<_WTAG<<");\n";
+            }
+
+            if(_ioVars[n].size.size()>0) {
+                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[n].size.size()<<",MPI_INT,"<<source<<", "<<_WTAG<<", MPI_COMM_WORLD, &stat);\n";
+            }
+
+            for(int x=0; x<_ioVars[n].size.size();++x) {
+                dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
+            }
+            memorySource << "MPI_Recv(&"<<_ioVars[n].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_WTAG<<", MPI_COMM_WORLD,&stat);\n";
+
+
+            memorySource << "break;\n";
+            //}
+            //}
         }
-        memorySource<<" }while(stat.MPI_TAG != "<<_WTAG<<");";
-                    
-        
-        if(_ioVars[n].size.size()>0) {
-            memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[n].size.size()<<",MPI_INT,"<<source<<", "<<_WTAG<<", MPI_COMM_WORLD, &stat);";
-        }
-        
-        for(int x=0; x<_ioVars[n].size.size();++x) {
-            dimensions<<"[coordVector"<<_num_transformed_blocks<<"["<<x<<"]]";
-        }
-        memorySource << "MPI_Recv(&"<<_ioVars[n].name<<dimensions<<", 1, MPI_"<<upperType<<", "<<source<<", "<<_WTAG<<", MPI_COMM_WORLD,&stat);";
-        
-        
-        memorySource << "break;";
-        //}
-        //}
+        memorySource<<"}\n }";
     }
     if(_fullArrayReads && _inVars.size()>0) {
-        memorySource<<"} } else if(stat.MPI_TAG == "<<_FRTAG<<") {"
-            "switch (partSize) {";
+        if(elseNeeded)
+            memorySource<<"else "; 
+        elseNeeded = 1;
+        memorySource<<"if(stat.MPI_TAG == "<<_FRTAG<<") {"
+            "switch (partSize) \n{";
         for (int i = 0; i< _inVars.size();++i){
             //if(_inVars[i].size.size()>0) {
             Source dimensions;
             string upperType = std::string(_inVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
             //if(_inVars[i].size.size()>0) {
-            memorySource<< "case  "<<i<<": ";
+            memorySource<< "case  "<<i<<": \n";
             if(_inVars[i].size.size()>0) {
-                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD, &stat);";
+                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_inVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD, &stat);\n";
             }
             for(int x=1; x<_inVars[i].size.size();++x) {
                 dimensions<<" * "<<std::string(_inVars[i].size[x]);
             }
-            memorySource << "MPI_Send(&"<<_inVars[i].name<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<", MPI_"<<upperType<<", "<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD);";
+            memorySource << "MPI_Send(&"<<_inVars[i].name<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<", MPI_"<<upperType<<", "<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD);\n";
             memorySource << "break;";
             //}
 
             //}
         }
+        memorySource<<"}\n } ";
     }
+
     if(_fullArrayWrites && _ioVars.size()>0) {
-        memorySource<<"} } else if(stat.MPI_TAG == "<<_FWTAG<<") {"
-            "switch (partSize) {";
+        if(elseNeeded)
+            memorySource<<"else "; 
+        elseNeeded = 1;
+        memorySource<<"if(stat.MPI_TAG == "<<_FWTAG<<") {\n"
+            "switch (partSize) {\n";
         for (int i = 0; i< _ioVars.size();++i){
             //if(_inVars[i].size.size()>0) {
             Source dimensions;
             string upperType = std::string(_ioVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
             //if(_inVars[i].size.size()>0) {
-            memorySource<< "case  "<<i<<": ";
+            memorySource<< "case  "<<i<<": \n";
             if(_ioVars[i].size.size()>0) {
-                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_FWTAG<<", MPI_COMM_WORLD, &stat);";
+                memorySource<<"MPI_Recv(&coordVector"<<_num_transformed_blocks<<","<<_ioVars[i].size.size()<<",MPI_INT,"<<source<<", "<<_FWTAG<<", MPI_COMM_WORLD, &stat);\n";
             }
             for(int x=1; x<_ioVars[i].size.size();++x) {
                 dimensions<<" * "<<std::string(_ioVars[i].size[x]);
             }
-            memorySource << "MPI_Recv(&"<<_ioVars[i].name<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<", MPI_"<<upperType<<", "<<source<<", "<<_FWTAG<<", MPI_COMM_WORLD, &stat);";
-            memorySource << "break;";
+            memorySource << "MPI_Recv(&"<<_ioVars[i].name<<"[coordVector"<<_num_transformed_blocks<<"[0]]"<<", coordVector"<<_num_transformed_blocks<<"[1]"<<dimensions<<", MPI_"<<upperType<<", "<<source<<", "<<_FWTAG<<", MPI_COMM_WORLD, &stat);\n";
+            memorySource << "break;\n";
             //}
 
             //}
         }
+        memorySource<<"}\n }";           
     }
-    memorySource<<"} }";           
-    
+   
+//    cout<<std::string(memorySource)<<endl;
+//    cin.get();
     return memorySource;
 }
 AST_t TransPhase::get_last_ast(AST_t ast, ScopeLink scopeL){
