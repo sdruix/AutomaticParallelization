@@ -38,13 +38,13 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _SWTAG = "SWTAG";
     _FRTAG = "FRTAG";
     _FWTAG = "FWTAG";
-    _withMemoryLimitation = 0;
-    _oldMPIStyle = 0;
+    _withMemoryLimitation = 1;
+    _oldMPIStyle = 1;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
-    _smartUploadDownload = 1;
-    _fullArrayReads = 1;
-    _fullArrayWrites = 1;
+    _smartUploadDownload = 0;
+    _fullArrayReads = 0;
+    _fullArrayWrites = 0;
 }
 
 void TransPhase::run(DTO& dto) {
@@ -1551,11 +1551,11 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                         }
                     }
                     int numIoVar = 0;
-                    cout<<"act: "<<expr_list[l].prettyprint()<<endl;
+//                    cout<<"act: "<<expr_list[l].prettyprint()<<endl;
 
-                    cout<<"L: "<<lineA<<endl;
-                    cout<<"L: "<<maxLine<<endl;
-                    cin.get();
+//                    cout<<"L: "<<lineA<<endl;
+//                    cout<<"L: "<<maxLine<<endl;
+//                    cin.get();
                     if(_fullArrayWrites && std::string(initVar).compare(std::string(firstIterator)) != 0 
                             && lineA>=maxLine && (isIOVar(actArg)|| !_smartUploadDownload)) {
                         int f = 0;
