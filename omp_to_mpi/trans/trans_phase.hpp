@@ -25,7 +25,7 @@ using namespace std;
 
 
 class TransPhase : public PragmaCustomCompilerPhase {
-    struct uploadInfo {
+    struct transferInfo {
         string name;
         string start;
         string end;
@@ -38,6 +38,7 @@ class TransPhase : public PragmaCustomCompilerPhase {
         ObjectList<Source> iterVar;
         int iterVarInOperation;
     };
+  
 public:
     TransPhase();
     virtual void run(DTO &dto);
@@ -55,7 +56,7 @@ private:
     Source generateMPIVariableMessagesSend(vector<infoVar> _inVars, Source initVar, Scope functionScope, string dest, string offset, int withReduced);
     Source handleMemory(string source);
     Source modifyReductionOperation(infoVar reducedVar, AST_t constructAST, PragmaCustomConstruct construct);
-    void putBarrier(int minLine, int staticC, int block_line, PragmaCustomConstruct construct, Symbol function_sym, Statement function_body, AST_t minAST);
+    void putBarrier(int minLine, int staticC, int block_line, PragmaCustomConstruct construct, Symbol function_sym, Statement function_body, AST_t minAST, AST_t startAST);
     int isUploadedVar(string name);
     AST_t _translation_unit;
     ScopeLink _scope_link;
@@ -74,9 +75,12 @@ private:
     int _construct_inside_bucle;
     int _secureWrite;
     int _workWithCopiesOnSlave;
-    Source _aditionalLines;
+    Source _aditionalLinesRead;
+    Source _aditionalLinesWrite;
     int _outsideAditionalReads;
-    vector<uploadInfo> _uploadedVars;
+    int _outsideAditionalWrites;
+    vector<transferInfo> _uploadedVars;
+    vector<transferInfo> _downloadVars;
     AST_t _construct_loop;
     ObjectList<string> _privateVars;
     string _lastFunctionName;
@@ -84,6 +88,7 @@ private:
     struct lastAst {
         AST_t _wherePutFinal;
         AST_t _lastModifiedAST;
+        AST_t _lastModifiedASTstart;
         string _lastFunctionNameList;
         
     };
@@ -92,7 +97,8 @@ private:
     string _FTAG;
     string _WTAG;
     string _SWTAG;
-    string _FRTAG;        
+    string _FRTAG;
+    string _FWTAG;    
     vector<lastAst> _lastTransformInfo;
     //*******************
     struct use{
@@ -128,6 +134,7 @@ private:
     int _inside_loop,_for_num, _for_min_line, _pragma_lines, _notOutlined;
     AST_t _for_ast, _for_internal_ast_last, _for_internal_ast_first, _file_tree;
     void assignMasterWork(lastAst ast2Work);
+    void assignMasterWork(string functionName);
     use fill_use(int line, AST_t actAst);
     int get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int update, int searching_construct, int initialConstruct);
     AST_t get_first_ast(AST_t ast, ScopeLink scopeL);
@@ -144,11 +151,12 @@ private:
     string replaceAll(std::string str, const std::string& from, const std::string& to);
     AST_t fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, int outline_num_line, ObjectList<Symbol> prmters , int hmppOrig, int offset, AST_t prevAST);
     string transformConstructAST(PragmaCustomConstruct construct, ScopeLink scopeL, Scope sC, Source initVar);
-    int isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName);
+    int isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName, int io);
     int _withMemoryLimitation;
     int _oldMPIStyle;
     int _smartUploadDownload;
     int _fullArrayReads;
+    int _fullArrayWrites;
     string _rI;
     string _rF;
     AST_t _forIter;
