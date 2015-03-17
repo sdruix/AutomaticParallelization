@@ -42,13 +42,60 @@ class TransPhase : public PragmaCustomCompilerPhase {
 public:
     TransPhase();
     virtual void run(DTO &dto);
-private:
-    void finalize();
+
+    class TraverseASTFunctor4All : public TraverseASTFunctor {
+    private:
+        ScopeLink _slM;
+        
+    public:
+        TraverseASTFunctor4All(ScopeLink sl) : _slM(sl) {};
+        virtual ASTTraversalResult do_(const TL::AST_t &a) const
+        {
+            //                    cout<<a.prettyprint()<<endl;
+            return ast_traversal_result_helper(true, true);
+        };
+    };
+    class TraverseASTFunctor4LocateOMP : public TraverseASTFunctor {
+    private:
+        ScopeLink _sl;
+    public:
+        
+        TraverseASTFunctor4LocateOMP(ScopeLink sl) : _sl(sl) {};
+        virtual ASTTraversalResult do_(const TL::AST_t &a) const
+        {
+            
+            bool retBool = false;
+            if (!Expression::predicate(a)) {
+                std::istringstream f(a.prettyprint());
+                std::string line;    
+                int lines=0;
+                while (std::getline(f, line)) {
+                    lines++;
+                }
+                if(lines>1){
+                    PragmaCustomConstruct test(a,_sl);
+                    if(test.is_construct()){
+                        retBool = true;
+                        return ast_traversal_result_helper(retBool,false);
+                    } 
+                }
+            }
+            return ast_traversal_result_helper(false, true);
+        };
+    };
     string addCommaIfNeeded(string arrayToCheck);
+    int get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int update, int searching_construct, int initialConstruct);
+     AST_t get_last_ast(AST_t ast, ScopeLink scopeL);
+    int is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct);
+    string cleanWhiteSpaces(string toClean);
+private:
+   
+    void finalize();
+    
     int iteratedVarCorrespondstoAnyVarIdx(string initVar, ObjectList<Source> iter);
     ObjectList<Source> findPrincipalIterator(string varUse, string name);
     AST_t getForContextofConstruct(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct);
-    string cleanWhiteSpaces(string toClean);
+
     void pragma_postorder(PragmaCustomConstruct construct);
     bool checkDirective(PragmaCustomConstruct construct, string directiveName);
     int get_size_of_array(string name, string declaration);
@@ -58,6 +105,9 @@ private:
     Source modifyReductionOperation(infoVar reducedVar, AST_t constructAST, PragmaCustomConstruct construct);
     void putBarrier(int minLine, int staticC, int block_line, PragmaCustomConstruct construct, Symbol function_sym, Statement function_body, AST_t minAST, AST_t startAST);
     int isUploadedVar(string name);
+    int isExistingVariable(string name, AST_t ast, ScopeLink sL);
+    void divideTask();
+    void assignMasterWork(AST_t functionAST, ObjectList<Symbol> functionsWithOMP);
     AST_t _translation_unit;
     ScopeLink _scope_link;
     vector<infoVar> _reducedVars;
@@ -75,6 +125,14 @@ private:
     int _construct_inside_bucle;
     int _secureWrite;
     int _workWithCopiesOnSlave;
+    int _divideWork;
+    string _statVar;
+    string _sizeVar;
+    string _myidVar;
+    string _timeStartVar;
+    string _timeFinishVar;
+    string _argcVar;
+    string _argvVar;
     Source _aditionalLinesRead;
     Source _aditionalLinesWrite;
     int _outsideAditionalReads;
@@ -134,12 +192,11 @@ private:
     int _inside_loop,_for_num, _for_min_line, _pragma_lines, _notOutlined;
     AST_t _for_ast, _for_internal_ast_last, _for_internal_ast_first, _file_tree;
     void assignMasterWork(lastAst ast2Work);
-    void assignMasterWork(string functionName);
+    int isDeclarationLine(AST_t ast, ObjectList<Symbol> allSym, ScopeLink sL);
     use fill_use(int line, AST_t actAst);
-    int get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int update, int searching_construct, int initialConstruct);
+
     AST_t get_first_ast(AST_t ast, ScopeLink scopeL);
-    AST_t get_last_ast(AST_t ast, ScopeLink scopeL);
-    int is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct);
+   
     int isReducedVar(string name);
     int isPrivateVar(string name);
     int isIOVar(string name);
@@ -159,7 +216,11 @@ private:
     int _fullArrayWrites;
     string _rI;
     string _rF;
+    int _outline_line;
+    int _num_included_if;
     AST_t _forIter;
+    ScopeLink _ifScopeL;
+    Scope _ifScope;
     int isParam(string p2check);
     void useOldStyle(int staticC, Source mpiVariantStructurePart1, Source mpiVariantStructurePart2, Source mpiVariantStructurePart3, 
                             string maxS, Source initVar, Scope functionScope, Source initValue, 
@@ -208,7 +269,9 @@ private:
                     retBool = true;
                 }
                 if(expr.is_function_call()){
+//                    cout<<expr.prettyprint()<<endl;
                     retBool = true;
+//                    cin.get();
                 }
                 
                 if(expr.is_operation_assignment()){
@@ -263,18 +326,7 @@ private:
             return ast_traversal_result_helper(false, true);
         };
     };
-    class TraverseASTFunctor4All : public TraverseASTFunctor {
-    private:
-        ScopeLink _slM;
-        
-    public:
-        TraverseASTFunctor4All(ScopeLink sl) : _slM(sl) {};
-        virtual ASTTraversalResult do_(const TL::AST_t &a) const
-        {
-            //                    cout<<a.prettyprint()<<endl;
-            return ast_traversal_result_helper(true, true);
-        };
-    };
+    
     class TraverseASTFunctor4LocateFor : public TraverseASTFunctor {
     private:
         ScopeLink _slLF;
@@ -301,34 +353,7 @@ private:
             return ast_traversal_result_helper(false, true);
         };
     };
-    class TraverseASTFunctor4LocateOMP : public TraverseASTFunctor {
-    private:
-        ScopeLink _sl;
-    public:
-        
-        TraverseASTFunctor4LocateOMP(ScopeLink sl) : _sl(sl) {};
-        virtual ASTTraversalResult do_(const TL::AST_t &a) const
-        {
-            
-            bool retBool = false;
-            if (!Expression::predicate(a)) {
-                std::istringstream f(a.prettyprint());
-                std::string line;    
-                int lines=0;
-                while (std::getline(f, line)) {
-                    lines++;
-                }
-                if(lines>1){
-                    PragmaCustomConstruct test(a,_sl);
-                    if(test.is_construct()){
-                        retBool = true;
-                        return ast_traversal_result_helper(retBool,false);
-                    } 
-                }
-            }
-            return ast_traversal_result_helper(false, true);
-        };
-    };
+    
     class TraverseASTFunctor4LocateIf : public TraverseASTFunctor {
     private:
         ScopeLink _sl;
