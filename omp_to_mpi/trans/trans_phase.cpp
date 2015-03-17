@@ -3143,9 +3143,10 @@ void TransPhase::finalize() {
     
     Source fin;
     
-     fin << "if("<<_myidVar<<" == 0) {("<<_timeFinishVar<<" = MPI_Wtime());"
-            << "printf(\"MPI_Wtime measured: %1.2f\\n\", "<<_timeFinishVar<<"-"<<_timeStartVar<<");}"
-            << "MPI_Finalize();";
+     fin << "if("<<_myidVar<<" == 0) {("<<_timeFinishVar<<" = MPI_Wtime());";
+             if(_divideWork)
+                 fin << "printf(\"MPI_Wtime measured: %1.2f\\n\", "<<_timeFinishVar<<"-"<<_timeStartVar<<");";
+     fin << "}"<< "MPI_Finalize();";
     AST_t finAST = fin.parse_statement(_translation_unit,_scope_link);
     ObjectList<string> taskDividedFunctions;
     
