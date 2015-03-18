@@ -133,6 +133,14 @@ private:
     string _timeFinishVar;
     string _argcVar;
     string _argvVar;
+    string _partSizeVar;
+    string _offsetVar;
+    string _sourceVar;
+    string _followINVar;
+    string _killedVar;
+    string _toVar;
+    string _fromVar;
+    string _coordVectorVar;
     Source _aditionalLinesRead;
     Source _aditionalLinesWrite;
     int _outsideAditionalReads;
@@ -194,7 +202,7 @@ private:
     void assignMasterWork(lastAst ast2Work);
     int isDeclarationLine(AST_t ast, ObjectList<Symbol> allSym, ScopeLink sL);
     use fill_use(int line, AST_t actAst);
-
+    void defineVars();
     AST_t get_first_ast(AST_t ast, ScopeLink scopeL);
    
     int isReducedVar(string name);
@@ -218,6 +226,7 @@ private:
     string _rF;
     int _outline_line;
     int _num_included_if;
+    int _expandFullArrayReads;
     AST_t _forIter;
     ScopeLink _ifScopeL;
     Scope _ifScope;
