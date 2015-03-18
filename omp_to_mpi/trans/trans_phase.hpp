@@ -231,6 +231,7 @@ private:
     AST_t _forIter;
     ScopeLink _ifScopeL;
     Scope _ifScope;
+    int _insideMaster;
     int isParam(string p2check);
     void useOldStyle(int staticC, Source mpiVariantStructurePart1, Source mpiVariantStructurePart2, Source mpiVariantStructurePart3, 
                             string maxS, Source initVar, Scope functionScope, Source initValue, 
@@ -377,6 +378,25 @@ private:
 
             if (IfStatement::predicate(a)) {
                 retBool = true;
+                return ast_traversal_result_helper(retBool,false);
+                    
+            }
+            return ast_traversal_result_helper(false, true);
+        };
+    };
+    class TraverseASTFunctor4LocateFunction : public TraverseASTFunctor {
+    private:
+        ScopeLink _sl;
+    public:
+        
+        TraverseASTFunctor4LocateFunction(ScopeLink sl) : _sl(sl) {};
+        virtual ASTTraversalResult do_(const TL::AST_t &a) const
+        {
+            
+            bool retBool = false;
+            Expression expr(a, _sl);
+            if (expr.is_function_call()) {
+                    retBool = true;
                 return ast_traversal_result_helper(retBool,false);
                     
             }
