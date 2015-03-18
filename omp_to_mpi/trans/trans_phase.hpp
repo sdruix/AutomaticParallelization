@@ -107,7 +107,7 @@ private:
     int isUploadedVar(string name);
     int isExistingVariable(string name, AST_t ast, ScopeLink sL);
     void divideTask();
-    void assignMasterWork(AST_t functionAST, ObjectList<Symbol> functionsWithOMP);
+    void assignMasterWork(AST_t functionAST, ObjectList<Symbol> functionsWithOMP, string functionName);
     AST_t _translation_unit;
     ScopeLink _scope_link;
     vector<infoVar> _reducedVars;
@@ -190,6 +190,7 @@ private:
     };
     ObjectList<Symbol> _prmters;
     typedef unordered_map <string, var_use> Mymap; 
+    unordered_map <string, AST_t> _initializedFunctions;
     unordered_map <string, var_use> _smart_use_table;
     std::unordered_map <std::string,ObjectList<AST_t>> _ioParams;
     std::unordered_map <std::string,ObjectList<AST_t>> _inParams;

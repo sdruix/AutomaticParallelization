@@ -43,10 +43,10 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
     _smartUploadDownload = 0;
-    _fullArrayReads = 0;
-    _fullArrayWrites = 0;
+    _fullArrayReads = 1;
+    _fullArrayWrites =1;
     _divideWork = 0;
-    _expandFullArrayReads = 0;
+    _expandFullArrayReads = 1;
     
 }
 
@@ -180,20 +180,32 @@ void TransPhase::divideTask() {
       FunctionDefinition fD(functionsWithConstructs[i].get_point_of_declaration(),_scope_link);
       //cout<<fD.get_function_body().get_ast()<<endl;
       //cin.get();
-      assignMasterWork(fD.get_function_body().get_ast(), functionsWithConstructs);
+      assignMasterWork(fD.get_function_body().get_ast(), functionsWithConstructs, fD.get_function_symbol().get_name());
     }
 //    cin.get();
     
 }
 
-void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> functionsWithOMP) {
+void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> functionsWithOMP, string functionName) {
 
     TraverseASTFunctor4All expr_traverse(_scope_link);
     ObjectList<AST_t> expr_list = functionAST.depth_subtrees(expr_traverse);
     ObjectList<Symbol> allSymbols = _scope_link.get_scope(functionAST).get_all_symbols(false);
     Source masterWork;
     AST_t masterWorkAST, ast2follow;
-    masterWork << "{int "<<_myidVar<<";\n"; 
+    Source initASTSource;
+    initASTSource <<"int "<<_myidVar<<";\n"
+            << "MPI_Status "<<_statVar<<";"
+            "int "<<_sizeVar<<";"
+            "int *"<<_argcVar<<"=NULL;"
+            "char *** "<<_argvVar<<"=NULL;"
+            "MPI_Init("<<_argcVar<<","<<_argvVar<<");"
+            "MPI_Comm_size(MPI_COMM_WORLD,&"<<_sizeVar<<");"
+            "MPI_Comm_rank(MPI_COMM_WORLD,&"<<_myidVar<<");"
+            ;
+    AST_t initAST = initASTSource.parse_statement(functionAST, _scope_link);
+    masterWork << "{"<<initAST.prettyprint();
+    _initializedFunctions[functionName]=initAST;
     int opened = 0;
     int lastLine = 0;
     for (int l = 0;l < expr_list.size(); l++) {
@@ -721,28 +733,27 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         
         cout<<"Creating initializations"<<endl;
         if(!_initialized) {
-            
-            varInitialization<<
+            if(!_divideWork) {
+                varInitialization<<
                     "MPI_Status "<<_statVar<<";"
-                    "int "<<_sizeVar;
-            if(!_divideWork)
-                varInitialization <<", "<<_myidVar;
-            varInitialization<<";"<<
+                    "int "<<_sizeVar <<", "<<_myidVar<<";"
                     "int *"<<_argcVar<<"=NULL;"
                     "char *** "<<_argvVar<<"=NULL;"
                     "MPI_Init("<<_argcVar<<","<<_argvVar<<");"
                     "MPI_Comm_size(MPI_COMM_WORLD,&"<<_sizeVar<<");"
                     "MPI_Comm_rank(MPI_COMM_WORLD,&"<<_myidVar<<");"
-                    "double "<<_timeStartVar<<" = MPI_Wtime();"
-                    "double "<<_timeFinishVar<<";"
-                    "const int "<<_FTAG<<" = 0;"
+                    ;
+            }
+            varInitialization<< "const int "<<_FTAG<<" = 0;"
                     "const int "<<_ATAG<<" = 1;"
                     "const int "<<_RTAG<<" = 2;"
                     "const int "<<_WTAG<<" = 3;"
                     "const int "<<_SWTAG<<" = 4;"
                     "const int "<<_FRTAG<<" = 5;"
                     "const int "<<_FWTAG<<" = 6;"
-                    ;
+                    "double "<<_timeStartVar<<" = MPI_Wtime();"
+                    "double "<<_timeFinishVar<<";";
+                    
             _maxManagedVarsCoor = 0;
             for(int j = 0; j<_inVars.size();++j) {  
                 //cout<<std::string(_inVars[j].name)<<" S: "<<_inVars[j].size.size()<< endl;
@@ -3055,7 +3066,7 @@ int TransPhase::isIOVar(string name) {
             if(_smart_use_table[name].row_last_read_cpu.row<_smart_use_table[name].row_last_write_cpu.row)
                 return 1;
     } else {
-        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_valid() && _divideWork){
+        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_valid() && _divideWork && _smartUploadDownload){
             if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_defined()){
                 cout<<"Detected "<<name<<" as global variable (this will be allways transfered to ensure proper value updates)"<<endl;
                 cin.get();
@@ -3072,7 +3083,7 @@ int TransPhase::isINVar(string name) {
         return 1;   
     else  {
         //TODO check if is global
-        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_valid() && _divideWork){
+        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_valid() && _divideWork && _smartUploadDownload){
             if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_defined()){
                 cout<<"Detected "<<name<<" as global variable (this will be allways transfered to ensure proper value updates)"<<endl;
                 cin.get();
