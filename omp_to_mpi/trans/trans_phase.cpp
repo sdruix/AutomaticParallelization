@@ -1253,6 +1253,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     
                 } else {
                     
+                    
                     mpiVariantStructurePart4<<"while(1){"
                             "MPI_Recv(&"<<_offsetVar<<", 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &"<<_statVar<<");";
                     mpiVariantStructurePart6 << "MPI_Recv(&"<<_partSizeVar<<", 1, MPI_INT, 0, "<<_ATAG<<", MPI_COMM_WORLD, &"<<_statVar<<");";
@@ -1303,7 +1304,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                 if(_inVars[i].size.size()>0)
                                     if(_workWithCopiesOnSlave)
                                         mpiVariantStructurePart6 <<std::string(_inVars[i].type)<<" "<< nameCopy<<iterators.str() <<"; ";
-                                if(functionScope.get_symbol_from_name(_inVars[i].name).get_type().is_array() || functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_pointer()) {
+                                if(functionScope.get_symbol_from_name(_inVars[i].name).get_type().is_array() || functionScope.get_symbol_from_name(_inVars[i].name).get_type().is_pointer()) {
                                     mpiVariantStructurePart6<<"MPI_Recv(&"<<varSent.str()<<", "<<_partSizeVar<<" "<<size.str()<<", MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD, &"<<_statVar<<");";
                                 } else {
                                     mpiVariantStructurePart6<<"MPI_Recv(&"<<_inVars[i].name<<", 1, MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD, &"<<_statVar<<");";
@@ -1313,6 +1314,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                         } 
                         
                     }
+                    
                     for (int i = 0; i<_ioVars.size();++i){
                         if(_ioVars[i].size.size()>0 && 
                                 !isUploadedVar(std::string(_ioVars[i].name)) &&
@@ -5168,7 +5170,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
                 }
                 size << ss.str();
             }
-            if(functionScope.get_symbol_from_name(_inVars[i].name).get_type().is_array() || functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_pointer()) {
+            if(functionScope.get_symbol_from_name(_inVars[i].name).get_type().is_array() || functionScope.get_symbol_from_name(_inVars[i].name).get_type().is_pointer()) {
                 mpiVariantStructurePart6<<"MPI_Recv(&"<<varSent.str()<<", "<<size.str()<<", MPI_"<<upperType<<", 0, MPI_ANY_TAG, MPI_COMM_WORLD, &"<<_statVar<<");";
             } else {
                 mpiVariantStructurePart6<<"MPI_Recv(&"<<_inVars[i].name<<", 1, MPI_"<<upperType<<", 0, MPI_ANY_TAG, MPI_COMM_WORLD, &"<<_statVar<<");";
