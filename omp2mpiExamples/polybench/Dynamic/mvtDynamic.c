@@ -3,7 +3,7 @@
 #include <sys/time.h>
 /* Default problem size. */
 #ifndef Y
-# define Y 8000
+# define Y 4000
 #endif
 
 

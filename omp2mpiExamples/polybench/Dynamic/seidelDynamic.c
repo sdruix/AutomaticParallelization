@@ -5,10 +5,10 @@
 
 /* Default problem size. */
 #ifndef TSTEPS
-# define TSTEPS 100
+# define TSTEPS 100//25
 #endif
 #ifndef N
-# define N 4000
+# define N 4000//1000
 #endif
 
 
@@ -40,11 +40,13 @@ struct timeval start, end;
     gettimeofday(&start, NULL);    
     for (t = 0; t <= tsteps - 1; t++) {
 #pragma omp parallel for private (j)  check
-        for (i = 1; i <= n - 2; i++)
-            for (j = 1; j <= n - 2; j++)
+        for (i = 1; i <= n - 2; i++) 
+            for (j = 1; j <= n - 2; j++)        
                 A[i][j] = (A[i - 1][j - 1] + A[i - 1][j] + A[i - 1][j + 1]
                         + A[i][j - 1] + A[i][j] + A[i][j + 1] + A[i + 1][j - 1]
                         + A[i + 1][j] + A[i + 1][j + 1]) / 9.0;
+            
+        
     }
     
 gettimeofday(&end, NULL);
@@ -56,7 +58,7 @@ gettimeofday(&end, NULL);
 
     printf("Elapsed time: %ld milliseconds\n", mtime);    
     double total = 0;
-    for(int y=0; y<N; ++y){
+    for(int y=1; y<N; ++y){
         for(int x=0; x<N; ++x) {
             total+= A[y][x];
         }

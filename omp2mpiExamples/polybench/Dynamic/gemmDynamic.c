@@ -1,16 +1,17 @@
 #include <string.h>
 #include <math.h>
+#include <mpi.h>
 #include <sys/time.h>
 
 /* Default problem size. */
 #ifndef NI
-# define NI 4000
+# define NI 4096
 #endif
 #ifndef NJ
-# define NJ 4000
+# define NJ 4096
 #endif
 #ifndef NK
-# define NK 4000
+# define NK 4096
 #endif
 
 

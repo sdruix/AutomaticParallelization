@@ -4,7 +4,7 @@
 
 /* Default problem size. */
 #ifndef N
-# define N 4000
+# define N 10
 #endif
 
 
@@ -68,10 +68,10 @@ struct timeval start, end;
     x[n] = y[n] / a[n][n];
 #pragma omp parallel for private (j, w) check
     for (i = 0; i <= n - 1; i++) {
-        w = y[n - 1 - (i)];
+        w = y[n - 1 - i];
         for (j = n - i; j <= n; j++)
-            w = w - a[n - 1 - (i)][j] * x[j];
-        x[n - 1 - (i)] = w / a[n - 1 - (i)][n - 1 - (i)];
+            w = w - a[n - 1 - i][j] * x[j];
+        x[n - 1 - i] = w / a[n - 1 - i][n - 1 - i];
     }
 gettimeofday(&end, NULL);
 

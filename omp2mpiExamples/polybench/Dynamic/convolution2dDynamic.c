@@ -4,10 +4,10 @@
 
 /* Default problem size. */
 #ifndef _PB_NI
-# define _PB_NI 8192
+# define _PB_NI 4096
 #endif
 #ifndef _PB_NJ
-# define _PB_NJ 8192
+# define _PB_NJ 4096
 #endif
 
 
@@ -51,8 +51,8 @@ gettimeofday(&end, NULL);
 
     printf("Elapsed time: %ld milliseconds\n", mtime);
  double total = 0;
-  for(int y=0; y<_PB_NI; ++y){
-      for(int x=0; x<_PB_NJ; ++x) {
+  for(int y=1; y<_PB_NI -1; ++y){
+      for(int x=1; x<_PB_NJ -1; ++x) {
           total+= B[y][x];
       }
   }

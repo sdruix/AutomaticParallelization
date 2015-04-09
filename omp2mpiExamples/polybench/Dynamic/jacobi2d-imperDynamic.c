@@ -3,10 +3,10 @@
 #include <sys/time.h>
 /* Default problem size. */
 #ifndef TSTEPS
-# define TSTEPS 100
+# define TSTEPS 100//25
 #endif
 #ifndef Y
-# define Y 4000
+# define Y 4000//1000
 #endif
 
 
@@ -62,8 +62,8 @@ int main(int argc, char** argv) {
     printf("Elapsed time: %ld milliseconds\n", mtime);   
     
     double total = 0;
-    for(int y=0; y<Y; ++y){
-        for(int x=0; x<Y; ++x) {
+    for(int y=2; y<n-1; ++y){
+        for(int x=2; x<n-1; ++x) {
             total+= A[y][x];
         }
     }

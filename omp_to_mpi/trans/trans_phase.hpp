@@ -89,7 +89,7 @@ public:
     int is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct);
     string cleanWhiteSpaces(string toClean);
 private:
-   
+    string getSimplifiedMathExpression(Expression iterating, string name, int doInverse);
     void finalize();
     
     int iteratedVarCorrespondstoAnyVarIdx(string initVar, ObjectList<Source> iter);
@@ -114,6 +114,7 @@ private:
     vector<infoVar> _ioVars;
     vector<infoVar> _inVars;
     int _initialized;
+    int _elseNeeded;
     AST_t _initAST;
     int _maxManagedVarsCoor;
     int _lastMaxManagedVarsCoor;
@@ -125,6 +126,7 @@ private:
     int _construct_inside_bucle;
     int _secureWrite;
     int _workWithCopiesOnSlave;
+    
     int _divideWork;
     string _statVar;
     string _sizeVar;
@@ -178,17 +180,19 @@ private:
         AST_t for_internal_ast_first;
     };
     struct var_use{       
-        use row_last_write_cpu;
-        use row_last_read_cpu;
-        use row_first_write_cpu;
-        use row_first_read_cpu;
+        use row_last_write_master;
+        use row_last_read_master;
+        use row_first_write_master;
+        use row_first_read_master;
     }; 
     struct for_info {
         AST_t ast;
         int lineS;
         int lineF;
     };
+    int _levelFunc;
     ObjectList<Symbol> _prmters;
+    ObjectList<ObjectList<Symbol>> _prmtersOutlinedFunc;
     typedef unordered_map <string, var_use> Mymap; 
     unordered_map <string, AST_t> _initializedFunctions;
     unordered_map <string, var_use> _smart_use_table;
@@ -228,6 +232,7 @@ private:
     int _outline_line;
     int _num_included_if;
     int _expandFullArrayReads;
+    int _sendComputedIndices;
     AST_t _forIter;
     ScopeLink _ifScopeL;
     Scope _ifScope;

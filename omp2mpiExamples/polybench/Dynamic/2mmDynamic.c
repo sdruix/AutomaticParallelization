@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <mpi.h>
 #include <unistd.h>
 #include <string.h>
 #include <math.h>
@@ -6,16 +7,16 @@
 
 /* Default problem size. */
 #ifndef NI
-# define NI 4000
+# define NI 4096
 #endif
 #ifndef NJ
-# define NJ 4000
+# define NJ 4096
 #endif
 #ifndef NK
-# define NK 4000
+# define NK 4096
 #endif
 #ifndef NL
-# define NL 4000
+# define NL 4096
 #endif
 
 
@@ -80,20 +81,22 @@ int main(int argc, char** argv) {
     int nj = NJ;
     int nk = NK;
     int nl = NL;
-    
     /* Initialize array. */
     init_array();
     struct timeval start, end;
-    long mtime, seconds, useconds;    
+    long mtime, seconds, useconds;  
+    
     gettimeofday(&start, NULL);
     
 #pragma omp parallel for private (j, k) check
     for (i = 0; i < ni; i++)
         for (j = 0; j < nj; j++) {
             C[i][j] = 0;
-            for (k = 0; k < nk; ++k)
-                C[i][j] += A[i][k] * B[k][j];
+            for (k = 0; k < nk; ++k) 
+                    C[i][j] += A[i][k] * B[k][j];
+
         }
+  
 #pragma omp parallel for private (j, k) check
     for (i = 0; i < ni; i++)
         for (j = 0; j < nl; j++) {

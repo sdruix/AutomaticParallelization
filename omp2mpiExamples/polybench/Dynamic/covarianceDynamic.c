@@ -4,10 +4,10 @@
 
 /* Default problem size. */
 #ifndef X
-# define X 4000
+# define X 4096
 #endif
 #ifndef Y
-# define Y 4000
+# define Y 4096
 #endif
 
 
@@ -73,9 +73,9 @@ gettimeofday(&end, NULL);
 
     printf("Elapsed time: %ld milliseconds\n", mtime);
    double total = 0;
-  for(int y=0; y<m; ++y){
-      for(int x=0; x<n; ++x) {
-          total+= symmat[y][x];
+  for(int y=1; y<=m; ++y){
+      for(int x=y; x<=n; ++x) {
+          total+= symmat[x][y];
       }
   }
   printf("Total: %f\n",total);

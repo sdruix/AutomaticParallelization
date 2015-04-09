@@ -4,10 +4,10 @@
 
 /* Default problem size. */
 #ifndef X
-# define X 2000
+# define X 10
 #endif
 #ifndef Y
-# define Y 2000
+# define Y 10
 #endif
 
 
@@ -45,7 +45,7 @@ struct timeval start, end;
 
 #define sqrt_of_array_cell(x,j) sqrt(x[j])
   #pragma omp parallel for private (i) check
-  for (j = 1; j <= m; j++) {
+  for (j = 1; j < m + 1; j++) {
     mean[j] = 0.0;
     for (i = 1; i <= n; i++)
       mean[j] += data[i][j];
@@ -53,7 +53,7 @@ struct timeval start, end;
   }
 
   #pragma omp parallel for private (i) check
-  for (j = 1; j <= m; j++) {
+  for (j = 1; j < m + 1; j++) {
     stddev[j] = 0.0;
     for (i = 1; i <= n; i++)
       stddev[j] += (data[i][j] - mean[j]) * (data[i][j] - mean[j]);
@@ -67,7 +67,7 @@ struct timeval start, end;
 
   /* Center and reduce the column vectors. */
   #pragma omp parallel for private (j) check
-  for (i = 1; i <= n; i++)
+  for (i = 1; i < n + 1; i++)
     for (j = 1; j <= m; j++) {
       data[i][j] -= mean[j];
       data[i][j] /= sqrt(float_n) * stddev[j];
@@ -75,7 +75,7 @@ struct timeval start, end;
 
   /* Calculate the m * m correlation matrix. */
   #pragma omp parallel for private (j2, i) check
-  for (j1 = 1; j1 <= m - 1; j1++) {
+  for (j1 = 1; j1 < m ; j1++) {
     for (j2 = j1; j2 <= m; j2++) {
       symmat[j1][j2] = 0.0;
       for (i = 1; i <= n; i++)
@@ -93,9 +93,9 @@ struct timeval start, end;
     printf("Elapsed time: %ld milliseconds\n", mtime);
   symmat[m][m] = 1.0;
   double total = 0;
-  for(int y=0; y<m; ++y){
-      for(int x=0; x<n; ++x) {
-          total+= symmat[y][x];
+  for(int y=1; y<=m; ++y){
+      for(int x=y; x<=m; ++x) {
+          total+= symmat[x][y];
       }
   }
   printf("Total: %f\n",total);

@@ -3,10 +3,10 @@
 
 /* Default problem size. */
 #ifndef Y
-# define Y 100
+# define Y 1000
 #endif
 #ifndef X
-# define X 100
+# define X 1000
 #endif
 
 double alpha;

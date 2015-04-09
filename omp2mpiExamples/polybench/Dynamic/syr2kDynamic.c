@@ -4,10 +4,10 @@
 
 /* Default problem size. */
 #ifndef Y
-# define Y 4000
+# define Y 4000//1000
 #endif
 #ifndef X
-# define X 4000
+# define X 4000//1000
 #endif
 
 

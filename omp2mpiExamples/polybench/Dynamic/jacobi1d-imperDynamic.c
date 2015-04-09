@@ -3,10 +3,10 @@
 #include <sys/time.h>
 /* Default problem size. */
 #ifndef TSTEPS
-# define TSTEPS 100
+# define TSTEPS 100//25
 #endif
 #ifndef Y
-# define Y 4000
+# define Y 4000//1000
 #endif
 
 
@@ -37,11 +37,13 @@ struct timeval start, end;
     
     for (t = 0; t < tsteps; t++) {
 #pragma omp parallel for check
-        for (i = 2; i < n - 1; i++)
+        for (i = 2; i < n - 1; i++) {
             B[i] = 0.33333 * (A[i - 1] + A[i] + A[i + 1]);
+        }
 #pragma omp parallel for check
-        for (j = 2; j < n - 1; j++)
+        for (j = 2; j < n - 1; j++) 
             A[j] = B[j];
+        
     }
     gettimeofday(&end, NULL);
 
@@ -52,7 +54,7 @@ struct timeval start, end;
 
     printf("Elapsed time: %ld milliseconds\n", mtime);
     double total = 0;
-    for(int y=0; y<Y; ++y){
+    for(int y=2; y<n-1; ++y){
         total+= A[y];
         
     }
