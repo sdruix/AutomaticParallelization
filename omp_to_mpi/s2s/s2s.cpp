@@ -675,7 +675,52 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
 
 
 }
+void normalizeLoopsFunction(string tempName, int extKind, string firstLine, vector<string> includeVector) {
+//    cout<<"Normalizing For loops"<<endl;
+    string normTempName = "normalized"+ tempName;
+//    cin.get();
+    std::stringstream loopNormCommand, commandK;
+    if(extKind) {
+        commandK << "forNormalization-phasec++";
+    } else {
+        commandK << "forNormalization-phasecc";
+    }
+    
+    loopNormCommand << commandK.str() << " -y " << tempName << " -o " << normTempName << "  -I/usr/lib/openmpi/include/ " << std::endl;
+    int check = system(loopNormCommand.str().c_str());
+    if (!(check == 0 || check == 256)) {
+        cerr << "Error using command: " << loopNormCommand.str().c_str() << "\n";
+        exit(-1);
+        cerr << "------------------------------------------------\n";
+    }
+    ifstream postprocessFile(normTempName);
+    int found = 0;
+    //cout <<"FL: "<< firstLine << endl;
+    //cin.get();
+    int lines = 0;
+    string line;
+    while (getline(postprocessFile, line)) {
+        if (line.find(firstLine) == 0 || found) {
+            includeVector.push_back(line);
+            found = 1;
+            lines++;
+            //cout<< line<<endl;
+        }
 
+    }
+    postprocessFile.close();
+
+
+    ofstream transFile;
+    transFile.open(tempName, ios::trunc);
+
+    for (unsigned int incN = 0; incN < includeVector.size(); ++incN) {
+        transFile << includeVector[incN] << "\n";
+        lines++;
+    }
+    transFile.close();
+//    cin.get();
+}
 inline bool exists(const std::string& name) {
     return ( access(name.c_str(), F_OK) != -1);
 }
@@ -695,7 +740,8 @@ int main(int argc, char *argv[]) {
     int nextOption; // return value of getopt
     int withNOOMP = 0;
     int folderTest = 0;
-    while ((nextOption = getopt(argc, argv, "r:t:f:F:c:e:n:N:l:E:oOhHivL:xp01234ws")) != -1) {
+    int normalizeLoops = 0;
+    while ((nextOption = getopt(argc, argv, "r:t:f:F:c:e:n:N:l:E:oOhHivL:xp01234wsz")) != -1) {
         switch (nextOption) {
             case 'r':
                 rep = atoi(optarg);
@@ -771,9 +817,14 @@ int main(int argc, char *argv[]) {
             case '4':
                 toDo = 4;
                 break;
+            case 'z':
+                normalizeLoops = 1;
+                
+                break;
+                
             case 'H':
             case 'h':
-                cout << argv[0] << " [-[0|1|2|3|4]][-o][-i][-p][-x][-f[name]][-F[name] -w][-c[name]][-e[name]][-l[name]][-L[name]][-c[name]][-e[name]][-r[number]][-t[number]]\n"
+                cout << argv[0] << " [-[0|1|2|3|4]][-o][-i][-p][-x][-z][-f[name]][-F[name] -w][-c[name]][-e[name]][-l[name]][-L[name]][-c[name]][-e[name]][-r[number]][-t[number]]\n"
                         " -0 Transform\n"
                         " -1 Compile preTranslated Versions\n"
                         " -2 Execute preCompiled Versions\n"
@@ -796,12 +847,13 @@ int main(int argc, char *argv[]) {
                         " -N <number of maximum processors to evaluate in execution>\n"
                         " -p Pause after each processed file\n"
                         " -x Report energy. \n"
+                        " -z Normalize For loops.\n"
                         " -v --verbose St0 Verbose MPI compilation errors(on/off)\n"
                         " -[h|H] --help Display this usage information. \n" << endl;
                 exit(0);
                 break;
             default:
-                cerr << argv[0] << " [-[0|1|2|3|4]][-o][-i][-p][-x][-f[name]][-F[name] -w][-c[name]][-e[name]][-l[name]][-L[name]][-c[name]][-e[name]][-r[number]][-t[number]]\n"
+                cerr << argv[0] << " [-[0|1|2|3|4]][-o][-i][-p][-x][-z][-f[name]][-F[name] -w][-c[name]][-e[name]][-l[name]][-L[name]][-c[name]][-e[name]][-r[number]][-t[number]]\n"
                         " -0 Transform\n"
                         " -1 Compile preTranslated Versions\n"
                         " -2 Execute preCompiled Versions\n"
@@ -824,6 +876,7 @@ int main(int argc, char *argv[]) {
                         " -N <number of maximum processors to evaluate in execution>\n"
                         " -p Pause after each processed file\n"
                         " -x Report energy. \n"
+                        " -z Normalize For loops.\n"
                         " -v --verbose St0 Verbose MPI compilation errors(on/off)\n"
                         " -[h|H] --help Display this usage information. \n" << endl;
                 exit(0);
@@ -938,7 +991,7 @@ int main(int argc, char *argv[]) {
                 exit(-1);
                 cerr << "------------------------------------------------\n";
             }
-
+           
             if (checkOri && toDo != 0 && toDo != 1) {
                 if (scalability)
                     testFile(filename, logFolder, extKind, 0, logFilename, energy, 1, numProcsMin, numProcsMax, withNOOMP, name);
@@ -947,12 +1000,18 @@ int main(int argc, char *argv[]) {
             }
 
 
-            std::stringstream nameF, nameOUT, commandOUT;
+            std::stringstream nameF, nameOUT, commandOUT, loopNormCommand;
             if (extKind) {
                 nameOUT << codesFolder << "/" << name << ".cpp";
+                if((toDo == 0 || toDo == 3) && normalizeLoops) {
+                    normalizeLoopsFunction(tempName, extKind, firstLine, includeVector);
+                }
                 commandOUT << "trans-phasec++ -y " << tempName << " -o " << nameOUT.str() << "  -I/usr/lib/openmpi/include/ " << std::endl;
             } else {
                 nameOUT << codesFolder << "/" << name << ".c";
+                if((toDo != 0 || toDo != 3) && normalizeLoops) {
+                    normalizeLoopsFunction(tempName, extKind, firstLine, includeVector);
+                }
                 commandOUT << "trans-phasecc -y " << tempName << " -o " << nameOUT.str() << " -std=c99 -I/usr/lib/openmpi/include/ " << std::endl;
             }
             if (toDo == 0 || toDo == 3) {
