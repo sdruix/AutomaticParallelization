@@ -39,15 +39,15 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _FRTAG = "FRTAG";
     _FWTAG = "FWTAG";
     _withMemoryLimitation = 0;
-    _oldMPIStyle = 0;
+    _oldMPIStyle = 1;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
     _sendComputedIndices = 0;
     _smartUploadDownload = 1;
     _fullArrayReads = 1;
     _fullArrayWrites =1;
-    _divideWork = 0;
-    _expandFullArrayReads = 0;
+    _divideWork = 1;
+    _expandFullArrayReads = 1;
     
 }
 
@@ -674,7 +674,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             
             //                 
             cout<<"Context Analized"<<endl;
-            cin.get();
+//            cin.get();
             cout<<"Getting out params"<<endl;
             //                        cout<<"HI"<<endl;
             _ioParams = outlineAux.get_parameter_io(construct.get_scope());
@@ -929,8 +929,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             cout<<std::string(_inVars[i].name)<<endl;
         }
         
-        
-                cin.get();
+        cout<<"Block number"<<_num_transformed_blocks+1<<" information"<<endl;
+//        cin.get();
         
         // 
         
@@ -4029,13 +4029,14 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     }
                     cout<<"------------------"<<endl;
                     if(check_clause.is_defined()) {
-                        cout<<test.get_ast().prettyprint()<<endl;
-                        cin.get();
+//                        cout<<test.get_ast().prettyprint()<<endl;
+//                        cin.get();
 
                         _insideMaster = 1;
                     }
                         
                     AST_t nouse =fill_smart_use_table(test.get_ast(), test.get_scope_link(), test.get_scope(), outline_num_line, prmters, hmpp, line, actAst);
+                    _insideMaster = 0;
                     //cout<<"Hola"<<endl;
                     //cin.get();
                     
@@ -4809,7 +4810,13 @@ int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int
                         //                            cout<<actLineAST.prettyprint()<<endl;
                         //                            if(expr_list2.size()>1) {
                         //                                line+=expr_list2.size();
-                        line-=myidLines-_num_transformed_blocks;
+//                        cout<<line<<endl;
+                        
+                        line-=myidLines;
+//                        cout<<line<<endl;
+                        line+=(_num_transformed_blocks-1);
+//                        cout<<line<<endl;
+//                        cin.get();
                         //                                cout<<"Incrementing line in: "<<expr_list2.size()<<endl;
                         
                         //            }
