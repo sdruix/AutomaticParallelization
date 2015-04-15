@@ -108,6 +108,7 @@ private:
     int isExistingVariable(string name, AST_t ast, ScopeLink sL);
     void divideTask();
     void assignMasterWork(AST_t functionAST, ObjectList<Symbol> functionsWithOMP, string functionName);
+    AST_t compute_last_astLoop(AST_t lastA, ScopeLink sL);
     AST_t _translation_unit;
     ScopeLink _scope_link;
     vector<infoVar> _reducedVars;
@@ -119,6 +120,7 @@ private:
     int _maxManagedVarsCoor;
     int _lastMaxManagedVarsCoor;
     int _num_transformed_blocks;
+    int _num_non_trasformed_blocks;
     int _finalized;
     int _isForDirective;
     int _reducedVarsIndexStart;
@@ -221,7 +223,7 @@ private:
     string replaceAll(std::string str, const std::string& from, const std::string& to);
     AST_t fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, int outline_num_line, ObjectList<Symbol> prmters , int hmppOrig, int offset, AST_t prevAST);
     string transformConstructAST(PragmaCustomConstruct construct, ScopeLink scopeL, Scope sC, Source initVar);
-    int isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName, int io);
+    int isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName, int io, ObjectList<string> iteratorOutside);
     int _withMemoryLimitation;
     int _oldMPIStyle;
     int _smartUploadDownload;

@@ -31,6 +31,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     register_directive("for private");
     register_directive("for threadprivate");
     on_directive_post["parallel"].connect(functor(&TransPhase::pragma_postorder, *this));
+    _num_non_trasformed_blocks = 0;
     _ATAG = "ATAG";
     _RTAG = "RTAG";
     _WTAG = "WTAG";
@@ -39,7 +40,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _FRTAG = "FRTAG";
     _FWTAG = "FWTAG";
     _withMemoryLimitation = 0;
-    _oldMPIStyle = 1;
+    _oldMPIStyle = 0;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
     _sendComputedIndices = 0;
@@ -304,11 +305,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                     //AST_t forAST = ;
                     AST_t lastA = get_last_ast(test.get_statement().get_ast(), test.get_scope_link());
                     
-                    while(ForStatement::predicate(lastA)) {
-                        ForStatement fS(lastA,test.get_scope_link());
-                        cout<<fS.get_loop_body().prettyprint()<<endl;
-                        lastA = get_last_ast(fS.get_loop_body().get_ast(), test.get_scope_link());
-                    }
+                    lastA = compute_last_astLoop(lastA, _scope_link);
                     
                     //cout<<lastA.prettyprint()<<endl;
                     lastLine = lastA.get_line();
@@ -340,6 +337,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                     TraverseASTFunctor4LocateOMP expr_traverseOMP(sL);
                     ObjectList<AST_t> expr_listOMP = loopAst.depth_subtrees(expr_traverse);
                     int check = 0;
+                    ObjectList<AST_t> noCheckASTs;
                     for(int o = 0; o < expr_listOMP.size();++o){
                         PragmaCustomConstruct test(expr_listOMP[o],sL);
                         if(test.is_construct()) {
@@ -347,7 +345,9 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                            if(check_clause.is_defined()) {
 //                            cout<<expr_listOMP[o].prettyprint()<<endl;
                             check = 1;
-                            break;
+                            
+                           } else {
+                               noCheckASTs.push_back(test.get_ast());
                            }
                         }
                     }
@@ -361,6 +361,13 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         
                         masterWork << "}\n";
                         opened = 0;
+                    } 
+                    if(check){
+                       for(int a=0;a<noCheckASTs.size();++a) {
+                           Source newSource;
+                           newSource <<"if("<<_myidVar<<" == 0) {\n"<<noCheckASTs[a].prettyprint()<<"}";
+                           noCheckASTs[a].replace_with(newSource.parse_statement(noCheckASTs[a],_scope_link));
+                       }
                     }
                     
                     masterWork << addCommaIfNeeded(expr_list[l].prettyprint());
@@ -368,11 +375,21 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                     //                            cout<<lastLine;
                     
                     AST_t lastA = get_last_ast(expr_list[l], test.get_scope_link());
-//                    cout<<lastA.prettyprint()<<endl;
+                    PragmaCustomConstruct test(lastA,expr.get_scope_link());
+                    if(test.is_construct()) {
+                        cout<<"construct"<<endl;
+                        lastA = get_last_ast(test.get_statement().get_ast(), test.get_scope_link());
+                        lastA = compute_last_astLoop(lastA, test.get_scope_link());
+                        
+                    } else  {
+                        cout<<"not construct"<<endl;
+                        lastA = compute_last_astLoop(lastA, _scope_link);
+                    }
                     lastLine = lastA.get_line();
+//                    cout<<lastA.prettyprint()<<endl;
+//                    cout<<lastLine<<endl;
+//                    cin.get();
                     
-                    //                            cout<<lastLine<<endl;
-                    //                            cin.get();
                 } else if((cleanWhiteSpaces(expr_list[l].prettyprint()).find_first_of(" ")>=0 &&
                         cleanWhiteSpaces(expr_list[l].prettyprint()).find_first_of(" ")<cleanWhiteSpaces(expr_list[l].prettyprint()).length())) {
                     Expression expr(expr_list[l],_scope_link);
@@ -434,6 +451,28 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
     //                cout<<"FINAL AST: "<<ast2follow.prettyprint()<<endl;
     //                
     
+}
+AST_t TransPhase::compute_last_astLoop(AST_t lastA, ScopeLink sL){
+    while(ForStatement::predicate(lastA)|| WhileStatement::predicate(lastA)
+    || DoWhileStatement::predicate(lastA)) {
+        AST_t loopAST;
+        if(ForStatement::predicate(lastA)) {
+            ForStatement fS(lastA,sL);
+            loopAST= fS.get_loop_body().get_ast();
+        }
+        if(WhileStatement::predicate(lastA)) {
+            ForStatement wS(lastA,sL);
+            loopAST= wS.get_loop_body().get_ast();
+        }
+        if(DoWhileStatement::predicate(lastA)) {
+            DoWhileStatement dWS(lastA,sL);
+            loopAST= dWS.get_body().get_ast();
+        }
+
+        cout<<loopAST.prettyprint()<<endl;
+        lastA = get_last_ast(loopAST, sL);
+    }
+    return lastA;
 }
 string TransPhase::getSimplifiedMathExpression(Expression iterating, string name, int doInverse) {
     
@@ -587,6 +626,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
     Scope globalScope = function_def.get_scope();
     cout<<"OMP("<<pragmaInstruction<<" in: "<<function_sym.get_name()<<")"<<endl;
     TL::PragmaCustomClause check_clause = construct.get_clause("check");
+    
     if(check_clause.is_defined()) { 
         TraverseASTFunctor4LocateFunction expr_traverseFunc(construct.get_scope_link());
         ObjectList<AST_t> expr_listFunc = construct.get_statement().get_ast().depth_subtrees(expr_traverseFunc);
@@ -595,7 +635,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 Expression e(expr_listFunc[f],construct.get_scope_link());
                 if(e.is_function_call()) {
                      cerr<<"Function call("<<e.prettyprint()<<") Found in construct (\n"<<construct.get_ast().prettyprint()<<" . Please use Inline Phase before execute OMP2MPI if you detect any error"<<endl;
-                     cin.get();
+//                     cin.get();
 //                     exit(-1);
                 }
             }
@@ -606,7 +646,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             
         }
         
-        _num_transformed_blocks++;
+        
         _file_tree = construct.get_statement().get_ast().get_enclosing_global_tree();
         Statement statement = construct.get_statement();
         
@@ -929,7 +969,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             cout<<std::string(_inVars[i].name)<<endl;
         }
         
-        cout<<"Block number"<<_num_transformed_blocks+1<<" information"<<endl;
+        cout<<"Block number"<<_num_transformed_blocks<<" information"<<endl;
 //        cin.get();
         
         // 
@@ -1668,12 +1708,30 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 checkS=" check";
                 preHMPPstart=1;
             }
-            if(clauses.find("fixed")>=0 && clauses.find("fixed")<clauses.length()) {
-                fixedS= clauses.substr(clauses.find("fixed"), clauses.find_last_of(")"));
-                preHMPPstart=1;
-            }
+
             if(preHMPPstart) {
-                construct.get_ast().replace(construct.get_statement().get_ast());
+                Source newConstructSource;
+                string contructSourceWithoutKeys = construct.get_statement().get_ast().prettyprint();
+                cout<<contructSourceWithoutKeys<<endl;
+                int finded = 0;
+                if(contructSourceWithoutKeys.find_first_of("{")==0) {
+                    finded =1;
+                    contructSourceWithoutKeys =  contructSourceWithoutKeys.substr(1,contructSourceWithoutKeys.length());
+                    cout<<"yes on start"<<endl;
+                }
+                if(contructSourceWithoutKeys.find_last_of("}")==contructSourceWithoutKeys.length()-1 && finded) {
+                    contructSourceWithoutKeys =  contructSourceWithoutKeys.substr(0,contructSourceWithoutKeys.length()-1);
+                    cout<<"yes on fin"<<endl;
+                } 
+                    
+                
+                newConstructSource<< contructSourceWithoutKeys;
+                cout<<contructSourceWithoutKeys<<endl;
+                AST_t nAST;
+                nAST = newConstructSource.parse_statement(construct.get_ast(),construct.get_scope_link());
+                cin.get();
+                construct.get_ast().replace_with(nAST);
+                //construct.get_ast().replace_with(construct.get_statement().get_ast());
                 TraverseASTFunctor4LocateOMP expr_traverse(construct.get_scope_link());
                 ObjectList<AST_t> expr_list = construct.get_ast().depth_subtrees(expr_traverse);
                 int l=0;
@@ -1693,11 +1751,6 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             if(fixedS.empty())
                                 checkSinside=" check";    
                             clauses  = clauses.substr(0,clauses.find("check")-1);
-                        }
-                        if(clauses.find("fixed")>=0 && clauses.find("fixed")<clauses.length()) {
-                            //                    if(!preHMPPstart)
-                            fixedSinside= clauses.substr(clauses.find("fixed"), clauses.find_last_of(")"));
-                            clauses  = clauses.substr(0,clauses.find("fixed")-1);
                         }
                         int outline_line = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), construct.get_ast(),1,0,0);
                         TL::HLT::Outline outlineAux(statement.get_scope_link(), statement,outline_line);
@@ -1884,7 +1937,9 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 AST_t translation_unit = _dto["translation_unit"];  
             }
         }
+        _num_transformed_blocks++;
     }
+    _num_non_trasformed_blocks++;
     
     
     
@@ -1895,32 +1950,17 @@ void TransPhase::putBarrier(int minLine, int staticC, int block_line, PragmaCust
     lastAst lA;
     lA._lastModifiedASTstart = startAST;
     if(minLine != std::numeric_limits<int>::max() && staticC!=2) {
-        
-        //        Source barrier;
-        //        barrier << "MPI_Barrier(MPI_COMM_WORLD);";
-        //        AST_t barrierAST = barrier.parse_global(function_body.get_ast(), function_body.get_scope_link());
-        ////        cout<<minLine<<": "<<minAST.prettyprint()<<endl;
-        //        if(minLine == block_line) {
-        ////            cout<<"1"<<endl;
-        //            minAST.append(barrierAST);
-        //        } else {
-        ////            cout<<"2"<<endl;
-        //            minAST.prepend(barrierAST);
-        //        }
+//        cout<<"Hi"<<endl;
         if(_construct_inside_bucle) {
-            //            cout<<"3"<<endl;
+//            cout<<"1"<<endl;
             lA._wherePutFinal=_construct_loop;  
-            
         } else {
-            //            cout<<"4"<<endl;
             lA._wherePutFinal = minAST;
-            //lA._wherePutFinal=barrierAST;  
-            
+//            cout<<"2"<<endl;
         }
         lA._lastModifiedAST = minAST;
-        // lA._lastModifiedAST=barrierAST;  
-        
     } else {
+//        cout<<"Hi2"<<endl;
         if(_construct_inside_bucle) {
             lA._wherePutFinal=_construct_loop;  
             
@@ -1929,7 +1969,7 @@ void TransPhase::putBarrier(int minLine, int staticC, int block_line, PragmaCust
         }
         lA._lastModifiedAST=construct.get_ast();  
     }
-    //    cin.get();
+//        cin.get();
     lA._lastFunctionNameList=function_sym.get_name();
     _lastTransformInfo.push_back(lA);
 }
@@ -2024,7 +2064,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
             int partVars = 0;
             int thisHasChanges = 0;
             if(expr_list[l].prettyprint().find_first_of("=")>= 0 && expr_list[l].prettyprint().find_first_of("=")<expr_list[l].prettyprint().length()) {
-                
+                 int old_outsideAditionalWrites = _outsideAditionalWrites;
                 ObjectList<Source> operands, operators;
                 string firstO, secondO;
                 
@@ -2146,8 +2186,9 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 numIoVar = _downloadVars.size()-1;
                             }
                             
-                            
-                            isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg, 1);
+                            ObjectList<string> itList;
+                            itList.push_back(std::string(initVar));
+                            isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg, 1, itList);
                             rangeInitialValue = _rI;
                             rangeFinishValue = _rF;
                             forIterated = _forIter;
@@ -2388,10 +2429,11 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 
                 for (int e=0;e<operands.size();e++){ //second Operand
                     Source operandMPIReads;
-                    
+                    int old_outsideAditionalReads = _outsideAditionalReads;
                     if(std::string(operands[e]).find_first_of("[")>= 0 && std::string(operands[e]).find_first_of("[")<std::string(operands[e]).length()) {
                         string firstIterator; 
-                        cout<<std::string(operands[e])<<endl;
+//                        cout<<"O("<<e<<"): "<<std::string(operands[e])<<endl;
+//                        cin.get();
                         string actArg = std::string(operands[e]).substr(0,std::string(operands[e]).find_first_of("["));
                         string iterators = std::string(operands[e]).substr(std::string(operands[e]).find_first_of("[")+1, std::string(operands[e]).length());
                         actArg = cleanWhiteSpaces(actArg);
@@ -2424,7 +2466,9 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             
                             int numUploadedVar = 0;
                             if(_fullArrayReads) {
-                                isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg, 0);
+                                 ObjectList<string> itList;
+                                itList.push_back(std::string(initVar));    
+                                isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg, 0, itList);
                                 rangeInitialValue = _rI;
                                 rangeFinishValue = _rF;
                                 forIterated = _forIter;
@@ -2530,6 +2574,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 thisHasChanges = 1;
                                 
                                 if(_withMemoryLimitation || !isUploadedVar(actArg)) {
+                                   
                                     mpiReads << operandMPIReads;                                                     
                                 } else {
                                     
@@ -2602,17 +2647,19 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         
                                         Source read;
                                         read << preRead << postRead;
-                                        //                                    cout<< "R: "<<std::string(read)<<endl;
-                                        //                                    cin.get();
+//                                                                            cout<< "R: "<<std::string(read)<<endl;
+//                                                                            cin.get();
                                         
-                                        if(!_outsideAditionalReads && !_fullArrayWrites) {
+                                        if(!_outsideAditionalReads) {
                                             
-                                            cout<<forIterated.get_line()<<endl;
-                                            cout<<construct_ast.get_line()<<endl;
+//                                            cout<<forIterated.get_line()<<endl;
+//                                            cout<<construct_ast.get_line()<<endl;
+//                                            cin.get();
                                             //                                        cout<<"append"<<endl;
                                             AST_t readAST;
                                             readAST = read.parse_statement(construct.get_scope(),construct.get_enclosing_function().get_scope_link());
                                             forIterated.prepend(readAST);
+                                           
                                             
                                         } else {
                                             Source start, end;
@@ -2640,18 +2687,19 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         } else {
                                             mpiReads<<operandMPIReads;
                                         }
+                                       
                                     }
                                 }
                                 
                                 if(!_fullArrayReads || !isInRange || !_expandFullArrayReads) {
-                                    //                                cout<<line<<endl;
-                                    //                                cout<<std::string(operands[e])<<endl;
-                                    //                                cout<<rectifiedVarName<<endl;
+//                                                                    cout<<line<<endl;
+//                                                                    cout<<std::string(operands[e])<<endl;
+//                                                                    cout<<rectifiedVarName<<endl;
                                     
                                     line = replaceAll(line, operands[e], rectifiedVarName);
-                                    //                                cout<<actArg<<endl;
-                                    //                                cout<<line<<endl;
-                                    //                                cin.get();
+//                                                                    cout<<actArg<<endl;
+//                                                                    cout<<line<<endl;
+//                                                                    cin.get();
                                 }
                                 
                             } else {
@@ -2673,7 +2721,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             }
                         }
                     }
-                    
+                    _outsideAditionalReads =  old_outsideAditionalReads;
                 } 
                 if(line.find_first_of(";")>= 0 && line.find_first_of(";")<line.length())
                     line = line.substr(0,line.find_first_of(";"));    
@@ -2681,6 +2729,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 
                 //            cout<<line<<endl;
                 //            cin.get();
+                _outsideAditionalWrites = old_outsideAditionalWrites;
             } else if((expr_list[l].prettyprint().find_first_of("++")>= 0 && expr_list[l].prettyprint().find_first_of("++")<expr_list[l].prettyprint().length()) 
                     || (expr_list[l].prettyprint().find_first_of("--")>= 0 && expr_list[l].prettyprint().find_first_of("--")<expr_list[l].prettyprint().length())){
                 string exprString =  expr_list[l].prettyprint();
@@ -2908,7 +2957,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
     //    
     return astPrettyprint;
 }
-int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName, int io) {
+int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName, int io, ObjectList<string> iteratorOutside) {
     
     TraverseASTFunctor4LocateFor expr_traverseFor(scopeL);
     ObjectList<AST_t> expr_listFor = astWhereSearch.depth_subtrees(expr_traverseFor);
@@ -3004,21 +3053,60 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                         exit(-1);
                     }
                     conditionToWork =  cleanWhiteSpaces(conditionToWork);
+                   
+                    
+//                    cout<<fS.get_enclosing_statement().get_ast().prettyprint()<<endl;
+                    
+                    ObjectList<Source> listOfSources;
+                    listOfSources= splitMathExpression(scopeL.get_scope(fS.get_enclosing_statement().get_ast()),conditionToWork, 0);
+                    int finded = 0;
+                    for(int s=0;s<listOfSources.size();++s) {
+                        for(int c=0; c<iteratorOutside.size();++c) {
+                            if(cleanWhiteSpaces(std::string(listOfSources[s])).compare(iteratorOutside[c])==0) {
+                                if(io) {        
+                                    _forIter = expr_listFor[lF];
+                                    _outsideAditionalWrites = 0;
+                                } else {
+                                    _forIter = expr_listFor[lF];
+                                    _outsideAditionalReads = 0;              
+                                }
+    //                            cout<<_forIter.prettyprint()<<endl;
+                            }
+                        }
+                    }
+                    listOfSources= splitMathExpression(scopeL.get_scope(fS.get_enclosing_statement().get_ast()),tempInitValue, 0);
+                    finded = 0;
+                    for(int s=0;s<listOfSources.size();++s) {
+                        for(int c=0; c<iteratorOutside.size();++c) {
+                            if(cleanWhiteSpaces(std::string(listOfSources[s])).compare(iteratorOutside[c])==0) {
+                                if(io) {        
+                                    _forIter = expr_listFor[lF];
+                                    _outsideAditionalWrites = 0;
+                                } else {
+                                    _forIter = expr_listFor[lF];
+                                    _outsideAditionalReads = 0;              
+                                }
+    //                            cout<<_forIter.prettyprint()<<endl;
+                            }
+                        }
+                    }
                     _rI = tempInitValue;
                     _rF = conditionToWork;
-                    
-                    //                    cout<< _rI<< endl;
-                    //                    cout<< _rF<< endl;
-                    //                    cout<< _forIter.prettyprint()<< endl;
-                    //                    cin.get();
+//                    cout<< _rF<< endl;
+//                    //                    cout<< _forIter.prettyprint()<< endl;
+//                    cin.get();
                     return 1;
                 }
                 //                _forIter = fS.get_ast();
                 //                _rF = "100";
             } else {
-                //            
-                return isInForIteratedBy(principalIt, ast, fS.get_loop_body().get_ast(), scopeL, variableName, io);
                 //
+                iteratorOutside.push_back(inductionVar);
+                if(isInForIteratedBy(principalIt, ast, fS.get_loop_body().get_ast(), scopeL, variableName, io, iteratorOutside)) {
+                    return 1;
+                } else {
+                    iteratorOutside.pop_back();
+                }
             }
         }
     }
@@ -3085,7 +3173,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                         if(std::string(newR.iterVar[x]).compare(std::string(iterators[j]))==0)
                             find = 1;
                     }
-                    if(!find) {
+                    if(!find && !iterators[j].empty()) {
                         cout<<"adding "<<std::string(iterators[j])<<" to "<<std::string(newR.name)<<endl;
                         newR.iterVar.push_back(iterators[j]);
                     }
@@ -3145,7 +3233,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                         if(std::string(newR.iterVar[x]).compare(std::string(iterators[j]))==0)
                             find = 1;
                     }
-                    if(!find) {
+                    if(!find && !iterators[j].empty()) {
                         //                        cout<<"adding "<<std::string(iterators[j])<<" to "<<std::string(newR.name)<<endl;
                         newR.iterVar.push_back(iterators[j]);
                     }
@@ -4573,10 +4661,16 @@ ObjectList<Source> TransPhase::splitMathExpression(Scope sC,std::string secondO,
                 operators[numElem]=empty;
                 
             }
-        } else if(std::string(actChar).compare(")")==0 && std::string(operators[numElem]).compare(std::string(empty))!=0){
+        } else if(std::string(actChar).compare(")")==0 && std::string(operators[numElem]).compare(std::string(empty))!=0 && (isInsideIndex==0 || !includeIterators)){
             operators.push_back(empty);
             numElem++;           
             operators[numElem]=empty;
+        } else if(isInsideIndex>0 && includeIterators && std::string(actChar).compare(" ")!=0) {
+            Source actElem;
+            actElem = operators[numElem];
+            actElem<<actChar;
+            operators.pop_back();
+            operators.push_back(actElem);
         }
         
     }
@@ -4642,13 +4736,13 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
                 }
                 if(loopAst.prettyprint().compare("")!=0 && _for_min_line==-1){
                     
-                    _for_min_line = get_real_line(loopAst, scopeL, exprI.get_ast(), 0, searching_construct,0);
+                    _for_min_line = get_real_line(loopAst, scopeL, exprI.get_ast(), 0, searching_construct,searching_construct);
                     //cout<<"LS: "<<_for_min_line<<"***********************"<<endl;
                     if(_for_min_line>=0) {
                         _for_internal_ast_last = get_last_ast(loopAst, scopeL);
                         _for_internal_ast_first = get_first_ast(loopAst, scopeL);
                         loopAst = loopAst.get_enclosing_function_definition_declaration();
-                        _for_min_line = get_real_line(loopAst, scopeL, exprI.get_ast(), 0, searching_construct,0);
+                        _for_min_line = get_real_line(loopAst, scopeL, exprI.get_ast(), 0, searching_construct,searching_construct);
                         if(searching_construct) {
                             _for_min_line-=_notOutlined;
                             _for_min_line-=_pragma_lines;
@@ -4810,11 +4904,13 @@ int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int
                         //                            cout<<actLineAST.prettyprint()<<endl;
                         //                            if(expr_list2.size()>1) {
                         //                                line+=expr_list2.size();
-//                        cout<<line<<endl;
+                        cout<<line<<endl;
                         
                         line-=myidLines;
 //                        cout<<line<<endl;
-                        line+=(_num_transformed_blocks-1);
+                        line+=(_num_transformed_blocks);
+//                        cout<<line<<endl;
+                        line-=(_num_non_trasformed_blocks);
 //                        cout<<line<<endl;
 //                        cin.get();
                         //                                cout<<"Incrementing line in: "<<expr_list2.size()<<endl;
