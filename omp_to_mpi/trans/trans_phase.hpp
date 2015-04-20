@@ -109,12 +109,14 @@ private:
     void divideTask();
     void assignMasterWork(AST_t functionAST, ObjectList<Symbol> functionsWithOMP, string functionName);
     AST_t compute_last_astLoop(AST_t lastA, ScopeLink sL);
+    int checkIfIteratedByOutsideIterators(string principalIt, AST_t _construct_loop, ScopeLink scopeL, int io, int exprLine);
     AST_t _translation_unit;
     ScopeLink _scope_link;
     vector<infoVar> _reducedVars;
     vector<infoVar> _ioVars;
     vector<infoVar> _inVars;
     int _initialized;
+    int _constructLine;
     int _elseNeeded;
     AST_t _initAST;
     int _maxManagedVarsCoor;
@@ -160,6 +162,8 @@ private:
         AST_t _lastModifiedAST;
         AST_t _lastModifiedASTstart;
         string _lastFunctionNameList;
+        int _inside_bucle;
+        int _num_loop;
         
     };
     string _RTAG;
