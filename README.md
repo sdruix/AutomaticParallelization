@@ -49,7 +49,7 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
   	5. [sudo] make install
   	6a. For OMP2HMPP execution: omp2hmpp [-h] 
 	6b. For OMP2MPI execution: omp2mpi [-h] 
-	6c. For Loop Normalitzation: trans-phase(cc/c++) -h
+	6c. For Loop Normalitzation: trans-phase(cc/c++) [-h]
   	
 ##Comments
 
