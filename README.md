@@ -25,9 +25,9 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 
 [2] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2014. [OMP2HMPP: HMPP Source Code Generation from Programs with Pragma Extensions](http://arxiv.org/abs/1407.6932). In High Performance Energy Efficient Embedded Systems. ACM.
 
-[3] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2015. OMP2MPI: Automatic MPI code generation from OpenMP programs. In High Performance Energy Efficient Embedded Systems. ACM.
+[3] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2015. [OMP2MPI: Automatic MPI code generation from OpenMP programs](http://arxiv.org/abs/1502.02921). In High Performance Energy Efficient Embedded Systems. ACM.
 
-[4][OMP2HMPP: Compiler Framework for Energy-Performance Trade-off Analysis of Automatically Generated Codes](http://www.ijcsi.org/papers/IJCSI-12-2-9-21.pdf)
+[4][OMP2HMPP: Compiler Framework for Energy-Performance Trade-off Analysis of Automatically Generated Codes](http://www.ijcsi.org/articles/Omp2hmpp-compiler-framework-for-energyperformance-tradeoff-analysis-of-automatically-generated-codes.php)
 Albert Saa-Garriga, David Castells-Rufas, Jordi Carrabina. 2015. In IJCSI International Journal of Computer Science Issues 12 (2), 9.
 
 ##Installation
