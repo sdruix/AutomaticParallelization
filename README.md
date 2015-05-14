@@ -10,7 +10,7 @@ Custom Source-To-Source Compilers + Mercurium Framework installation and configu
 
 The presented tools are Source to Source compilers (S2S) based on BSC's [Mercurium Framework](https://pm.bsc.es/mcxx)[1]. Mercurium is a source-to-source compilation infrastructure aimed at fast prototyping and supports C and C++ languages and is mainly used in Nanos environment to implement OpenMP but since it is quite extensible it has been used to implement other programming models or compiler transformations. This framework is used in order to implement our S2S transformation phases, providing us with the Abstract Syntax Tree(AST) as an easy access to the table of symbols. This information is analyzed through our set of tools to parse and translate the original problem to an optimum version of target language.
 
-* **OMP2HMPP**[2], a tool that, automatically translates a high-level C source code(OpenMP) code into HMPP. The generated version rarely will differs from a hand-coded HMPP version, and will provide an important speedup, near 113%, that could be later improved by hand-coded CUDA.
+* **OMP2HMPP**[2,4], a tool that, automatically translates a high-level C source code(OpenMP) code into HMPP. The generated version rarely will differs from a hand-coded HMPP version, and will provide an important speedup, near 113%, that could be later improved by hand-coded CUDA.
 
 * **Inline**, as part of the OMP2HMPP tool, the implemented Mercurium Plugin is able to do smart inlining of all the selected function calls.
 
@@ -25,7 +25,9 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
 
 [2] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2014. [OMP2HMPP: HMPP Source Code Generation from Programs with Pragma Extensions](http://arxiv.org/abs/1407.6932). In High Performance Energy Efficient Embedded Systems. ACM.
 
-[3] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2015. OMP2MPI: Automatic MPI code generation from OpenMP programs. In High Performance Energy Efficient Embedded Systems. ACM.
+[3] Albert Saa-Garriga, David Castells-Rufas, and Jordi Carrabina. 2015. [OMP2MPI: Automatic MPI code generation from OpenMP programs](http://arxiv.org/abs/1502.02921). In High Performance Energy Efficient Embedded Systems. ACM.
+
+[4]Albert Saa-Garriga, David Castells-Rufas, Jordi Carrabina. 2015.[OMP2HMPP: Compiler Framework for Energy-Performance Trade-off Analysis of Automatically Generated Codes](http://www.ijcsi.org/articles/Omp2hmpp-compiler-framework-for-energyperformance-tradeoff-analysis-of-automatically-generated-codes.php). In IJCSI International Journal of Computer Science Issues 12 (2), 9.
 
 ##Installation
 
@@ -47,7 +49,7 @@ The presented tools are Source to Source compilers (S2S) based on BSC's [Mercuri
   	5. [sudo] make install
   	6a. For OMP2HMPP execution: omp2hmpp [-h] 
 	6b. For OMP2MPI execution: omp2mpi [-h] 
-	6c. For Loop Normalitzation: trans-phase(cc/c++) -h
+	6c. For Loop Normalitzation: trans-phase(cc/c++) [-h]
   	
 ##Comments
 
