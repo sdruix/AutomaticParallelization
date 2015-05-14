@@ -130,7 +130,7 @@ private:
     int _construct_inside_bucle;
     int _secureWrite;
     int _workWithCopiesOnSlave;
-    
+
     int _divideWork;
     string _statVar;
     string _sizeVar;
@@ -227,7 +227,7 @@ private:
     string replaceAll(std::string str, const std::string& from, const std::string& to);
     AST_t fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, int outline_num_line, ObjectList<Symbol> prmters , int hmppOrig, int offset, AST_t prevAST);
     string transformConstructAST(PragmaCustomConstruct construct, ScopeLink scopeL, Scope sC, Source initVar);
-    int isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName, int io, ObjectList<string> iteratorOutside);
+    int isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName, int io, ObjectList<string> iteratorOutside, string op);
     int _withMemoryLimitation;
     int _oldMPIStyle;
     int _smartUploadDownload;
@@ -237,7 +237,7 @@ private:
     string _rF;
     int _outline_line;
     int _num_included_if;
-    int _expandFullArrayReads;
+    int _expandFullArrayReadWrite;
     int _sendComputedIndices;
     AST_t _forIter;
     ScopeLink _ifScopeL;

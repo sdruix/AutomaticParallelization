@@ -3,9 +3,7 @@
 all:	
 	@echo ""
 	@echo "BEGIN build custom phases..."
-	@make -C ./trans/
-	@echo "---------------------------------------------------------------------------"
-	@make -C ./s2s/
+	@make -C ./onFor/
 	@echo "---------------------------------------------------------------------------"
 	@echo "END build custom phases."
 	@echo ""
@@ -14,11 +12,8 @@ all:
 install:
 	@echo ""
 	@echo "Installing custom phases..."
-	@make -C ./trans/ install
-	@make -C ./s2s/ install
-	@echo "---------------------------------------------------------------------------"
+	@make -C ./onFor/ install
 	@echo ""
 
 clean:
-	@make -C ./trans/ clean
-	@make -C ./s2s/ clean
+	@make -C ./onFor/ clean
