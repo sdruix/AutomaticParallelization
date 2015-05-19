@@ -952,7 +952,8 @@ int main(int argc, char *argv[]) {
                 string firstChar = line.substr(0, 1);
                 if (subline.compare(includeS) == 0) {
                     //Avoid inlude mpi duplicated
-                    if (line.find("mpi.h") < 0 || line.find("mpi.h") > line.length()) {
+                    if ((line.find("mpi.h") < 0 || line.find("mpi.h") > line.length()) &&
+                            (line.find("stdlib.h") < 0 || line.find("stdlib.h") > line.length())) {
                         includeVector.push_back(line);
                         //cout<<"Not found in "<< line <<" ("<<line.find_first_of("mpi.h")<<")"<< endl;
                     }

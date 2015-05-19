@@ -1,0 +1,23 @@
+[OnFor-phasecc]
+language = C
+options =  
+preprocessor_name = gcc 
+preprocessor_options = -E 
+compiler_name = gcc 
+compiler_options =  -lmpi 
+linker_name = gcc 
+linker_options =  -lmpi 
+compiler_phase=/home/sdruix/mcxx/add_traces/onFor/onFor-phase.so 
+pragma_prefix=omp
+
+[OnFor-phasec++] 
+language = C++  
+options =  
+preprocessor_name = g++  
+preprocessor_options = -E 
+compiler_name = g++  
+compiler_options =  -lmpi
+linker_name = g++  
+linker_options =  -lmpi 
+compiler_phase=/home/sdruix/mcxx/add_traces/onFor/OnFor-phase.so 
+pragma_prefix=omp

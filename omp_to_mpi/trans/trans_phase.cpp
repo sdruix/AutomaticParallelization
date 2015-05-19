@@ -32,6 +32,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     register_directive("for threadprivate");
     on_directive_post["parallel"].connect(functor(&TransPhase::pragma_postorder, *this));
     _num_non_trasformed_blocks = 0;
+    _breakPointNumber=0;
     _ATAG = "ATAG";
     _RTAG = "RTAG";
     _WTAG = "WTAG";
@@ -40,15 +41,15 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _FRTAG = "FRTAG";
     _FWTAG = "FWTAG";
     _withMemoryLimitation = 0;
-    _oldMPIStyle = 0;
+    _oldMPIStyle = 1;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
     _sendComputedIndices = 0;
-    _smartUploadDownload = 1;
+    _smartUploadDownload =0;
     _fullArrayReads = 1;
     _fullArrayWrites = 1;
     _divideWork = 1;
-    _expandFullArrayReadWrite = 0;
+    _expandFullArrayReadWrite = 1;
     
 }
 
@@ -63,12 +64,26 @@ void TransPhase::run(DTO& dto) {
     
     if(_divideWork)
         divideTask();
+     
     PragmaCustomCompilerPhase::run(dto);
     finalize();
     
+//    debugPoint(_translation_unit.prettyprint());
     
     
+   
 }
+
+void TransPhase::debugPoint(string msg) {
+    if(msg.empty()) {
+        cout<< "Debug Point("<<_breakPointNumber<<")"<<endl;
+    } else {
+        cout<<"MGS: "<<msg <<" on debug Point("<<_breakPointNumber<<")"<<endl;
+    }
+    cin.get();
+    _breakPointNumber++;
+}
+
 void TransPhase::defineVars() {
     _statVar = "stat";
     int num = 0;
@@ -167,7 +182,7 @@ void TransPhase::divideTask() {
     for(int i =0; i <allSym.size();++i){
         if(allSym[i].is_function()) {
             if(!allSym[i].get_point_of_definition().prettyprint().empty()) {
-                
+//                cout<<"Checking if"<<allSym[i].get_name()<< " has construct inside"<<endl;
                 TransPhase::TraverseASTFunctor4LocateOMP expr_traverse(_scope_link);
                 ObjectList<AST_t> expr_list = allSym[i].get_point_of_definition().depth_subtrees(expr_traverse);
                 if(expr_list.size()>0){
@@ -175,19 +190,27 @@ void TransPhase::divideTask() {
                 }
             } 
         }
-        //cout<<i<<": "<<allSym[i].get_point_of_declaration().prettyprint()<<endl;
+//        cout<<i<<": "<<allSym[i].get_point_of_declaration().prettyprint()<<endl;
     }
-    
     for(int i =0; i <functionsWithConstructs.size();++i){
+        
         FunctionDefinition fD(functionsWithConstructs[i].get_point_of_declaration(),_scope_link);
-        assignMasterWork(fD.get_function_body().get_ast(), functionsWithConstructs, fD.get_function_symbol().get_name());
+
+        if(!fD.get_function_body().get_ast().prettyprint().empty()) {
+            assignMasterWork(fD.get_function_body().get_ast(), functionsWithConstructs, fD.get_function_symbol().get_name());
+        } else {
+             FunctionDefinition fD2(functionsWithConstructs[i].get_point_of_definition(),_scope_link);
+             if(!fD.get_function_body().get_ast().prettyprint().empty()) {
+                 assignMasterWork(fD2.get_function_body().get_ast(), functionsWithConstructs, fD.get_function_symbol().get_name());
+             }
+        }
+    
     }
     
     
 }
 
 void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> functionsWithOMP, string functionName) {
-    
     TraverseASTFunctor4All expr_traverse(_scope_link);
     ObjectList<AST_t> expr_list = functionAST.depth_subtrees(expr_traverse);
     ObjectList<Symbol> allSymbols = _scope_link.get_scope(functionAST).get_all_symbols(false);
@@ -577,6 +600,13 @@ string TransPhase::getSimplifiedMathExpression(Expression iterating, string name
     
     return mathExpr;
 }
+string TransPhase::concatenateUnsigned(string s) {
+    if(s.find("UNSIGNED") == 0) {
+        s = s.substr(s.find_last_of(" ")+1, s.length());
+        s = "UNSIGNED_"+s;
+    } 
+    return s;
+}
 int TransPhase::isDeclarationLine(AST_t ast, ObjectList<Symbol> allSym, ScopeLink sL) {
     int l = ast.get_line();
     
@@ -630,7 +660,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             
         }
         
-        
+       
         _file_tree = construct.get_statement().get_ast().get_enclosing_global_tree();
         Statement statement = construct.get_statement();
         
@@ -656,9 +686,9 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         
         
         
-        
+         
         _prmters = outlineAux.get_parameter_list();
-        
+       
         if(_prmters.size()==0) {         
             _prmters =outlineAux.recomputeParameters(); // Error in compute_referenced_entities has to repeat this function
         }
@@ -666,7 +696,6 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         //  cout<<"Hola"<<endl;
         //  
         AST_t prevAST;
-        
         _construct_inside_bucle = is_inside_bucle(construct.get_ast(),construct.get_enclosing_function().get_scope_link(),block_line, 1);
         _construct_num_loop = _for_num;
         _construct_loop = _for_ast;
@@ -1043,7 +1072,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             }
         } else {
             if(_isForDirective)
-                varInitialization << _partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) : 1;";
+                varInitialization << "("<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) : 1);";
             varInitialization << "int "<<_coordVectorVar << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
         }
         
@@ -1078,7 +1107,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             astToAttach = _construct_loop;
                             Source partSizeSource;
                             if(_isForDirective) {
-                                partSizeSource << _partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) : 1;"; //<< "int coordVector" << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
+                                partSizeSource << "("<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) : 1);"; //<< "int coordVector" << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
                                 construct.get_ast().prepend(partSizeSource.parse_statement(function_body.get_ast(), function_body.get_scope_link()));
                             }
                         } else {
@@ -1126,6 +1155,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         // 
         if(_isForDirective) {
             cout<<"Generating MPI Master code"<<endl;
+            
+           
             mpiFixStructurePart1 << "if("<<_myidVar<<" == 0) {\n ";
             if(_oldMPIStyle)
             {
@@ -1139,12 +1170,12 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     mpiVariantStructurePart1 << "for (int "<<_toVar<<" =1;"<<_toVar<<"<"<<_sizeVar<<";++"<<_toVar<<") {";
                     
                     mpiVariantStructurePart1 <<"if("<<_toVar<<"!="<<_sizeVar<<"-1) {";
-                    mpiVariantStructurePart1 <<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1);";
+                    mpiVariantStructurePart1 <<"("<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1));";
                     if(_inVars.size()!=0)
                         mpiVariantStructurePart1       << _offsetVar<<" = ("<<_partSizeVar<<" * ("<<_toVar<<"-1))+"<<initValue<<";"
                                 << "} else {";
                     
-                    mpiVariantStructurePart1  << _partSizeVar<<" = ("<<maxS<<"/ ("<<_sizeVar<<"-1)) + ("<<maxS <<"%"<<"("<<_sizeVar<<"-1)) ;";
+                    mpiVariantStructurePart1  << "("<<_partSizeVar<<" = ("<<maxS<<"/ ("<<_sizeVar<<"-1)) + ("<<maxS <<"%"<<"("<<_sizeVar<<"-1))) ;";
                     if(_inVars.size()!=0)
                         mpiVariantStructurePart1 << _offsetVar<<" = (" << maxS << "/ ("<<_sizeVar<<"-1) * ("<<_toVar<<"-1))+"<<initValue<<";"
                                 << "}";
@@ -1166,12 +1197,12 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     
                     
                     mpiVariantStructurePart1 << "if("<<_fromVar<<"!="<<_sizeVar<<"-1) {"
-                            << _partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1);";
+                            << "( "<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1));";
                     if(maxDim>0) 
                         mpiVariantStructurePart1    <<_offsetVar<<" = ("<<_partSizeVar<<" * ("<<_fromVar<<"-1))+"<<initValue<<";";
                     
                     mpiVariantStructurePart1    << "} else {"
-                            << _partSizeVar<<" = ("<<maxS<<"/ ("<<_sizeVar<<"-1)) + ("<<maxS <<"%"<<"("<<_sizeVar<<"-1)) ;";
+                            << "("<<_partSizeVar<<" = ("<<maxS<<"/ ("<<_sizeVar<<"-1)) + ("<<maxS <<"%"<<"("<<_sizeVar<<"-1)));";
                     if(maxDim>0) 
                         mpiVariantStructurePart1    <<_offsetVar<<" = (" << maxS << "/ ("<<_sizeVar<<"-1) * ("<<_fromVar<<"-1))+"<<initValue<<";";
                     mpiVariantStructurePart1    << "}";
@@ -1180,6 +1211,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                         for(int i = 0; i<_ioVars.size(); ++i){
                             string upperType = std::string(_ioVars[i].type);
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                            upperType = concatenateUnsigned(upperType);
                             stringstream varSent, size;
                             
                             
@@ -1205,6 +1237,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             if(_ioVars[i].size.size()==0) {
                                 string upperType = std::string(_inVars[i].type);
                                 std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                               upperType = concatenateUnsigned(upperType);
                                 mpiVariantStructurePart1 << "MPI_Recv(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<","<<_fromVar<<","<<_ATAG<<",MPI_COMM_WORLD, &"<<_statVar<<");";
                             }
                         }
@@ -1217,6 +1250,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     
                     
                 } else {
+
                     int checkonFirstSend = 1;
                     mpiVariantStructurePart1 << "int "<<_followINVar<<" = "<<initValue<<"; int "<<_killedVar<<" = 0;"
                             << "for (int "<<_toVar<<"=1; "<<_toVar<<"<"<<_sizeVar<<"; ++"<<_toVar<<") {";
@@ -1233,7 +1267,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     if(checkonFirstSend) {
                     mpiVariantStructurePart1 <<"}"
                             << "else if(("<<conditionToWork<<"-"<<_followINVar<<")>0) {"
-                            << _partSizeVar<<" ="<<conditionToWork <<"-"<<_followINVar<<";"
+                            << "("<<_partSizeVar<<" ="<<conditionToWork <<"-"<<_followINVar<<");"
                             << "MPI_Send(&"<<_followINVar<<", 1, MPI_INT, "<<_toVar<<", "<<_ATAG<<", MPI_COMM_WORLD);"
                             << "MPI_Send(&"<<_partSizeVar<<", 1, MPI_INT, "<<_toVar<<", "<<_ATAG<<", MPI_COMM_WORLD);";
                             mpiVariantStructurePart1 << generateMPIVariableMessagesSend(_inVars,initVar,functionScope,_toVar,_followINVar,0);
@@ -1257,6 +1291,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                         for(int i = 0; i<_ioVars.size(); ++i){
                             string upperType = std::string(_ioVars[i].type);
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                            upperType = concatenateUnsigned(upperType);
                             stringstream varSent, size;
                             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _ioVars[i].iterVar) || _ioVars[i].size.size()<1) {
                                 
@@ -1266,14 +1301,14 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                 for(int x=1; x<_ioVars[i].size.size();++x) {
                                     size<<" * (" <<_ioVars[i].size[x]<<")";
                                 }
-                                
-                                
+                          
                                 
                                 if(functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_array() || functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_pointer()) {
                                     mpiVariantStructurePart1 << "MPI_Recv(&"<<varSent.str()<<", "<<size.str()<<", MPI_"<<upperType<<","<<_sourceVar<<","<<_ATAG<<",MPI_COMM_WORLD, &"<<_statVar<<");";
                                 } else {
                                     mpiVariantStructurePart1 << "MPI_Recv(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<","<<_sourceVar<<","<<_ATAG<<",MPI_COMM_WORLD, &"<<_statVar<<");";
                                 }
+                                
                             }
                             
                         }
@@ -1283,20 +1318,21 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             if(_ioVars[i].size.size()==0) {
                                 string upperType = std::string(_inVars[i].type);
                                 std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                                upperType = concatenateUnsigned(upperType);
                                 mpiVariantStructurePart1 << "MPI_Recv(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<","<<_sourceVar<<","<<_ATAG<<",MPI_COMM_WORLD, &"<<_statVar<<");";
                             }
                         }
                         
                         
                     }
-                    
+
                     for(int i = 0; i<_reducedVars.size(); ++i){
                         string upperType = std::string(_reducedVars[i].type);
                         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                        upperType = concatenateUnsigned(upperType);
                         mpiVariantStructurePart1<< "MPI_Recv(&work"<<_reducedVarsIndexStart+i<<", 1, MPI_"<<upperType<<", "<<_sourceVar<<", MPI_ANY_TAG, MPI_COMM_WORLD,&"<<_statVar<<");";
                         mpiVariantStructurePart1<< _reducedVars[i].name<<" "<<_reducedVars[i].operation<<"= work"<<_reducedVarsIndexStart+i<<";";
                     }
-                    
                     mpiVariantStructurePart1 << "if (("<<_followINVar<<"+"<<_partSizeVar<<") <"<<conditionToWork<<") {"
                             << "MPI_Send(&"<<_followINVar<<", 1, MPI_INT, "<<_sourceVar<<", "<<_ATAG<<", MPI_COMM_WORLD);"
                             << "MPI_Send(&"<<_partSizeVar<<", 1, MPI_INT, "<<_sourceVar<<", "<<_ATAG<<", MPI_COMM_WORLD);";
@@ -1304,7 +1340,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     
                     //mpiVariantStructurePart1 << "} else if(("<<conditionToWork<<"-"<<_followINVar<<")< "<<_partSizeVar<<" && ("<<conditionToWork<<"-"<<_followINVar<<")>0) {"//MODIFIED
                     mpiVariantStructurePart1 << "} else if(("<<conditionToWork<<"-"<<_followINVar<<")>0) {"
-                            << _partSizeVar<<" ="<<conditionToWork <<"-"<<_followINVar<<";"
+                            << "("<<_partSizeVar<<" ="<<conditionToWork <<"-"<<_followINVar<<");"
                             << "MPI_Send(&"<<_followINVar<<", 1, MPI_INT, "<<_sourceVar<<", "<<_ATAG<<", MPI_COMM_WORLD);"
                             << "MPI_Send(&"<<_partSizeVar<<", 1, MPI_INT, "<<_sourceVar<<", "<<_ATAG<<", MPI_COMM_WORLD);";
                     mpiVariantStructurePart1 << generateMPIVariableMessagesSend(_inVars,initVar,functionScope,_sourceVar,_followINVar,0);
@@ -1323,7 +1359,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 mpiFixStructurePart1 <<"}";
                 //pragma2mpi.prepend(ASTmpiFixStructurePart1);
-                
+               
                 AST_t ast2start = mpiFixStructurePart1.parse_statement(function_body.get_ast(), function_body.get_scope_link());
                 if(_construct_inside_bucle){
                     newASTStart = ast2start;
@@ -1341,7 +1377,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 if(staticC!=0) {
                     if(_inVars.size()!=0){
                         mpiVariantStructurePart4 
-                                <<"if("<<_myidVar<<"!="<<_sizeVar<<"-1) {"<<_partSizeVar<<" = (" << maxS << ") / ("<<_sizeVar<<" - 1); "<<_offsetVar<<" = ("<<_partSizeVar<<" * ("<<_myidVar<<"-1)) +"<<initValue
+                                <<"if("<<_myidVar<<"!="<<_sizeVar<<"-1) {"<<"("<<_partSizeVar<<" = (" << maxS << ") / ("<<_sizeVar<<" - 1)); "<<_offsetVar<<" = ("<<_partSizeVar<<" * ("<<_myidVar<<"-1)) +"<<initValue
                                 <<";} else {"<<_offsetVar<<" = (" << maxS << "/ ("<<_sizeVar<<"-1) * ("<<_myidVar<<"-1))+"<<initValue<<";}";
                     }
                     mpiVariantStructurePart4 << "while(1){"
@@ -1364,6 +1400,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             
                             
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                            upperType = concatenateUnsigned(upperType);
                             stringstream varSent, size, iterators;
                             
                             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
@@ -1440,6 +1477,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             if(_inVars[i].size.size()==0) {
                                 string upperType = std::string(_inVars[i].type);
                                 std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                                upperType = concatenateUnsigned(upperType);
                                 mpiVariantStructurePart6 << "MPI_Recv(&"<<_inVars[i].name<<", 1, MPI_"<<upperType<<",0,"<<_ATAG<<",MPI_COMM_WORLD, &"<<_statVar<<");";
                             }
                         }                    
@@ -1447,6 +1485,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     for(int i = 0; i<_reducedVars.size(); ++i){
                         string upperType = std::string(_reducedVars[i].type);
                         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                        upperType = concatenateUnsigned(upperType);
                         mpiVariantStructurePart6 << "MPI_Recv(&"<<_reducedVars[i].name<<", 1, MPI_"<<upperType<<",MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&"<<_statVar<<");";
                         
                         
@@ -1463,6 +1502,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             if(_ioVars[i].size.size()==0) {
                                 string upperType = std::string(_inVars[i].type);
                                 std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                                upperType = concatenateUnsigned(upperType);
                                 mpiVariantStructurePart2 << "MPI_Send(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<",0,"<<_ATAG<<",MPI_COMM_WORLD);";
                             }
                         }
@@ -1470,6 +1510,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                         for(int i = 0; i<_ioVars.size(); ++i){
                             string upperType = std::string(_ioVars[i].type);
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                            upperType = concatenateUnsigned(upperType);
                             //                                                    cout<<std::string(_ioVars[i].name)<<" size "<<_ioVars[i].size.size()<<endl;
                             //                                                    cin.get();
                             if(_ioVars[i].size.size()>0) {
@@ -1522,6 +1563,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             
                             string upperType = std::string(_inVars[i].type);
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                            upperType = concatenateUnsigned(upperType);
                             stringstream varSent, size, iterators;
                             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar) || _inVars[i].size.size()<1) {
                                 transferInfo up;
@@ -1594,6 +1636,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             if(_inVars[i].size.size()==0) {
                                 string upperType = std::string(_inVars[i].type);
                                 std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                                upperType = concatenateUnsigned(upperType);
                                 mpiVariantStructurePart6 << "MPI_Recv(&"<<_inVars[i].name<<", 1, MPI_"<<upperType<<",0,"<<_ATAG<<",MPI_COMM_WORLD, &"<<_statVar<<");";
                             }
                         }                    
@@ -1614,6 +1657,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             if(_ioVars[i].size.size()==0) {
                                 string upperType = std::string(_inVars[i].type);
                                 std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                                upperType = concatenateUnsigned(upperType);
                                 mpiVariantStructurePart2 << "MPI_Send(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<",0,"<<_ATAG<<",MPI_COMM_WORLD);";
                             }
                         }
@@ -1621,6 +1665,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                         for(int i = 0; i<_ioVars.size(); ++i){
                             string upperType = std::string(_ioVars[i].type);
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                            upperType = concatenateUnsigned(upperType);
                             //                                                    cout<<std::string(_ioVars[i].name)<<" size "<<_ioVars[i].size.size()<<endl;
                             //                                                    cin.get();
                             if(_ioVars[i].size.size()>0) {
@@ -1677,6 +1722,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 //
                 completeLoopsInAST(construct.get_ast(), function_def.get_function_body().get_scope_link());
                 constructASTS = transformConstructAST(construct, function_def.get_function_body().get_scope_link(), functionScope, initVar); 
+                
                 mpiFixStructurePart2 <<mpiVariantStructurePart6<<_aditionalLinesRead<<"for("<<initType<<" "<<initVar<<" = "<<_offsetVar<<"; "<<initVar<<"<"<<_offsetVar<<"+"<<_partSizeVar<<";++"<<initVar<<")";
                 mpiFixStructurePart2 <<"{"<<constructASTS<<"}"<<_aditionalLinesWrite<<mpiVariantStructurePart2;
                 
@@ -1686,6 +1732,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 for(int i = 0; i<_reducedVars.size(); ++i){
                     string upperType = std::string(_reducedVars[i].type);
                     std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                    upperType = concatenateUnsigned(upperType);
                     mpiFixStructurePart2<< "MPI_Send(&"<<_reducedVars[i].name<<", 1, MPI_"<<upperType<<", 0, "<<_ATAG<<", MPI_COMM_WORLD);";    
                     // constructASTS = modifyReductionOperation(_reducedVars[i], construct.get_ast(), construct);
                 }  
@@ -1696,6 +1743,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 AST_t ASTmpiFixStructurePart2 = mpiFixStructurePart2.parse_statement(function_body.get_ast(), function_body.get_scope_link());
                 construct.get_ast().replace_with(ASTmpiFixStructurePart2);
+               
             }
             putBarrier(minLine, staticC, block_line, construct, function_sym, function_body, minAST, newASTStart);
             
@@ -2057,11 +2105,13 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
     vector<Source> copyVariables;
     int hasChanges = 0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();it != expr_list.end(); it++, l++) {
+        
         PragmaCustomConstruct test(expr_list[l],construct.get_scope_link());
         if(test.is_construct()){
             string pragmaLine = test.get_pragma_line().prettyprint();
             if(pragmaLine.find("atomic")>=0 && pragmaLine.find("atomic")<pragmaLine.length()
                     || pragmaLine.find("critical")>=0 && pragmaLine.find("critical")<pragmaLine.length()) {
+               
                 _secureWrite =1;
                 test.get_ast().replace_with(test.get_statement().get_ast());
                 Source newExprSource;
@@ -2088,16 +2138,18 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
             Source variableInit;
             string line;
             line =  expr_list[l].prettyprint();
+           
             int partVars = 0;
             int thisHasChanges = 0;
             if(expr_list[l].prettyprint().find_first_of("=")>= 0 && expr_list[l].prettyprint().find_first_of("=")<expr_list[l].prettyprint().length()) {
-                 int old_outsideAditionalWrites = _outsideAditionalWrites;
-                 int old_SecureWrite = _secureWrite;
+                int old_outsideAditionalWrites = _outsideAditionalWrites;
+                int old_SecureWrite = _secureWrite;
                 ObjectList<Source> operands, operators;
                 string firstO, secondO;
                 
                 firstO = expr_list[l].prettyprint().substr(0,expr_list[l].prettyprint().find_first_of("="));
                 secondO = expr_list[l].prettyprint().substr(expr_list[l].prettyprint().find_first_of("=")+1, expr_list[l].prettyprint().length());
+                
                 
                 //            cout<<"---------------------------"<<endl;
                 //            cout<<expr_list[l].prettyprint()<<endl;
@@ -2143,8 +2195,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 if(firstO.find_first_of("[")>= 0 && firstO.find_first_of("[")<firstO.length()) {
                     Source dimensions;
                     string actArg = firstO.substr(0,firstO.find_first_of("["));
-//                                    cout<<actArg<<endl;
-//                                    cin.get();
+                    
                     string iterators = firstO.substr(firstO.find_first_of("[")+1, firstO.length());
                     actArg = cleanWhiteSpaces(actArg);
                     
@@ -2154,10 +2205,11 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                         if(std::string(_ioVars[k].name).compare(actArg)==0) {
                             finded = k;
                             break;
-                        }
+                        } 
                     }
                     string firstIterator; 
                     if(finded>-1) {
+                        int numVar = 0;
                         int isInRange = 0;
                         string rangeInitialValue = "0";
                         string rangeFinishValue = "1";
@@ -2188,18 +2240,19 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     break;
                                 }
                             }
-                            if(!rV) {
-                                for(int n = 0; n<operands.size();++n) {
-                                    cout<<std::string(operands[n])<<" vs. "<<firstO<<endl;
-                                    if(std::string(operands[n]).compare(firstO) == 0) {
-                                        _secureWrite = 1;
-                                        isInRange = 0;
-    //                                    cout<<"secure write activated"<<endl;
-
-                                    }
-    //                                cin.get();
-                                }
-                            }
+                            //TEST THAT
+//                            if(!rV) {
+//                                for(int n = 0; n<operands.size();++n) {
+//                                    cout<<std::string(operands[n])<<" vs. "<<firstO<<endl;
+//                                    if(std::string(operands[n]).compare(firstO) == 0 ) {
+//                                        _secureWrite = 1;
+//                                        isInRange = 0;
+////                                        cout<<"secure write activated"<<endl;
+//                                        cin.get();
+//                                    }
+//    //                                cin.get();
+//                                }
+//                            }
                             if(!_secureWrite) {
                                 int f = 0;
                                 for(int x = 0; x<_downloadVars.size();++x){
@@ -2212,7 +2265,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     transferInfo down;
                                     down.name = actArg;
 
-                                    int numVar = 0;
+                                   
                                     for(int y=0;y<_ioVars.size();++y) {
                                         if(std::string(_ioVars[y].name).compare(actArg)==0) {
                                             numVar = y;
@@ -2228,8 +2281,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         down.start = _offsetVar;
                                         down.end = _offsetVar + " + " + _partSizeVar;
                                     } else {
-                                        down.start = "UNKNOWN";
-                                        down.end = "UNKNOWN";
+                                        down.start = _ioVars[numVar].size[0];
+                                        down.end = "0";
                                     }
                                     _downloadVars.push_back(down);
                                     numIoVar = _downloadVars.size()-1;
@@ -2256,6 +2309,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                         variableDeclaration << std::string(_ioVars[finded].type)<<" ";
                         string upperType = std::string(_ioVars[finded].type);
                         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                        upperType = concatenateUnsigned(upperType);
                         int n = 0;
                         int isLastWrite = 1; 
                         
@@ -2388,7 +2442,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                             <<rangeInitialValue<<");\n";
                                     _downloadVars[numIoVar].start = std::string(rangeInitialValue);
                                         
-                                    if(_downloadVars[numIoVar].start.compare("UNKNOWN") !=0 && _expandFullArrayReadWrite) {
+                                    if(_downloadVars[numIoVar].start.compare( _ioVars[numVar].size[0]) !=0 && _expandFullArrayReadWrite) {
                                         preWrite << "("<<_coordVectorVar
                                             <<_num_transformed_blocks
                                             <<"[1] = ("<<_downloadVars[numIoVar].start<<" > "<<rangeFinishValue<<") ? ("
@@ -2410,10 +2464,10 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                             <<"MPI_Send(&"<<_coordVectorVar<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_FWTAG<<", MPI_COMM_WORLD);"
                                             //<<"MPI_Send(&"<<actArg<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<", ("<<_coordVectorVar<<_num_transformed_blocks<<"[1] -" <<_coordVectorVar<<_num_transformed_blocks<<"[0])"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_FWTAG<<", MPI_COMM_WORLD);\n";
                                             <<"MPI_Send(&"<<actArg<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<","<<_coordVectorVar<<_num_transformed_blocks<<"[1] "<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_FWTAG<<", MPI_COMM_WORLD);\n";
-                                    if(_downloadVars[numIoVar].start.compare("UNKNOWN") !=0 && _expandFullArrayReadWrite) {
+                                    if(_downloadVars[numIoVar].start.compare( _ioVars[numVar].size[0]) !=0 && _expandFullArrayReadWrite) {
                                             preWrite<<"}";
                                     }
-                                    if(_downloadVars[numIoVar].start.compare("UNKNOWN") !=0 && _expandFullArrayReadWrite) {
+                                    if(_downloadVars[numIoVar].start.compare( _ioVars[numVar].size[0]) !=0 && _expandFullArrayReadWrite) {
                                         postWrite <<" (idxForReadWriteSwitch ="<<finded<<");\n";
                                         postWrite << "("<<_coordVectorVar
                                                 <<_num_transformed_blocks
@@ -2505,11 +2559,13 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 }
                 
                 for (int e=0;e<operands.size();e++){ //second Operand
+                    
                     Source operandMPIReads;
 //                    cout<<"O("<<e<<"): "<<std::string(operands[e])<<endl;
 //                        cin.get();
                     int old_outsideAditionalReads = _outsideAditionalReads;
                     if(std::string(operands[e]).find_first_of("[")>= 0 && std::string(operands[e]).find_first_of("[")<std::string(operands[e]).length()) {
+                       
                         string firstIterator; 
                         
                         string actArg = std::string(operands[e]).substr(0,std::string(operands[e]).find_first_of("["));
@@ -2525,7 +2581,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             }
                         }
                         if(finded>-1) {
-                            
+                          
                             Source variableNewName, variableDeclaration, dimensions;
                             int isInRange = 0;
                             string rangeInitialValue = "0";
@@ -2549,9 +2605,20 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 if(_construct_inside_bucle) {
                                     int exprLine =  construct_ast.get_line();
                                     isInRange = checkIfIteratedByOutsideIterators(firstIterator, _construct_loop, scopeL, 0, exprLine);
+                                  
                                 }
                                 if(!isInRange) {
+                                   
+                                    int exprLine =  construct_ast.get_line();
+                                    cout<<std::string(operands[e])<<endl;
+                                    cout<<"Construct on--"<<exprLine<<endl;
+                                    cout<<"Expression on--"<<expr_list[l].get_line()<<endl;
+                                    cout<<"Is expression n--"<<l<<endl;
+//                                    cin.get();
                                     isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg, 0, itList, std::string(operands[e]));
+                                } else {
+                                    cout<<std::string(operands[e])<<endl;
+                                    cout<<"In in outsideFor"<<endl;
                                 }
                                 
                                 rangeInitialValue = _rI;
@@ -2577,6 +2644,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             }
                             if(isInRange && isUploadedVar(actArg) 
                                     && expr_list[l].get_line()>=minLine && (isINVar(actArg)|| !_smartUploadDownload)) {
+                                    //TEST THAT&& expr_list[l].get_line()>=minLine && (isINVar(actArg))) {
                                 for(int x = 0; x<_uploadedVars.size();++x){
                                     if(_uploadedVars[x].name.compare(actArg)==0)
                                         numUploadedVar = x;
@@ -2589,6 +2657,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             int isFirstRead = 1; 
                             
                             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                            upperType = concatenateUnsigned(upperType);
                             int n = 0, knowedVariable=0;
                             if(!hasChanges) {
                                 
@@ -2906,6 +2975,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                     variableDeclaration << std::string(_inVars[findedR].type)<<" ";
                     string upperType = std::string(_inVars[findedR].type);
                     std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                    upperType = concatenateUnsigned(upperType);
                     string iterators = exprString.substr(exprString.find_first_of("[")+1, exprString.length());
                     string allIter;
                     if(exprString.find_first_of("[")>= 0 && exprString.find_first_of("[")<exprString.length())
@@ -3098,8 +3168,9 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                 ObjectList<AST_t> expr_listUse = fS.get_loop_body().get_ast().depth_subtrees(expr_traverseUse);
                 int l = 0;
                 int finded = 0;
-                int exprLineUse = expr_listUse[l].get_line();
+                int exprLineUse = minLine;
                 for (ObjectList<AST_t>::iterator it2 = expr_listUse.begin();it2 != expr_listUse.end(); it2++, l++) { 
+                      exprLineUse = expr_listUse[l].get_line();
 //                    cout<<ast.prettyprint()<<" vs. "<<expr_listUse[l].prettyprint()<<endl;
 //                    cout<< ast.get_line() <<" vs. "<<exprLineUse<<endl;
 //                    cout<<"------------------"<<endl;
@@ -3110,16 +3181,19 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                     if(ast.prettyprint().compare(expr_listUse[l].prettyprint())==0) {
                         if(ast.get_line() == exprLineUse) {
                             finded = 1;
+                            break;
                         }
                         if(get_real_line(astWhereSearch, scopeL, ast,1,0,0) == get_real_line(astWhereSearch, scopeL, expr_listUse[l],1,0,0)) {
                             
                             if(io) {
                               if(ast.prettyprint().find(operatorS)>=0 && ast.prettyprint().find(operatorS)<ast.prettyprint().find("="))   {
                                   finded = 1;
+                                  break;
                               }
                             } else {
                                 if(ast.prettyprint().find(operatorS)>=ast.prettyprint().find("=") && ast.prettyprint().find(operatorS)<ast.prettyprint().length())   {
                                   finded = 1;
+                                  break;
                                 }
                             }
 
@@ -3129,20 +3203,25 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                 if(finded) {
 //                    cout<<"finded"<<endl;
 //                    cin.get();
+                    cout<<exprLineUse<<endl;
                     cout<<minLine<<endl;
+                    cout<<l<<endl;
                     cout<<minLineReal<<endl;
                     if(io) {
-                        if(exprLineUse>minLine || minLineReal == -1) {
+                        if(exprLineUse>minLine) {
                             
                             _forIter = expr_listFor[lF];
                             //cout<<"HI1"<<endl;
                             _outsideAditionalWrites = 0;
                                                       
                         }
-                    } else if(exprLineUse>minLine || minLineReal == -1) {
+                    } else if(exprLineUse>minLine) {
 //                         cout<<"HI2"<<endl;
                         _forIter = expr_listFor[lF];
                         _outsideAditionalReads = 0;
+                        debugPoint(ast.prettyprint());
+                        
+                        
                                                
                     }
 //                                        cin.get();
@@ -3352,6 +3431,14 @@ int TransPhase::isUploadedVar(string name){
 }
 string TransPhase::rectifyName(string oldName) {
     string rectifiedVarName = replaceAll(oldName," ","_");
+    rectifiedVarName = replaceAll(rectifiedVarName,":","Dot");
+    rectifiedVarName = replaceAll(rectifiedVarName,"?","Ask");
+    rectifiedVarName = replaceAll(rectifiedVarName,"<","Lower");
+    rectifiedVarName = replaceAll(rectifiedVarName,">","Greater");
+    rectifiedVarName = replaceAll(rectifiedVarName,"=","Equal");
+    rectifiedVarName = replaceAll(rectifiedVarName,"&","And");
+    rectifiedVarName = replaceAll(rectifiedVarName,"|","Or");
+    rectifiedVarName = replaceAll(rectifiedVarName,"!","Not");
     rectifiedVarName = replaceAll(rectifiedVarName,"+","Plus");
     rectifiedVarName = replaceAll(rectifiedVarName,"-","Sub");
     rectifiedVarName = replaceAll(rectifiedVarName,"/","Div");
@@ -3500,18 +3587,31 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
             if(findedS.is_valid()){
                 
                 declaration = std::string(findedS.get_type().get_declaration(globalScope,newR.name));
-                // cout<<"d1:"<<declaration<<endl;
+//                cout<<"d1:"<<declaration<<endl;
                 declaration = declaration.substr(0, declaration.find(n2find));
-                //cout<<"d1:"<<declaration<<endl;
+//                cout<<"d1:"<<declaration<<endl;
+            } else {
+                findedS = construct.get_enclosing_statement().get_scope().get_symbol_from_name(newR.name);
+                if(findedS.is_valid()){
+                
+                    declaration = std::string(findedS.get_type().get_declaration(globalScope,newR.name));
+    //                cout<<"d1:"<<declaration<<endl;
+                    declaration = declaration.substr(0, declaration.find(n2find));
+    //                cout<<"d1:"<<declaration<<endl;
+                } else {
+                    cerr<<"Symbol with name ("<<std::string(newR.name)<<" must be at least in function scope"<<endl;
+                    exit(-1);
+                }
             }
         } else {
             declaration = std::string(findedS.get_type().get_declaration(functionScope,newR.name));
             
-            //cout<<"d2:"<<declaration<<endl;
+//            cout<<"d2:"<<declaration<<endl;
             declaration = declaration.substr(0, declaration.find(n2find));
-            //cout<<"d2:"<<declaration<<endl;
+//            cout<<"d2:"<<declaration<<endl;
         }
         if(findedS.is_valid()) {
+            
             if(findedS.get_type().is_pointer()) {
                 AST_t allocateAst;
                 TraverseASTFunctor4Malloc expr_traverse(_scope_link);
@@ -3533,6 +3633,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                             findMalloc = mallocExpr.find("malloc");
                             if(findMalloc > 0 && findMalloc<mallocExpr.length()) {
                                 sizeS = mallocExpr.substr(findMalloc+6,mallocExpr.length());
+                                newR.size.push_back(sizeS);
                             }
                         }
                     } 
@@ -3554,9 +3655,14 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
         //cout<< "FS1: -"<<declaration<<"-"<<endl;
         declaration = cleanWhiteSpaces(declaration);
         
-        //cout<< "FS: -"<<declaration<<"-"<<endl;
+        cout<< "Type: -"<<declaration<<"- " ;
         newR.type <<  declaration;
-        //cout<<"T: "<<std::string(newR.type)<<endl;
+        cout<<"Size: ";
+        for(int si = 0; si <newR.size.size(); si++) {
+             cout<<std::string(newR.size[si])<<", ";
+        }
+        cout<<endl;
+//        cin.get();
         //
         if(!isReducedVar(std::string(newR.name))  && !isPrivateVar(std::string(newR.name))){
             
@@ -3574,6 +3680,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                 }
                 cout<<endl;
             } else if (!iNOUT && (isINVar(std::string(newR.name)) || !_smartUploadDownload)) {
+                //TEST THAT} else if (!iNOUT && (isINVar(std::string(newR.name)))) {
                 //} else if (!iNOUT) {
                 vars.push_back(newR);
                 cout<<"INVAR: "<<std::string(newR.name);
@@ -3638,6 +3745,21 @@ int TransPhase::isINVar(string name) {
             || (_construct_inside_bucle && _smart_use_table[name].row_first_write_master.for_num == _construct_num_loop)) 
         return 1;   
     else  {
+        //TEST THAT
+//        if(!_withMemoryLimitation) {
+//            transferInfo newTI;
+//            for(int i = 0; i<_inVars.size();++i) {
+//                if(_inVars[i].size.size()>0) {
+//                    if(std::string(_inVars[i].name).compare(name)==0) {
+//                        newTI.name = name;
+//                        newTI.start = "0";
+//                        newTI.end = _inVars[i].size[0];
+//                        _uploadedVars.push_back(newTI);
+//                        return 0;
+//                    }
+//                }
+//            }
+//        }
         //TODO check if is global
 //        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_valid() && _divideWork && _smartUploadDownload){
 //            if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_defined()){
@@ -5187,6 +5309,7 @@ Source TransPhase::generateMPIVariableMessagesSend(vector<infoVar> vars, Source 
             //if(isINVar(std::string(vars[i].name))) {
             string upperType = std::string(vars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             cout<<"-----------"<<endl;
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, vars[i].iterVar) || vars[i].size.size()<1) {
@@ -5214,6 +5337,7 @@ Source TransPhase::generateMPIVariableMessagesSend(vector<infoVar> vars, Source 
             if(vars[i].size.size()==0) {
                 string upperType = std::string(vars[i].type);
                 std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                upperType = concatenateUnsigned(upperType);
                 mpiMessages << "MPI_Send(&"<<vars[i].name<<", 1, MPI_"<<upperType<<","<<dest<<","<<_ATAG<<",MPI_COMM_WORLD);";
             }
         }
@@ -5222,6 +5346,7 @@ Source TransPhase::generateMPIVariableMessagesSend(vector<infoVar> vars, Source 
         for(int i = 0; i<_reducedVars.size(); ++i){
             string upperType = std::string(_reducedVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+           upperType = concatenateUnsigned(upperType);
             if(std::string(_reducedVars[i].operation).compare("+") == 0 || std::string(_reducedVars[i].operation).compare("-") == 0) {
                 mpiMessages<<_reducedVars[i].name << " = "<< "0;";
             }else{
@@ -5245,6 +5370,7 @@ Source TransPhase::handleMemory(string source) {
             Source dimensions;
             string upperType = std::string(_inVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             //if(_inVars[i].size.size()>0) {
             memorySource<< "case  "<<i<<": \n";
             if(_inVars[i].size.size()>0) {
@@ -5276,6 +5402,7 @@ Source TransPhase::handleMemory(string source) {
             Source dimensions;
             string upperType = std::string(_ioVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             //if(_ioVars[i].size.size()>0) {
             memorySource<< "case  "<<i<<": \n";
             if(_ioVars[i].size.size()>0) {
@@ -5305,6 +5432,7 @@ Source TransPhase::handleMemory(string source) {
             Source dimensions;
             string upperType = std::string(_ioVars[n].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             //if(_ioVars[i].size.size()>0) {
             memorySource<< "case  "<<n<<": \n";
             if(_inVars.size()>0) {
@@ -5317,6 +5445,7 @@ Source TransPhase::handleMemory(string source) {
                     Source dimensions;
                     string upperType = std::string(_inVars[i].type);
                     std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+                    upperType = concatenateUnsigned(upperType);
                     //if(_inVars[i].size.size()>0) {
                     memorySource<< "case  "<<i<<": ";
                     if(_inVars[i].size.size()>0) {
@@ -5361,6 +5490,7 @@ Source TransPhase::handleMemory(string source) {
             Source dimensions;
             string upperType = std::string(_inVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             //if(_inVars[i].size.size()>0) {
             if(_inVars[i].size.size()>0) {
                 memorySource<< "case  "<<i<<": \n";
@@ -5393,6 +5523,7 @@ Source TransPhase::handleMemory(string source) {
             Source dimensions;
             string upperType = std::string(_ioVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             //if(_inVars[i].size.size()>0) {
             memorySource<< "case  "<<i<<": \n";
             if(_ioVars[i].size.size()>0) {
@@ -5434,11 +5565,11 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         mpiVariantStructurePart1 << "for (int "<<_toVar<<"=1;"<<_toVar<<"<"<<_sizeVar<<";++"<<_toVar<<") {";
         mpiVariantStructurePart1 <<"if("<<_toVar<<"!="<<_sizeVar<<"-1) {";
         if(_inVars.size()!=0)
-            mpiVariantStructurePart1 <<""<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1);";
+            mpiVariantStructurePart1 <<"("<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1));";
         mpiVariantStructurePart1 << ""<<_offsetVar<<" = "<<_partSizeVar<<" * ("<<_toVar<<"-1);"
                 << "} else {";
         if(_inVars.size()!=0)
-            mpiVariantStructurePart1 << ""<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1) + "<<maxS <<"%"<<"("<<_sizeVar<<"-1) ;";
+            mpiVariantStructurePart1 << "("<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1) + "<<maxS <<"%"<<"("<<_sizeVar<<"-1));";
         mpiVariantStructurePart1 << ""<<_offsetVar<<" = " << maxS << "/ ("<<_sizeVar<<"-1) * ("<<_toVar<<"-1);"
                 << "}";
         if(_inVars.size()==0)
@@ -5446,6 +5577,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_inVars.size(); ++i){
             string upperType = std::string(_inVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
                 varSent << std::string(_inVars[i].name)<<"["<<_offsetVar<<"]";
@@ -5473,6 +5605,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_reducedVars.size(); ++i){
             string upperType = std::string(_reducedVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             if(std::string(_reducedVars[i].operation).compare("+") == 0 || std::string(_reducedVars[i].operation).compare("-") == 0) {
                 mpiVariantStructurePart1<<_reducedVars[i].name << " = "<< "0;";
             }else{
@@ -5484,16 +5617,17 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         mpiVariantStructurePart1 << "for(int "<<_fromVar<<" = 1; "<<_fromVar<<"<"<<_sizeVar<<";++"<<_fromVar<<") {";
         if(_ioVars.size()>0) {
             mpiVariantStructurePart1 << "if("<<_fromVar<<"!="<<_sizeVar<<"-1) {"
-                    << _partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1);"
+                    << "("<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1));"
                     << _offsetVar<<" = "<<_partSizeVar<<" * ("<<_fromVar<<"-1);"
                     << "} else {"
-                    << _partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1) + "<<maxS <<"%"<<"("<<_sizeVar<<"-1) ;"
+                    << "("<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1) + "<<maxS <<"%"<<"("<<_sizeVar<<"-1)) ;"
                     << _offsetVar<<" = " << maxS << "/ ("<<_sizeVar<<"-1) * ("<<_fromVar<<"-1);"
                     << "}";
         }
         for(int i = 0; i<_ioVars.size(); ++i){
             string upperType = std::string(_ioVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _ioVars[i].iterVar)) {
@@ -5523,6 +5657,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_reducedVars.size(); ++i){
             string upperType = std::string(_reducedVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             mpiVariantStructurePart1<< "MPI_Recv(&work"<<_reducedVarsIndexStart+i<<", 1, MPI_"<<upperType<<", "<<_fromVar<<", MPI_ANY_TAG, MPI_COMM_WORLD,&"<<_statVar<<");";
             mpiVariantStructurePart1<< _reducedVars[i].name<<" "<<_reducedVars[i].operation<<"= work"<<_reducedVarsIndexStart+i<<";";
         }
@@ -5538,6 +5673,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i=0; i< _inVars.size(); ++i){
             string upperType = std::string(_inVars[0].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
                 varSent << std::string(_inVars[i].name)<<"["<<_followINVar<<"]";
@@ -5572,6 +5708,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_ioVars.size(); ++i){
             string upperType = std::string(_ioVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _ioVars[i].iterVar)) {
@@ -5601,6 +5738,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_reducedVars.size(); ++i){
             string upperType = std::string(_reducedVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             mpiVariantStructurePart1<< "MPI_Recv(&work"<<_reducedVarsIndexStart+i<<", 1, MPI_"<<upperType<<", "<<_sourceVar<<", MPI_ANY_TAG, MPI_COMM_WORLD,&"<<_statVar<<");";
             mpiVariantStructurePart1<< _reducedVars[i].name<<" "<<_reducedVars[i].operation<<"= work"<<_reducedVarsIndexStart+i<<";";
         }
@@ -5610,6 +5748,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_inVars.size(); ++i){
             string upperType = std::string(_inVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
                 varSent << std::string(_inVars[i].name)<<"["<<_followINVar<<"]";
@@ -5636,12 +5775,13 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
             }
         }
         mpiVariantStructurePart1 << "} else if(("<<conditionToWork<<"-"<<_followINVar<<")< "<<_partSizeVar<<" && ("<<conditionToWork<<"-"<<_followINVar<<")>0) {"
-                << ""<<_partSizeVar<<" ="<<conditionToWork <<"-"<<_followINVar<<";"
+                << "("<<_partSizeVar<<" ="<<conditionToWork <<"-"<<_followINVar<<");"
                 << "MPI_Send(&"<<_followINVar<<", 1, MPI_INT, "<<_sourceVar<<", ATAG, MPI_COMM_WORLD);"
                 << "MPI_Send(&"<<_partSizeVar<<", 1, MPI_INT, "<<_sourceVar<<", ATAG, MPI_COMM_WORLD);";
         for(int i = 0; i<_inVars.size(); ++i){
             string upperType = std::string(_inVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
                 varSent << std::string(_inVars[i].name)<<"["<<_followINVar<<"]";
@@ -5687,12 +5827,12 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
     if(staticC!=0) {
         mpiVariantStructurePart4
                 <<"if("<<_myidVar<<"!="<<_sizeVar<<"-1) {"
-                << _partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1);";
+                << "("<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1));";
         if(_inVars.size()!=0){
             mpiVariantStructurePart4 << ""<<_offsetVar<<" = "<<_partSizeVar<<" * ("<<_myidVar<<"-1);";
         }
         mpiVariantStructurePart4 <<" } else {"
-                << _partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1) + "<<maxS <<"%"<<"("<<_sizeVar<<"-1) ;";
+                << "("<<_partSizeVar<<" = "<<maxS<<"/ ("<<_sizeVar<<"-1) + "<<maxS <<"%"<<"("<<_sizeVar<<"-1));";
         if(_inVars.size()!=0){
             mpiVariantStructurePart4 << ""<<_offsetVar<<" = " << maxS << "/ ("<<_sizeVar<<"-1) * ("<<_myidVar<<"-1);";
         }
@@ -5704,6 +5844,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_inVars.size(); ++i){
             string upperType = std::string(_inVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
                 varSent << std::string(_inVars[i].name)<<"["<<_offsetVar<<"]";
@@ -5732,6 +5873,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_reducedVars.size(); ++i){
             string upperType = std::string(_reducedVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             mpiVariantStructurePart4 << "MPI_Recv(&"<<_reducedVars[i].name<<", 1, MPI_"<<upperType<<",MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&"<<_statVar<<");";
         }
         // for(int i = 0; i<_reducedVars.size(); ++i){
@@ -5746,6 +5888,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
         for(int i = 0; i<_inVars.size(); ++i){
             string upperType = std::string(_inVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+            upperType = concatenateUnsigned(upperType);
             stringstream varSent, size;
             if(iteratedVarCorrespondstoAnyVarIdx(initVar, _inVars[i].iterVar)) {
                 varSent << std::string(_inVars[i].name)<<"["<<_offsetVar<<"]";
@@ -5792,6 +5935,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
     for(int i = 0; i<_ioVars.size(); ++i){
         string upperType = std::string(_ioVars[i].type);
         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+        upperType = concatenateUnsigned(upperType);
         stringstream varSent, size;
         
         if(iteratedVarCorrespondstoAnyVarIdx(initVar, _ioVars[i].iterVar)) {
@@ -5821,6 +5965,7 @@ void TransPhase::useOldStyle(int staticC, Source mpiVariantStructurePart1, Sourc
     for(int i = 0; i<_reducedVars.size(); ++i){
         string upperType = std::string(_reducedVars[i].type);
         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
+        upperType = concatenateUnsigned(upperType);
         mpiFixStructurePart2<< "MPI_Send(&"<<_reducedVars[i].name<<", 1, MPI_"<<upperType<<", 0, 0, MPI_COMM_WORLD);";
         // constructASTS = modifyReductionOperation(_reducedVars[i], construct.get_ast(), construct);
     }

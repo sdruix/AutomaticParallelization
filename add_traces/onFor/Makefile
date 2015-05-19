@@ -6,7 +6,7 @@ END=
 include ../Makefile.common
 
 # IMPORTANT: Fill this with the name of the current phase
-PHASE_NAME=addTracesOnFor-phase
+PHASE_NAME=onFor-phase
 
 # Write here the list of sources (all *.cpp *.cc *.h and *.hpp files you need)
 SOURCES=\

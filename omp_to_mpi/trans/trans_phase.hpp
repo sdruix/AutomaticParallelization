@@ -243,6 +243,9 @@ private:
     ScopeLink _ifScopeL;
     Scope _ifScope;
     int _insideMaster;
+    int _breakPointNumber;
+    string concatenateUnsigned(string s);
+    void debugPoint(string msg);
     int isParam(string p2check);
     void useOldStyle(int staticC, Source mpiVariantStructurePart1, Source mpiVariantStructurePart2, Source mpiVariantStructurePart3, 
                             string maxS, Source initVar, Scope functionScope, Source initValue, 

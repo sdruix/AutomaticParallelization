@@ -23,7 +23,13 @@ AddTracesOnForPhase::AddTracesOnForPhase() : PragmaCustomCompilerPhase("omp") {
     //register_construct("acpa");
     _initialized =0;
     _groupInside = 0;
+    
+
     register_construct("acpa");
+    register_directive("var");
+    register_directive("iter");
+    //register_directive("iter");
+
     on_directive_post["acpa"].connect(functor(&AddTracesOnForPhase::pragma_postorder, *this));
     //on_directive_post["check"].connect(functor(&AddTracesOnForPhase::pragma_postorder, *this));
     
@@ -74,6 +80,9 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
             commented_loop << "//  - " << argument.prettyprint() << "\n";
             cout << "//  - " << argument.prettyprint() << endl;
         }
+    } else {
+        cerr<<"Var clause needed on #pragma acpa"<<endl;
+        exit(-1);
     }
     
     cout<<"Analyzing iter Clause"<<endl;
@@ -89,6 +98,9 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
             commented_loop << "//  - " << argument.prettyprint() << "\n";
             cout << "//  - " << argument.prettyprint() << endl;
         }
+    } else {
+        cerr<<"Iter clause needed on #pragma acpa"<<endl;
+        exit(-1);
     }
     Source newdeclaration;
     int varsToInclude = shared_arguments.size();
@@ -100,6 +112,7 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
             }
         }
     }
+   
     if(varsToInclude>0) {
 //        newdeclaration << "mem_trace_enable(1);\n";
         for(int i = 0; i< shared_arguments.size();++i){
@@ -196,10 +209,13 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
         
         
     }
-    
+     
 //    cout<< construct.get_ast()<<endl;
+//    cout<<construct.get_statement().get_ast().prettyprint()<<endl;
+//    cin.get();
      construct.get_ast().replace(construct.get_statement().get_ast());
 //    cout<< construct.get_ast()<<endl;
+//    cout<<"HI"<<endl;
 //    cin.get();
     //cout<<std::string(newdeclaration)<<endl;
     AST_t ast2append;
@@ -521,7 +537,7 @@ string AddTracesOnForPhase::transformConstructAST(PragmaCustomConstruct construc
     int l = 0;
     vector<string> newVariables;
     vector<Source> copyVariables;
-    
+    int hasArraysWriteOrRead = 0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();it != expr_list.end(); it++, l++) {
         int hasChanges = 0;
         string line;
@@ -565,7 +581,7 @@ string AddTracesOnForPhase::transformConstructAST(PragmaCustomConstruct construc
             }
             int hasC = 0;
             if(firstO.find_first_of("[")>= 0 && firstO.find_first_of("[")<firstO.length()) {
-                
+                hasArraysWriteOrRead=1;
                 Source dimensions;
                 string actArg = firstO.substr(0,firstO.find_first_of("["));
                 //                                    cout<<actArg<<endl;
@@ -596,7 +612,7 @@ string AddTracesOnForPhase::transformConstructAST(PragmaCustomConstruct construc
                  operands[e] = std::string(operands[e]).substr(0,std::string(operands[e]).find_first_of(";"));
                 }
                 if(std::string(operands[e]).find_first_of("[")>= 0 && std::string(operands[e]).find_first_of("[")<std::string(operands[e]).length()) {
-                   
+                    hasArraysWriteOrRead=1;
                     string firstIterator; 
                     
                     string actArg = std::string(operands[e]).substr(0,std::string(operands[e]).find_first_of("["));
@@ -674,13 +690,15 @@ string AddTracesOnForPhase::transformConstructAST(PragmaCustomConstruct construc
                 hasChanges = 1;
             }
         }
+         if(line.find_first_of(";")>= 0 && line.find_first_of(";")<line.length())
+                    line = line.substr(0,line.find_first_of(";"));    
+        Source nL;
         if(hasChanges) {
-            cout<<std::string(newLineSource)<<endl;
-            
-            
-            Source nL;
-            //nL << "mem_trace_enable(1);\n"<< newLineSource<<"mem_trace_enable(0);\n"<< line;
-            nL <<  newLineSource << line;
+           // cout<<std::string(newLineSource)<<endl;
+            nL <<  newLineSource <<"("<<line<<")"<<";";
+            expr_list[l].replace_with(nL.parse_statement(sC,scopeL));
+        } else if(hasArraysWriteOrRead) {
+            nL <<  "("<<line<<")"<<";";
             expr_list[l].replace_with(nL.parse_statement(sC,scopeL));
         }
     }
