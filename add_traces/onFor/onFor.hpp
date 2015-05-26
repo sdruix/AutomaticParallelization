@@ -89,6 +89,10 @@ private:
                 retBool =true;
                 return ast_traversal_result_helper(retBool,false);
             }
+            if(IfStatement::predicate(a)) {
+                retBool =true;
+                return ast_traversal_result_helper(retBool,false);
+            }
             return ast_traversal_result_helper(false, true);
         };
     };
@@ -202,7 +206,7 @@ private:
     int _for_min_line;
     AST_t _file_tree, _for_ast, _for_internal_ast_last, _for_internal_ast_first, _construct_loop, _last_construct, _initializationAST, _groupAST;
     
-    int _for_num, _construct_num_loop, _last_construct_num_loop, _groupInside;
+    int _for_num, _construct_num_loop, _last_construct_num_loop, _groupInside, _numLoop;
     int _notOutlined, _initialized;
     int _pragma_lines;
     int _construct_inside_bucle;

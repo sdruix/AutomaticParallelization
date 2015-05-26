@@ -23,7 +23,7 @@ AddTracesOnForPhase::AddTracesOnForPhase() : PragmaCustomCompilerPhase("omp") {
     //register_construct("acpa");
     _initialized =0;
     _groupInside = 0;
-    
+    _numLoop = 0;
 
     register_construct("acpa");
     register_directive("var");
@@ -48,6 +48,7 @@ void AddTracesOnForPhase::run(DTO& dto) {
 
 
 void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
+    
     PragmaCustomClause block_clause = construct.get_clause("block");
     _file_tree = construct.get_statement().get_ast().get_enclosing_global_tree();
     string pragmaInstruction = construct.get_pragma_line().prettyprint(false);
@@ -58,6 +59,7 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
     Scope globalScope = function_def.get_scope();
     cout<<"OMP("<<pragmaInstruction<<" in: "<<function_sym.get_name()<<") ->" <<construct.get_ast().get_line()<<endl;
     if (!block_clause.is_defined()) {
+    _numLoop++;
     
 //    cin.get();
     int block_line = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), construct.get_ast(),0,0,1);
@@ -186,6 +188,9 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             }
                             
                             
+                        } else {
+                            cerr<<"Error determining size of Dynamic Variable: "<<name<<endl;
+                            exit(-1);
                         }
                     }
                     //cout<< "FS1: -"<<declaration<<"-"<<endl;
@@ -250,9 +255,9 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
         string principalIt = iter_arguments[y].prettyprint();
         if(!putIteratedVarsOfInterest(principalIt, construct.get_ast(), functionScopeLink)) {
             Source newBodySource;
-                newBodySource << "mem_trace_iter_start(\""<<principalIt<<"\", "<<principalIt<<");"
+                newBodySource << "mem_trace_iter_start(\"loop"<<_numLoop<<"\", \""<<principalIt<<"\", "<<principalIt<<");"
                         << construct.get_ast().prettyprint()
-                        << "mem_trace_iter_end(\""<<principalIt<<"\", "<<principalIt<<");";
+                        << "mem_trace_iter_end(\"loop"<<_numLoop<<"\", \""<<principalIt<<"\", "<<principalIt<<");";
             construct.get_ast().replace(newBodySource.parse_statement(functionScope,functionScopeLink));
         }
     }
@@ -308,9 +313,9 @@ int AddTracesOnForPhase::putIteratedVarsOfInterest(string principalIt,  AST_t as
             inductionVar = fS.get_induction_variable().prettyprint();
             if(inductionVar.compare(principalIt) == 0) {
                 Source newBodySource;
-                newBodySource << "{mem_trace_iter_start(\""<<principalIt<<"\", "<<principalIt<<");"
+                newBodySource << "{mem_trace_iter_start(\"loop"<<_numLoop<<"\", \""<<principalIt<<"\", "<<principalIt<<");"
                         << fS.get_loop_body().get_ast().prettyprint()
-                        << "mem_trace_iter_end(\""<<principalIt<<"\", "<<principalIt<<");}";
+                        << "mem_trace_iter_end(\"loop"<<_numLoop<<"\", \""<<principalIt<<"\", "<<principalIt<<");}";
                 fS.get_loop_body().get_ast().replace(newBodySource.parse_statement(astWhereSearch,scopeL));
                 finded = 1;
             } else if(putIteratedVarsOfInterest(principalIt, fS.get_loop_body().get_ast(), scopeL)) {
@@ -506,7 +511,18 @@ void AddTracesOnForPhase::completeLoopsInAST(AST_t ast, ScopeLink scopeL){
             loopAst = dWS.get_body().get_ast();
             fullLoopAst = dWS.get_enclosing_statement().get_ast();
         }
-        
+        if(IfStatement::predicate(expr_listFor[lF])) {
+            IfStatement ifS(expr_listFor[lF],scopeL);
+            loopAst = ifS.get_then_body().get_ast();
+            fullLoopAst = ifS.get_enclosing_statement().get_ast();
+            AST_t elseAST;
+            elseAST = ifS.get_else_body().get_ast();
+            if(elseAST.prettyprint().find("{")!=0 && !elseAST.prettyprint().empty()){
+                Source loopAstWithKeys;
+                loopAstWithKeys << "{"<<elseAST.prettyprint()<<"}";
+                elseAST.replace_with(loopAstWithKeys.parse_statement(ast,scopeL));
+            }
+        }
         if(loopAst.prettyprint().find("{")!=0){
             Source loopAstWithKeys;
             loopAstWithKeys << "{"<<loopAst.prettyprint()<<"}";
@@ -515,13 +531,17 @@ void AddTracesOnForPhase::completeLoopsInAST(AST_t ast, ScopeLink scopeL){
             //            cout<<"2: "<<loopAst.prettyprint()<<endl;
             //
         }
+        if(IfStatement::predicate(expr_listFor[lF])) {
+            IfStatement ifS(expr_listFor[lF],scopeL);
+            loopAst = ifS.get_then_body().get_ast();
+            fullLoopAst = ifS.get_enclosing_statement().get_ast();
+        }
         if(!loopAst.prettyprint().empty()) {
             //            cout<<"Continue with: "<<loopAst.prettyprint()<<endl;
             //            cout<<"Or Continue with: "<<fullLoopAst.prettyprint()<<endl;
             completeLoopsInAST(loopAst,scopeL);
         }
     }
-    //    cout<<"C:" <<ast.prettyprint()<<endl;
     //
     
     
@@ -537,9 +557,10 @@ string AddTracesOnForPhase::transformConstructAST(PragmaCustomConstruct construc
     int l = 0;
     vector<string> newVariables;
     vector<Source> copyVariables;
-    int hasArraysWriteOrRead = 0;
+    
     for (ObjectList<AST_t>::iterator it = expr_list.begin();it != expr_list.end(); it++, l++) {
         int hasChanges = 0;
+        int hasArraysWriteOrRead = 0;
         string line;
         line =  expr_list[l].prettyprint();
 //        cout<<line<<endl;
@@ -580,31 +601,7 @@ string AddTracesOnForPhase::transformConstructAST(PragmaCustomConstruct construc
                     break;
             }
             int hasC = 0;
-            if(firstO.find_first_of("[")>= 0 && firstO.find_first_of("[")<firstO.length()) {
-                hasArraysWriteOrRead=1;
-                Source dimensions;
-                string actArg = firstO.substr(0,firstO.find_first_of("["));
-                //                                    cout<<actArg<<endl;
-                //                                    cin.get();
-                string iterators = firstO.substr(firstO.find_first_of("[")+1, firstO.length());
-                actArg = cleanWhiteSpaces(actArg);
-                if(is_studied_var(actArg,sh)) {
-                    newLineSource<< "mem_trace_write(\"";
-                    newLineSource<<actArg<<"\"";
-                    hasC = 1;
-                }
-            } else {
-                if(is_studied_var(firstO,sh)) {
-                    newLineSource<< "mem_trace_write(\"";
-                    newLineSource<<firstO<<"\"";
-                    hasC = 1;
-                }
-                
-            }
-            if(hasC) {
-                newLineSource <<", &"<<firstO<<");\n";
-                hasChanges = 1;
-            }
+            
             
             for (int e=0;e<operands.size();e++){ //second Operand
                 int hasC = 0;
@@ -634,6 +631,31 @@ string AddTracesOnForPhase::transformConstructAST(PragmaCustomConstruct construc
                     newLineSource<< ", &"<<operands[e]<<");\n";
                     hasChanges = 1;
                 }    
+            }
+            if(firstO.find_first_of("[")>= 0 && firstO.find_first_of("[")<firstO.length()) {
+                hasArraysWriteOrRead=1;
+                Source dimensions;
+                string actArg = firstO.substr(0,firstO.find_first_of("["));
+                //                                    cout<<actArg<<endl;
+                //                                    cin.get();
+                string iterators = firstO.substr(firstO.find_first_of("[")+1, firstO.length());
+                actArg = cleanWhiteSpaces(actArg);
+                if(is_studied_var(actArg,sh)) {
+                    newLineSource<< "mem_trace_write(\"";
+                    newLineSource<<actArg<<"\"";
+                    hasC = 1;
+                }
+            } else {
+                if(is_studied_var(firstO,sh)) {
+                    newLineSource<< "mem_trace_write(\"";
+                    newLineSource<<firstO<<"\"";
+                    hasC = 1;
+                }
+                
+            }
+            if(hasC) {
+                newLineSource <<", &"<<firstO<<");\n";
+                hasChanges = 1;
             }
         } else if((expr_list[l].prettyprint().find_first_of("++")>= 0 && expr_list[l].prettyprint().find_first_of("++")<expr_list[l].prettyprint().length()) 
                 || (expr_list[l].prettyprint().find_first_of("--")>= 0 && expr_list[l].prettyprint().find_first_of("--")<expr_list[l].prettyprint().length())){
@@ -672,14 +694,16 @@ string AddTracesOnForPhase::transformConstructAST(PragmaCustomConstruct construc
                      if(is_studied_var(actArg,sh)) {
                         lR<< "mem_trace_read(\"";
                         lW<< "mem_trace_write(\"";
-                        newLineSource<<actArg<<"\"";
+                        lR<<actArg<<"\"";
+                        lW<<actArg<<"\"";
                         hasC = 1;
                      }
                 } else {
                     if(is_studied_var(exprString,sh)) {
                         lR<< "mem_trace_read(\"";
                         lW<< "mem_trace_write(\"";
-                        newLineSource<<exprString<<"\"";
+                        lR<<exprString<<"\"";
+                        lW<<exprString<<"\"";
                         hasC =1;
                     }
                 }
