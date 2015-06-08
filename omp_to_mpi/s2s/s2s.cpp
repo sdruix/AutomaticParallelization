@@ -741,7 +741,10 @@ int main(int argc, char *argv[]) {
     int withNOOMP = 0;
     int folderTest = 0;
     int normalizeLoops = 0;
-    while ((nextOption = getopt(argc, argv, "r:t:f:F:c:e:n:N:l:E:oOhHivL:xp01234wsz")) != -1) {
+    int numDivisions = -1;
+    int partSize = -1;
+    
+    while ((nextOption = getopt(argc, argv, "r:t:f:F:c:e:n:N:l:E:oOhHivL:xp01234wszd:D:")) != -1) {
         switch (nextOption) {
             case 'r':
                 rep = atoi(optarg);
@@ -821,6 +824,12 @@ int main(int argc, char *argv[]) {
                 normalizeLoops = 1;
                 
                 break;
+            case 'd':
+                numDivisions = atoi(optarg);
+                break;
+            case 'D':
+                partSize = atoi(optarg);
+                break;
                 
             case 'H':
             case 'h':
@@ -847,6 +856,8 @@ int main(int argc, char *argv[]) {
                         " -N <number of maximum processors to evaluate in execution>\n"
                         " -p Pause after each processed file\n"
                         " -x Report energy. \n"
+                        " -d Normal part divided by.\n"
+                        " -D Max Size of division per node.\n"
                         " -z Normalize For loops.\n"
                         " -v --verbose St0 Verbose MPI compilation errors(on/off)\n"
                         " -[h|H] --help Display this usage information. \n" << endl;
@@ -877,6 +888,8 @@ int main(int argc, char *argv[]) {
                         " -p Pause after each processed file\n"
                         " -x Report energy. \n"
                         " -z Normalize For loops.\n"
+                        " -d Normal part divided by.\n"
+                        " -D Max Size of division per node.\n"
                         " -v --verbose St0 Verbose MPI compilation errors(on/off)\n"
                         " -[h|H] --help Display this usage information. \n" << endl;
                 exit(0);
@@ -1000,13 +1013,24 @@ int main(int argc, char *argv[]) {
                     testFile(filename, logFolder, extKind, 0, logFilename, energy, 1, numProcsMax, numProcsMax, withNOOMP, name);
             }
 
-
+            ofstream divFile;
+            divFile.open("div.data", ios::trunc);
+            if(numDivisions>0) {
+                divFile << numDivisions << "\n";
+            } else {
+                divFile << "1\n";
+            }
+            if(partSize > 0) {
+                divFile << partSize;
+            }
+            divFile.close();
             std::stringstream nameF, nameOUT, commandOUT, loopNormCommand;
             if (extKind) {
                 nameOUT << codesFolder << "/" << name << ".cpp";
                 if((toDo == 0 || toDo == 3) && normalizeLoops) {
                     normalizeLoopsFunction(tempName, extKind, firstLine, includeVector);
                 }
+                
                 commandOUT << "trans-phasec++ -y " << tempName << " -o " << nameOUT.str() << "  -I/usr/lib/openmpi/include/ " << std::endl;
             } else {
                 nameOUT << codesFolder << "/" << name << ".c";

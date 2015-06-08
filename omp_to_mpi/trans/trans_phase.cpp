@@ -24,14 +24,17 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     register_construct("atomic");
     register_construct("master");
     register_construct("barrier");
-    register_construct("critical");
+    //register_construct("critical");
+    //register_directive("critical");
+    register_directive("critical");
     register_directive("check");
-    register_directive("schedule");
+//    register_directive("schedule");
     register_directive("for check");
     register_directive("for private");
     register_directive("for threadprivate");
     on_directive_post["parallel"].connect(functor(&TransPhase::pragma_postorder, *this));
     _num_non_trasformed_blocks = 0;
+    _num_Loop_uncountedLines = 2;
     _breakPointNumber=0;
     _ATAG = "ATAG";
     _RTAG = "RTAG";
@@ -41,14 +44,14 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _FRTAG = "FRTAG";
     _FWTAG = "FWTAG";
     _withMemoryLimitation = 0;
-    _oldMPIStyle = 1;
+    _oldMPIStyle = 0;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
     _sendComputedIndices = 0;
-    _smartUploadDownload =0;
+    _smartUploadDownload = 1;
     _fullArrayReads = 1;
     _fullArrayWrites = 1;
-    _divideWork = 1;
+    _divideWork = 0;
     _expandFullArrayReadWrite = 1;
     
 }
@@ -68,7 +71,6 @@ void TransPhase::run(DTO& dto) {
     PragmaCustomCompilerPhase::run(dto);
     finalize();
     
-//    debugPoint(_translation_unit.prettyprint());
     
     
    
@@ -697,9 +699,15 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         //  
         AST_t prevAST;
         _construct_inside_bucle = is_inside_bucle(construct.get_ast(),construct.get_enclosing_function().get_scope_link(),block_line, 1);
+        if(_construct_inside_bucle)
+            block_line-=_num_Loop_uncountedLines;
         _construct_num_loop = _for_num;
         _construct_loop = _for_ast;
-
+        if(_construct_inside_bucle) {
+            cout<<"num Loop:"<<_construct_num_loop<<endl;
+            cout<<"Construct inside bucle"<<endl;
+//            debugPoint("inside bucle");
+        }
 
         AST_t minAST = NULL;
         int minLine= std::numeric_limits<int>::max();
@@ -731,23 +739,27 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 std::cout<<"---------------------------"<<endl;
             }
-            
+             typedef std::unordered_map <std::string,ObjectList<AST_t>> iter4in; 
             //                 
             cout<<"Context Analized"<<endl;
-//            cin.get();
+
             cout<<"Getting out params"<<endl;
-            //                        cout<<"HI"<<endl;
             _ioParams = outlineAux.get_parameter_io(construct.get_scope());
-            //                        cout<<"BYE"<<endl;
-            //                        cin.get();
             cout<<"This block has "<<_ioParams.size()<<" OUT variables"<<endl;
+             for (iter4in::const_iterator it = _ioParams.begin(); it != _ioParams.end(); ++it) {
+               cout<<it->first<<endl;
+            }
+            
             cout<<"Getting in params"<<endl;
             _inParams = outlineAux.get_parameter_in(construct.get_scope());
             cout<<"This block has "<<_inParams.size()<<" IN variables"<<endl;
-            
+           
+            for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
+               cout<<it->first<<endl;
+            }
         }
         
-        
+//        cin.get();
         //            cout<<"InVars:"<<endl;
         //            typedef std::unordered_map <std::string,AST_t> iter4in; 
         //            for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
@@ -882,24 +894,30 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                         argument = argument.substr(argument.find_first_of(":")+1,argument.length());
                     }
                     infoVar newR;
-                    newR.name << act;
-                    newR.operation << operation;
+                    newR.name = act;
+                    newR.operation = operation;
                     // cout << "N: -"<< std::string(newR.name) <<"- O: -"<< std::string(newR.operation) <<"-"<< endl;
                     Symbol findedS = functionScope.get_symbol_from_name(newR.name);
+//                    cout<<construct.get_enclosing_function().get_scope().get_symbol_from_name(act).get_name()<<endl;
                     string declaration;
                     if(!findedS.is_valid()){
-                        findedS = globalScope.get_symbol_from_name(newR.name);
+                        cout<<"-"<<std::string(newR.name)<<"- not found in local function scope"<<endl;
+                        findedS = globalScope.get_symbol_from_name(act);
                         if(findedS.is_valid()){
                             declaration = std::string(findedS.get_type().get_declaration(globalScope,newR.name));
                             declaration = declaration.substr(0, declaration.find(newR.name));
+                        } else {
+                            cout<<"-"<<std::string(newR.name)<<"- not found in global scope"<<endl;
                         }
                     } else {
                         declaration = std::string(findedS.get_type().get_declaration(functionScope,newR.name));
                         declaration = declaration.substr(0, declaration.find(newR.name));
                     }
-                    declaration = cleanWhiteSpaces(declaration);
                     
-                    //cout<< "FS: -"<<declaration<<"-"<<endl;
+                    declaration = cleanWhiteSpaces(declaration);
+                  
+//                    cout<< "FS: -"<<declaration<<"-"<<endl;
+                  
                     newR.type <<  declaration;
                     _reducedVars.push_back(newR);
                     
@@ -1061,18 +1079,44 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         //                      if(_ioVars[i].size>atoi(maxS.c_str()))
         //                          maxS=_ioVars[i].size;
         //                  }
+        ifstream divFile("div.data");
+        int lines = 0;
+        string infoDiv;
+        int fixDivided = 0;
+        string partSizeDivisionString, line;
+        while (getline(divFile, line)) {
+            if(!line.empty()) {
+                partSizeDivisionString = line;
+            }
+            lines++;
+        }
         
+        divFile.close();
+        if(lines>1)
+            fixDivided = 1;
+        else if(partSizeDivisionString.empty())
+            partSizeDivisionString =  "1";
         if(!_initialized) {
             if(_construct_inside_bucle && _isForDirective) {
                 varInitialization << "int "<<_partSizeVar<<", "<<_offsetVar<<";";
             } else if(_isForDirective){
-                varInitialization << "int "<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) : 1;";
+                if(fixDivided) {
+                    varInitialization << "int "<<_partSizeVar<<" = ("<<partSizeDivisionString<<");";
+                } else {
+                    varInitialization << "int "<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) / "<<partSizeDivisionString<<": 1;";
+                }
                 varInitialization << "int "<<_offsetVar<<";";
                 //varInitialization << "int "<<_partSizeVar<<" = ("<<maxS<<") / 100000 * "<<_sizeVar<<"), "<<_offsetVar<<";";
             }
         } else {
-            if(_isForDirective)
-                varInitialization << "("<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) : 1);";
+            if(_isForDirective) {
+                
+                if(fixDivided) {
+                    varInitialization << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
+                } else {
+                    varInitialization << "("<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) / "<<partSizeDivisionString <<": 1);";
+                }
+            }
             varInitialization << "int "<<_coordVectorVar << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
         }
         
@@ -1107,7 +1151,11 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             astToAttach = _construct_loop;
                             Source partSizeSource;
                             if(_isForDirective) {
-                                partSizeSource << "("<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) : 1);"; //<< "int coordVector" << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
+                                 if(fixDivided) {
+                                    partSizeSource << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
+                                } else {
+                                    partSizeSource << "("<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) / "<<partSizeDivisionString <<": 1);";
+                                }
                                 construct.get_ast().prepend(partSizeSource.parse_statement(function_body.get_ast(), function_body.get_scope_link()));
                             }
                         } else {
@@ -2111,7 +2159,6 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
             string pragmaLine = test.get_pragma_line().prettyprint();
             if(pragmaLine.find("atomic")>=0 && pragmaLine.find("atomic")<pragmaLine.length()
                     || pragmaLine.find("critical")>=0 && pragmaLine.find("critical")<pragmaLine.length()) {
-               
                 _secureWrite =1;
                 test.get_ast().replace_with(test.get_statement().get_ast());
                 Source newExprSource;
@@ -2240,15 +2287,18 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     break;
                                 }
                             }
-                            //TEST THAT
 //                            if(!rV) {
 //                                for(int n = 0; n<operands.size();++n) {
 //                                    cout<<std::string(operands[n])<<" vs. "<<firstO<<endl;
-//                                    if(std::string(operands[n]).compare(firstO) == 0 ) {
+//                                    if(std::string(operands[n]).compare(firstO) == 0) {
+////                                        from(int e=0;e<operands.size();++e) {
+////                                            string firstIT = std::string(operands[e]).substring(0, std::string(operands[e]).find_first_of("]"));
+////                                            
+////                                        }
 //                                        _secureWrite = 1;
 //                                        isInRange = 0;
 ////                                        cout<<"secure write activated"<<endl;
-//                                        cin.get();
+////                                        cin.get();
 //                                    }
 //    //                                cin.get();
 //                                }
@@ -2439,8 +2489,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     preWrite << "("<<_coordVectorVar
                                             <<_num_transformed_blocks
                                             <<"[0] = "
-                                            <<rangeInitialValue<<");\n";
-                                    _downloadVars[numIoVar].start = std::string(rangeInitialValue);
+                                            << rangeInitialValue <<" < "<< _downloadVars[numIoVar].start<<");\n";
+                                    //_downloadVars[numIoVar].start = std::string(rangeInitialValue);
                                         
                                     if(_downloadVars[numIoVar].start.compare( _ioVars[numVar].size[0]) !=0 && _expandFullArrayReadWrite) {
                                         preWrite << "("<<_coordVectorVar
@@ -2599,6 +2649,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             //                        cin.get();
                             
                             int numUploadedVar = 0;
+                            int isNewUploadedVar=0;
                             if(_fullArrayReads && !_secureWrite) {
                                  ObjectList<string> itList;
                                 itList.push_back(std::string(initVar)); 
@@ -2607,6 +2658,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     isInRange = checkIfIteratedByOutsideIterators(firstIterator, _construct_loop, scopeL, 0, exprLine);
                                   
                                 }
+                                cout<<"...--------------------..."<<endl;
                                 if(!isInRange) {
                                    
                                     int exprLine =  construct_ast.get_line();
@@ -2625,31 +2677,44 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 rangeFinishValue = _rF;
                                 forIterated = _forIter;
                                 if(isInRange) {
-                                    cout<<"inRange: "<<std::string(operands[e])<<endl;
-                                    cout<<"startOn: "<<_rI<<endl;
-                                    cout<<"endsOn: "<<_rF<<endl;
-                                    
-                                
+                                    cout<<"inRange: "<<std::string(operands[e])<<" from "<<_rI<< " to "<<_rF<<endl;
+
                                     if(!isUploadedVar(actArg)){
                                         transferInfo up;
-                                        up.start = rangeFinishValue;
-                                        up.end = rangeInitialValue;
+                                        up.start = "("+rangeInitialValue+")";
+                                        up.end = "("+rangeFinishValue+")";
                                         up.name = actArg;
                                         _uploadedVars.push_back(up);
-                                    }
-                                } else {
+                                        isNewUploadedVar = 1;
+                                        cout<<rangeInitialValue<<" to "<<rangeFinishValue<<endl;
+
+                                        numUploadedVar = _uploadedVars.size()-1;
+                                    } 
+                                  
+                                } else if(firstIterator.compare(std::string(initVar))!=0){
                                     cout<<"not inRange "<<std::string(operands[e])<<endl;
+                                    
+                                } else if (isUploadedVar(actArg)) {
+                                    cout<<"Uploaded Var by this range"<<endl;
+                                    
                                 }
-//                               cin.get();
+                               
                             }
-                            if(isInRange && isUploadedVar(actArg) 
-                                    && expr_list[l].get_line()>=minLine && (isINVar(actArg)|| !_smartUploadDownload)) {
+                            if((isINVar(actArg)|| !_smartUploadDownload)) {
                                     //TEST THAT&& expr_list[l].get_line()>=minLine && (isINVar(actArg))) {
                                 for(int x = 0; x<_uploadedVars.size();++x){
                                     if(_uploadedVars[x].name.compare(actArg)==0)
                                         numUploadedVar = x;
                                 }
                             }
+                            if(isUploadedVar(actArg) ) {
+                                cout<<"startOn: "<<_uploadedVars[numUploadedVar].start<<endl;
+                                cout<<"endsOn: "<<_uploadedVars[numUploadedVar].end<<endl;
+                            } else {
+                                cout<<"this var has to be individually loaded"<<endl;
+                            }
+                           
+                            
                             variableNewName <<actArg;
                             variableDeclaration << std::string(_inVars[finded].type)<<" ";
                             string upperType = std::string(_inVars[finded].type);
@@ -2757,40 +2822,48 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
 //                                            cout<<"HI"<<endl;
 //                                            cin.get();
 //                                        }
-                                        if(!_outsideAditionalReads  && (firstIterator.compare(std::string(initVar))==0 || !_expandFullArrayReadWrite)) {
+                                        if(!isNewUploadedVar && !_outsideAditionalReads  && (firstIterator.compare(std::string(initVar))==0 || !_expandFullArrayReadWrite)) {
                                             
                                            
                                             _uploadedVars[numUploadedVar].start = _offsetVar;
                                             _uploadedVars[numUploadedVar].end = _offsetVar +" + "+ _partSizeVar;
+                                           
                                         }
                                          
                                         Source preRead;
                                         Source postRead;
+                                        Source stSource;
                                         
                                         preRead << "("<<_coordVectorVar
                                                 <<_num_transformed_blocks
                                                 <<"[0] = "
                                                 <<rangeInitialValue<<");\n";
                                         
-                                        if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) ==0 || !_expandFullArrayReadWrite) {
+                                        if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) ==0 || !_expandFullArrayReadWrite || isNewUploadedVar) {
                                           
                                             preRead << "("<<_coordVectorVar
                                                     <<_num_transformed_blocks
                                                     <<"[1] = (("<<rangeFinishValue<<") - "<<_coordVectorVar
                                                 <<_num_transformed_blocks
                                                 <<"[0]));\n";
+                                             if(isNewUploadedVar) {
+//                                            cout<<std::string(preRead)<<endl;
+//                                            cin.get();
+                                         }
                                            
                                             
                                         } else if(_expandFullArrayReadWrite){
-                                              
+                                            
+                                            stSource<< "("<<_uploadedVars[numUploadedVar].start<<" > ("<<rangeFinishValue<<")) ? ("
+                                                    <<"("<<rangeFinishValue<<") - ("<<rangeInitialValue<<")) : ("<<_uploadedVars[numUploadedVar].start
+                                                    <<" - ("<<rangeInitialValue<<"))"
+                                                    <<")";
                                             preRead << "("<<_coordVectorVar
                                                     <<_num_transformed_blocks
-                                                    <<"[1] = ("<<_uploadedVars[numUploadedVar].start<<" > "<<rangeFinishValue<<") ? ("
-                                                    <<rangeFinishValue<<" - "<<rangeInitialValue<<") : ("<<_uploadedVars[numUploadedVar].start
-                                                    <<" -"<<rangeInitialValue<<")"
-                                                    <<");\n";
+                                                    <<"[1] = "<<stSource<<";\n";
+//                                           _uploadedVars[numUploadedVar].start = std::string(stSource);
                                         } 
-                                        if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) !=0 && _expandFullArrayReadWrite) {
+                                        if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) !=0 && _expandFullArrayReadWrite && !isNewUploadedVar) {
                                             preRead <<"if (("<<rangeInitialValue<<") < "<<_uploadedVars[numUploadedVar].start<<" && "<<_coordVectorVar
                                                     <<_num_transformed_blocks<<"[1] > 0) {";
                                         }
@@ -2799,10 +2872,10 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                                 <<"MPI_Send(&"<<_coordVectorVar<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_FRTAG<<", MPI_COMM_WORLD);"
                                                 //<<"MPI_Recv(&"<<actArg<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<", ("<<_coordVectorVar<<_num_transformed_blocks<<"[1]  -" <<_coordVectorVar<<_num_transformed_blocks<<"[0])"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_FRTAG<<", MPI_COMM_WORLD, &"<<_statVar<<");\n";
                                                 <<"MPI_Recv(&"<<actArg<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<", "<<_coordVectorVar<<_num_transformed_blocks<<"[1]" <<dimensions<<" , MPI_"<<upperType<<", 0, "<<_FRTAG<<", MPI_COMM_WORLD, &"<<_statVar<<");\n";
-                                        if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) !=0 && _expandFullArrayReadWrite) {
+                                        if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) !=0 && _expandFullArrayReadWrite && !isNewUploadedVar) {
                                             preRead<<"}";
                                         }
-                                        if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) !=0 && _expandFullArrayReadWrite) {
+                                        if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) !=0 && _expandFullArrayReadWrite && !isNewUploadedVar) {
                                             postRead << "("<<_coordVectorVar
                                                     <<_num_transformed_blocks
                                                     <<"[0] = (("<<_uploadedVars[numUploadedVar].end<<") > ("<<rangeInitialValue<<")) ? ("
@@ -2841,14 +2914,18 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                            
                                             
                                         } else {
-                                            Source start, end;
-                                            start << "(("<<_offsetVar<<" > "<<rangeInitialValue<<") ? "<<rangeInitialValue<<" : "<<_offsetVar<<")";
-                                            end << "((("<<_offsetVar<<" + "<<_partSizeVar<<") < "<<rangeFinishValue<<") ? "<<rangeFinishValue<<" : ("<<_offsetVar<<" + "<<_partSizeVar<<"))";
-                                            
-                                            _uploadedVars[numUploadedVar].start = std::string(start);
-                                            _uploadedVars[numUploadedVar].end = std::string(end);
+                                            if(!isNewUploadedVar) {
+                                                Source start, end;
+                                                start << "("<<stSource;//"(("<<_offsetVar<<" > "<<rangeInitialValue<<") ? "<<rangeInitialValue<<" : "<<_offsetVar<<")";
+                                                end <<"("<< _uploadedVars[numUploadedVar].end <<" < "<< rangeFinishValue << " ? "
+                                                        <<rangeFinishValue<<" : "
+                                                        <<_uploadedVars[numUploadedVar].end<<")";//"("<<rangeFinishValue<<")";//"((("<<_offsetVar<<" + "<<_partSizeVar<<") < "<<rangeFinishValue<<") ? "<<rangeFinishValue<<" : ("<<_offsetVar<<" + "<<_partSizeVar<<"))";
+
+                                                _uploadedVars[numUploadedVar].start = std::string(start);
+                                                _uploadedVars[numUploadedVar].end = std::string(end);
+                                            }
                                             _aditionalLinesRead << read;
-                                            //                                       cout<<"Will be outside construct"<<endl;
+                                                                                  
                                         }
                                         
                                         //                                    cin.get();  
@@ -2862,7 +2939,9 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         
                                         variableCopyName <<restIters;
                                         if(isUploadedVar(actArg)) {
-                                            mpiReads << "if ("<<firstIterator<<">="<<_offsetVar<<" + "<<_partSizeVar<<""<<" || "<<firstIterator<<"<"<<_offsetVar<<"){"<<operandMPIReads<<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}";
+//                                            cout<<actArg<<endl;
+//                                            cin.get();
+                                            mpiReads << "if ("<<firstIterator<<">"<< _uploadedVars[numUploadedVar].end<<" || "<<firstIterator<<"<"<< _uploadedVars[numUploadedVar].start<<"){"<<operandMPIReads<<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}";
                                         } else {
                                             mpiReads<<operandMPIReads;
                                         }
@@ -3203,10 +3282,10 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                 if(finded) {
 //                    cout<<"finded"<<endl;
 //                    cin.get();
-                    cout<<exprLineUse<<endl;
-                    cout<<minLine<<endl;
-                    cout<<l<<endl;
-                    cout<<minLineReal<<endl;
+//                    cout<<exprLineUse<<endl;
+//                    cout<<minLine<<endl;
+//                    cout<<l<<endl;
+//                    cout<<minLineReal<<endl;
                     if(io) {
                         if(exprLineUse>minLine) {
                             
@@ -3219,7 +3298,6 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
 //                         cout<<"HI2"<<endl;
                         _forIter = expr_listFor[lF];
                         _outsideAditionalReads = 0;
-                        debugPoint(ast.prettyprint());
                         
                         
                                                
@@ -3742,9 +3820,12 @@ int TransPhase::isIOVar(string name) {
 }
 int TransPhase::isINVar(string name) {
     if(_smart_use_table[name].row_last_write_master.row>0 
-            || (_construct_inside_bucle && _smart_use_table[name].row_first_write_master.for_num == _construct_num_loop)) 
-        return 1;   
-    else  {
+            || (_construct_inside_bucle && _smart_use_table[name].row_first_write_master.for_num == _construct_num_loop)) {
+//        cout<<name<< " is in var"<<endl;
+//        cin.get();
+        return 1;  
+    }
+//    else  {
         //TEST THAT
 //        if(!_withMemoryLimitation) {
 //            transferInfo newTI;
@@ -3772,7 +3853,7 @@ int TransPhase::isINVar(string name) {
         //            cout<<name <<": "<<_smart_use_table[name].row_last_write_cpu.row<<endl;
         //            cin.get();
         //        }
-    }
+//    }
     return 0;
 }
 
@@ -5056,7 +5137,8 @@ TransPhase::use TransPhase::fill_use(int line, AST_t actAst){
 }
 
 int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct) {
-    
+    cout<< ast2check<<endl;
+   
     TraverseASTFunctor4LocateFor expr_traverseFor(scopeL);
     ObjectList<AST_t> expr_listFor = _file_tree.depth_subtrees(expr_traverseFor);
     _for_min_line =-1;
@@ -5075,9 +5157,9 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
             string nameF = fdF.get_function_name().get_symbol().get_name();
             string nameI = fdI.get_function_name().get_symbol().get_name();
             
-            //cout <<"nF: -"<<nameF<<"- vs nI: -"<<nameI<<"-"<<endl;
+//            cout <<"nF: -"<<nameF<<"- vs nI: -"<<nameI<<"-"<<endl;
             if (nameF.compare(nameI)==0){
-                //cout<<"******************************\nFOR: "<<exprF.prettyprint()<<endl;
+//                cout<<"******************************\nFOR: "<<exprF.prettyprint()<<endl;
                 AST_t loopAst;
                 Statement s(expr_listFor[lF],scopeL);
                 if(ForStatement::predicate(expr_listFor[lF])) {
@@ -5098,7 +5180,7 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
                 if(loopAst.prettyprint().compare("")!=0 && _for_min_line==-1){
                     
                     _for_min_line = get_real_line(loopAst, scopeL, exprI.get_ast(), 0, searching_construct,searching_construct);
-                    //cout<<"LS: "<<_for_min_line<<"***********************"<<endl;
+//                    cout<<"LS: "<<_for_min_line<<"***********************"<<endl;
                     if(_for_min_line>=0) {
                         _for_internal_ast_last = get_last_ast(loopAst, scopeL);
                         _for_internal_ast_first = get_first_ast(loopAst, scopeL);
@@ -5108,7 +5190,10 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
                             _for_min_line-=_notOutlined;
                             _for_min_line-=_pragma_lines;
                         }
+                        
                         num_for= expr_listFor[lF].get_line();
+//                        cout<<"NF: "<<_for_min_line<<endl;
+//                        cin.get();
                         _for_ast = expr_listFor[lF];
                     }
                 }
@@ -5117,11 +5202,16 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
         
         
     }
-    if(_for_min_line==exprLine){
+    cout<<exprLine<<endl;
+    if(_for_min_line>-1 || _for_min_line==exprLine){
         _for_num = num_for;
+//        cout<<"inside bucle "<< _for_num<<endl;
+//        cin.get();
         return 1;
     }else{
         _for_num = -1;
+//        cout<< "Not inside bucle"<<endl;
+//        cin.get();
         return 0;
     }
 }

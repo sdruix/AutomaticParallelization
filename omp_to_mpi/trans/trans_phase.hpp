@@ -228,6 +228,7 @@ private:
     AST_t fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, int outline_num_line, ObjectList<Symbol> prmters , int hmppOrig, int offset, AST_t prevAST);
     string transformConstructAST(PragmaCustomConstruct construct, ScopeLink scopeL, Scope sC, Source initVar);
     int isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereSearch, ScopeLink scopeL, string variableName, int io, ObjectList<string> iteratorOutside, string op);
+    int _num_Loop_uncountedLines;
     int _withMemoryLimitation;
     int _oldMPIStyle;
     int _smartUploadDownload;
