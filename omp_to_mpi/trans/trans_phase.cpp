@@ -28,7 +28,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     //register_directive("critical");
     register_directive("critical");
     register_directive("check");
-//    register_directive("schedule");
+    //    register_directive("schedule");
     register_directive("for check");
     register_directive("for private");
     register_directive("for threadprivate");
@@ -51,7 +51,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _smartUploadDownload = 1;
     _fullArrayReads = 1;
     _fullArrayWrites = 1;
-    _divideWork = 1;
+    _divideWork = 0;
     _expandFullArrayReadWrite = 1;
     
 }
@@ -67,13 +67,13 @@ void TransPhase::run(DTO& dto) {
     
     if(_divideWork)
         divideTask();
-     
+    
     PragmaCustomCompilerPhase::run(dto);
     finalize();
     
     
     
-   
+    
 }
 
 void TransPhase::debugPoint(string msg) {
@@ -184,7 +184,7 @@ void TransPhase::divideTask() {
     for(int i =0; i <allSym.size();++i){
         if(allSym[i].is_function()) {
             if(!allSym[i].get_point_of_definition().prettyprint().empty()) {
-//                cout<<"Checking if"<<allSym[i].get_name()<< " has construct inside"<<endl;
+                //                cout<<"Checking if"<<allSym[i].get_name()<< " has construct inside"<<endl;
                 TransPhase::TraverseASTFunctor4LocateOMP expr_traverse(_scope_link);
                 ObjectList<AST_t> expr_list = allSym[i].get_point_of_definition().depth_subtrees(expr_traverse);
                 if(expr_list.size()>0){
@@ -192,21 +192,21 @@ void TransPhase::divideTask() {
                 }
             } 
         }
-//        cout<<i<<": "<<allSym[i].get_point_of_declaration().prettyprint()<<endl;
+        //        cout<<i<<": "<<allSym[i].get_point_of_declaration().prettyprint()<<endl;
     }
     for(int i =0; i <functionsWithConstructs.size();++i){
         
         FunctionDefinition fD(functionsWithConstructs[i].get_point_of_declaration(),_scope_link);
-
+        
         if(!fD.get_function_body().get_ast().prettyprint().empty()) {
             assignMasterWork(fD.get_function_body().get_ast(), functionsWithConstructs, fD.get_function_symbol().get_name());
         } else {
-             FunctionDefinition fD2(functionsWithConstructs[i].get_point_of_definition(),_scope_link);
-             if(!fD.get_function_body().get_ast().prettyprint().empty()) {
-                 assignMasterWork(fD2.get_function_body().get_ast(), functionsWithConstructs, fD.get_function_symbol().get_name());
-             }
+            FunctionDefinition fD2(functionsWithConstructs[i].get_point_of_definition(),_scope_link);
+            if(!fD.get_function_body().get_ast().prettyprint().empty()) {
+                assignMasterWork(fD2.get_function_body().get_ast(), functionsWithConstructs, fD.get_function_symbol().get_name());
+            }
         }
-    
+        
     }
     
     
@@ -341,7 +341,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         sL = fS.get_scope_link();
                         loopAst = fS.get_loop_body().get_ast();
                     }
-
+                    
                     if(WhileStatement::predicate(expr_list[l])) {
                         WhileStatement wS(expr_list[l],_scope_link);
                         sL = wS.get_scope_link();
@@ -352,7 +352,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         sL = dWS.get_scope_link();
                         loopAst = dWS.get_body().get_ast();  
                     }   
-                   
+                    
                     TraverseASTFunctor4LocateOMP expr_traverseOMP(sL);
                     ObjectList<AST_t> expr_listOMP = loopAst.depth_subtrees(expr_traverse);
                     int check = 0;
@@ -361,13 +361,13 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         PragmaCustomConstruct test(expr_listOMP[o],sL);
                         if(test.is_construct()) {
                             TL::PragmaCustomClause check_clause = test.get_clause("check");
-                           if(check_clause.is_defined()) {
-//                            cout<<expr_listOMP[o].prettyprint()<<endl;
-                            check = 1;
-                            
-                           } else {
-                               noCheckASTs.push_back(test.get_ast());
-                           }
+                            if(check_clause.is_defined()) {
+                                //                            cout<<expr_listOMP[o].prettyprint()<<endl;
+                                check = 1;
+                                
+                            } else {
+                                noCheckASTs.push_back(test.get_ast());
+                            }
                         }
                     }
                     if(opened==0 && !check) {
@@ -382,11 +382,11 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         opened = 0;
                     } 
                     if(check){
-                       for(int a=0;a<noCheckASTs.size();++a) {
-                           Source newSource;
-                           newSource <<"if("<<_myidVar<<" == 0) {\n"<<noCheckASTs[a].prettyprint()<<"}";
-                           noCheckASTs[a].replace_with(newSource.parse_statement(noCheckASTs[a],_scope_link));
-                       }
+                        for(int a=0;a<noCheckASTs.size();++a) {
+                            Source newSource;
+                            newSource <<"if("<<_myidVar<<" == 0) {\n"<<noCheckASTs[a].prettyprint()<<"}";
+                            noCheckASTs[a].replace_with(newSource.parse_statement(noCheckASTs[a],_scope_link));
+                        }
                     }
                     
                     masterWork << addCommaIfNeeded(expr_list[l].prettyprint());
@@ -401,7 +401,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         lastA = compute_last_astLoop(lastA, test.get_scope_link());
                         
                     } else  {
-//                        cout<<"not construct"<<endl;
+                        //                        cout<<"not construct"<<endl;
                         lastA = compute_last_astLoop(lastA, _scope_link);
                     }
                     lastLine = lastA.get_line();
@@ -434,15 +434,15 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
         } else {
             if (expr_list[l].prettyprint().find("return ")==0) {
                 if(opened>0) {
-                            //                                     if(opened==1)
-                            //                                    masterWork << "int test=0;";
-                            masterWork << "}";
-                            opened = 0;
-                        }
-                        masterWork << addCommaIfNeeded(expr_list[l].prettyprint())<<"\n";
-                        expr_list[l].remove_in_list();              
+                    //                                     if(opened==1)
+                    //                                    masterWork << "int test=0;";
+                    masterWork << "}";
+                    opened = 0;
+                }
+                masterWork << addCommaIfNeeded(expr_list[l].prettyprint())<<"\n";
+                expr_list[l].remove_in_list();              
             } else {
-            //                    cout<<"DISCARTED: "<<expr_list[l].prettyprint()<<endl;
+                //                    cout<<"DISCARTED: "<<expr_list[l].prettyprint()<<endl;
                 if(expr_list[l].get_line()>lastLine)
                     lastLine = expr_list[l].get_line();
             }
@@ -455,8 +455,8 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
         
     }
     if(opened>0) {
-       masterWork << "}";
-       opened = 0; 
+        masterWork << "}";
+        opened = 0; 
     }
     
     masterWork << "}";
@@ -468,7 +468,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
 }
 AST_t TransPhase::compute_last_astLoop(AST_t lastA, ScopeLink sL){
     while(ForStatement::predicate(lastA)|| WhileStatement::predicate(lastA)
-    || DoWhileStatement::predicate(lastA)) {
+            || DoWhileStatement::predicate(lastA)) {
         AST_t loopAST;
         if(ForStatement::predicate(lastA)) {
             ForStatement fS(lastA,sL);
@@ -482,8 +482,8 @@ AST_t TransPhase::compute_last_astLoop(AST_t lastA, ScopeLink sL){
             DoWhileStatement dWS(lastA,sL);
             loopAST= dWS.get_body().get_ast();
         }
-
-//        cout<<loopAST.prettyprint()<<endl;
+        
+        //        cout<<loopAST.prettyprint()<<endl;
         lastA = get_last_ast(loopAST, sL);
     }
     return lastA;
@@ -534,20 +534,20 @@ string TransPhase::getSimplifiedMathExpression(Expression iterating, string name
     //cout<<"Condition: "<<condition<<endl;
     if (regexec(&expEqualPlusPrev, iteratingExpression.c_str(), nmatch, matchesEqual, 0) == 0 ||
             regexec(&expEqualPlusPost, iteratingExpression.c_str(), nmatch, matchesEqual, 0) == 0){
-//        cout<<"expEqualPlusPost"<<endl;
+        //        cout<<"expEqualPlusPost"<<endl;
         if(doInverse == 1) {
-//            cout<<"inverted"<<endl;
+            //            cout<<"inverted"<<endl;
             mathExpr = "- 1";
         } else { 
             mathExpr = "+ 1";
         }
     }
-
+    
     if (regexec(&expEqualSubPrev, iteratingExpression.c_str(), nmatch, matchesEqual, 0) == 0 ||
             regexec(&expEqualSubPost, iteratingExpression.c_str(), nmatch, matchesEqual, 0) == 0){
-//        cout<<"expEqualSubPost"<<endl;
+        //        cout<<"expEqualSubPost"<<endl;
         if(doInverse == 1 || doInverse == 2) {
-//            cout<<"inverted"<<endl;
+            //            cout<<"inverted"<<endl;
             mathExpr = "+ 1";
         } else { 
             mathExpr = "- 1";
@@ -581,18 +581,18 @@ string TransPhase::getSimplifiedMathExpression(Expression iterating, string name
         
         if (regexec(&exprEqualMathExpressionBeforeName, mathExpr.c_str(), nmatch, matchesEqual, 0) == 0){
             stringstream operation; 
-//            cout<<"Before name in: "<<mathExpr<<endl;
+            //            cout<<"Before name in: "<<mathExpr<<endl;
             if(doInverse == 1) {
                 operation<<" -"<<"("<<mathExpr.substr(0,matchesEqual[0].rm_so)<<")";
                 
             } else {
-                 operation<<mathExpr.substr(0,matchesEqual[0].rm_so);
+                operation<<mathExpr.substr(0,matchesEqual[0].rm_so);
             }
             mathExpr = operation.str();
         }
         if (regexec(&exprEqualMathExpressionAfterName, mathExpr.c_str(), nmatch, matchesEqual, 0) == 0){
             stringstream operation; 
-//            cout<<"After Name in: "<<mathExpr<<endl;
+            //            cout<<"After Name in: "<<mathExpr<<endl;
             if(doInverse == 1) {
                 operation<<mathExpr.substr(0,matchesEqual[0].rm_so)<<"-("<<mathExpr.substr(mathExpr.find_first_of(name)+1, mathExpr.length())<<")";
                 
@@ -600,7 +600,7 @@ string TransPhase::getSimplifiedMathExpression(Expression iterating, string name
                 operation<<mathExpr.substr(0,matchesEqual[0].rm_so)<<mathExpr.substr(mathExpr.find_first_of(name)+1, mathExpr.length());
             }
             mathExpr = operation.str();
-             
+            
         }
         
     }
@@ -655,19 +655,19 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             for(int f = 0; f<expr_listFunc.size();++f) {
                 Expression e(expr_listFunc[f],construct.get_scope_link());
                 if(e.is_function_call()) {
-                     cerr<<"Function call("<<e.prettyprint()<<") Found in construct (\n"<<construct.get_ast().prettyprint()<<" . Please use Inline Phase before execute OMP2MPI if you detect any error"<<endl;
-//                     cin.get();
-//                     exit(-1);
+                    cerr<<"Function call("<<e.prettyprint()<<") Found in construct (\n"<<construct.get_ast().prettyprint()<<" . Please use Inline Phase before execute OMP2MPI if you detect any error"<<endl;
+                    //                     cin.get();
+                    //                     exit(-1);
                 }
             }
-
+            
             //InlinePhase.inlineFunction(exprF.get_called_entity(),exprF);
             
             // a.find_functions(construct.get_statement().get_ast(), construct.get_scope_link());
             
         }
         
-       
+        
         _file_tree = construct.get_statement().get_ast().get_enclosing_global_tree();
         Statement statement = construct.get_statement();
         
@@ -681,7 +681,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         Source empty;
         _aditionalLinesRead = empty;
         _aditionalLinesWrite = empty;
-
+        
         int block_line = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), construct.get_ast(),0,0,1);
         _constructLine = construct.get_pragma_line().get_line();
         // cin.get();
@@ -693,9 +693,9 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         
         
         
-         
+        
         _prmters = outlineAux.get_parameter_list();
-       
+        
         if(_prmters.size()==0) {         
             _prmters =outlineAux.recomputeParameters(); // Error in compute_referenced_entities has to repeat this function
         }
@@ -711,9 +711,9 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         if(_construct_inside_bucle) {
             cout<<"num Loop:"<<_construct_num_loop<<endl;
             cout<<"Construct inside bucle"<<endl;
-//            debugPoint("inside bucle");
+            //            debugPoint("inside bucle");
         }
-
+        
         AST_t minAST = NULL;
         int minLine= std::numeric_limits<int>::max();
         for(int i = 0; i<_prmters.size();++i)
@@ -744,27 +744,27 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 std::cout<<"---------------------------"<<endl;
             }
-             typedef std::unordered_map <std::string,ObjectList<AST_t>> iter4in; 
+            typedef std::unordered_map <std::string,ObjectList<AST_t>> iter4in; 
             //                 
             cout<<"Context Analized"<<endl;
-
+            
             cout<<"Getting out params"<<endl;
             _ioParams = outlineAux.get_parameter_io(construct.get_scope());
             cout<<"This block has "<<_ioParams.size()<<" OUT variables"<<endl;
-             for (iter4in::const_iterator it = _ioParams.begin(); it != _ioParams.end(); ++it) {
-               cout<<it->first<<endl;
+            for (iter4in::const_iterator it = _ioParams.begin(); it != _ioParams.end(); ++it) {
+                cout<<it->first<<endl;
             }
             
             cout<<"Getting in params"<<endl;
             _inParams = outlineAux.get_parameter_in(construct.get_scope());
             cout<<"This block has "<<_inParams.size()<<" IN variables"<<endl;
-           
+            
             for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
-               cout<<it->first<<endl;
+                cout<<it->first<<endl;
             }
         }
         
-//        cin.get();
+        //        cin.get();
         //            cout<<"InVars:"<<endl;
         //            typedef std::unordered_map <std::string,AST_t> iter4in; 
         //            for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
@@ -827,7 +827,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             AST_t pragma2mpi = fS.get_loop_body().get_ast();
             construct.get_ast().replace_with(pragma2mpi);
             Expression iterating = fS.get_iterating_expression();
-           
+            
             Expression condition = fS.get_iterating_condition();
             AST_t init = fS.get_iterating_init();
             cout<<"Analyzing for expression"<<endl;
@@ -836,8 +836,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             initS << exprInit.prettyprint();
             initVar << fS.get_induction_variable().prettyprint();
             mathExpressiononIteratingVariable << getSimplifiedMathExpression(iterating, std::string(initVar),2);
-//            cout<< std::string(mathExpressiononIteratingVariable) <<endl;
-//            cin.get();
+            //            cout<< std::string(mathExpressiononIteratingVariable) <<endl;
+            //            cin.get();
             string tempInitValue = std::string(initS).substr(std::string(initS).find_first_of("=")+1,std::string(initS).length());
             if(tempInitValue.find_first_of(";")>=0 && tempInitValue.find_first_of(";")<tempInitValue.length()) {
                 cout<<"; found"<<endl;
@@ -903,7 +903,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     newR.operation = operation;
                     // cout << "N: -"<< std::string(newR.name) <<"- O: -"<< std::string(newR.operation) <<"-"<< endl;
                     Symbol findedS = functionScope.get_symbol_from_name(newR.name);
-//                    cout<<construct.get_enclosing_function().get_scope().get_symbol_from_name(act).get_name()<<endl;
+                    //                    cout<<construct.get_enclosing_function().get_scope().get_symbol_from_name(act).get_name()<<endl;
                     string declaration;
                     if(!findedS.is_valid()){
                         cout<<"-"<<std::string(newR.name)<<"- not found in local function scope"<<endl;
@@ -921,9 +921,9 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     }
                     
                     declaration = cleanWhiteSpaces(declaration);
-                  
-//                    cout<< "FS: -"<<declaration<<"-"<<endl;
-                  
+                    
+                    //                    cout<< "FS: -"<<declaration<<"-"<<endl;
+                    
                     newR.type <<  declaration;
                     _reducedVars.push_back(newR);
                     
@@ -1014,7 +1014,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         }
         
         cout<<"Block number"<<_num_transformed_blocks<<" information"<<endl;
-//        cin.get();
+        //        cin.get();
         
         // 
         
@@ -1157,7 +1157,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             astToAttach = _construct_loop;
                             Source partSizeSource;
                             if(_isForDirective) {
-                                 if(fixDivided) {
+                                if(fixDivided) {
                                     partSizeSource << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
                                 } else {
                                     partSizeSource << "("<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1)) > 0 ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString <<") : 1);";
@@ -1184,7 +1184,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             if(_lastTransformInfo[_lastTransformInfo.size()-1]._inside_bucle) {
                 cout<<"last was inside bucle"<<endl;
                 if(_lastTransformInfo[_lastTransformInfo.size()-1]._num_loop == _construct_num_loop) {
-                   
+                    
                     cout<<"last was on the same bucle"<<endl;
                     cout<<_lastTransformInfo[_lastTransformInfo.size()-1]._num_loop<<endl;
                     cout<<_construct_num_loop<<endl;
@@ -1199,9 +1199,9 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 cout<<"last was not inside bucle"<<endl;
                 astToAttach = _lastTransformInfo[_lastTransformInfo.size()-1]._lastModifiedAST;
             }
-           
-//            cout<<astToAttach<<endl;
-//            cin.get();
+            
+            //            cout<<astToAttach<<endl;
+            //            cin.get();
             astToAttach.append(initalizationAST);            
         }
         // cout<<astToAttach.prettyprint()<<endl;
@@ -1209,7 +1209,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         // 
         if(_isForDirective) {
             cout<<"Generating MPI Master code"<<endl;
-           
+            
             
             mpiFixStructurePart1 << "if("<<_myidVar<<" == 0) {\n ";
             if(_oldMPIStyle)
@@ -1291,7 +1291,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             if(_ioVars[i].size.size()==0) {
                                 string upperType = std::string(_inVars[i].type);
                                 std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
-                               upperType = concatenateUnsigned(upperType);
+                                upperType = concatenateUnsigned(upperType);
                                 mpiVariantStructurePart1 << "MPI_Recv(&"<<_ioVars[i].name<<", 1, MPI_"<<upperType<<","<<_fromVar<<","<<_ATAG<<",MPI_COMM_WORLD, &"<<_statVar<<");";
                             }
                         }
@@ -1304,7 +1304,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     
                     
                 } else {
-
+                    
                     int checkonFirstSend = 1;
                     mpiVariantStructurePart1 << "int "<<_followINVar<<" = "<<initValue<<"; int "<<_killedVar<<" = 0;"
                             << "for (int "<<_toVar<<"=1; "<<_toVar<<"<"<<_sizeVar<<"; ++"<<_toVar<<") {";
@@ -1319,19 +1319,19 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     
                     
                     if(checkonFirstSend) {
-                    mpiVariantStructurePart1 <<"}"
-                            << "else if(("<<conditionToWork<<"-"<<_followINVar<<")>0) {"
-                            << "("<<_partSizeVar<<" ="<<conditionToWork <<"-"<<_followINVar<<");"
-                            << "MPI_Send(&"<<_followINVar<<", 1, MPI_INT, "<<_toVar<<", "<<_ATAG<<", MPI_COMM_WORLD);"
-                            << "MPI_Send(&"<<_partSizeVar<<", 1, MPI_INT, "<<_toVar<<", "<<_ATAG<<", MPI_COMM_WORLD);";
-                            mpiVariantStructurePart1 << generateMPIVariableMessagesSend(_inVars,initVar,functionScope,_toVar,_followINVar,0);
-                            mpiVariantStructurePart1 << "}";
-                            mpiVariantStructurePart1 << "else {"
-                            << "MPI_Send(&"<<_offsetVar<<", 1, MPI_INT, "<<_toVar<<", "<<_FTAG<<", MPI_COMM_WORLD);"
-                            << ""<<_killedVar<<"++;"
-                            << " }";
+                        mpiVariantStructurePart1 <<"}"
+                                << "else if(("<<conditionToWork<<"-"<<_followINVar<<")>0) {"
+                                << "("<<_partSizeVar<<" ="<<conditionToWork <<"-"<<_followINVar<<");"
+                                << "MPI_Send(&"<<_followINVar<<", 1, MPI_INT, "<<_toVar<<", "<<_ATAG<<", MPI_COMM_WORLD);"
+                                << "MPI_Send(&"<<_partSizeVar<<", 1, MPI_INT, "<<_toVar<<", "<<_ATAG<<", MPI_COMM_WORLD);";
+                        mpiVariantStructurePart1 << generateMPIVariableMessagesSend(_inVars,initVar,functionScope,_toVar,_followINVar,0);
+                        mpiVariantStructurePart1 << "}";
+                        mpiVariantStructurePart1 << "else {"
+                                << "MPI_Send(&"<<_offsetVar<<", 1, MPI_INT, "<<_toVar<<", "<<_FTAG<<", MPI_COMM_WORLD);"
+                                << ""<<_killedVar<<"++;"
+                                << " }";
                     }
-                            mpiVariantStructurePart1 << _followINVar<<" += "<<_partSizeVar<<";"<<"}"
+                    mpiVariantStructurePart1 << _followINVar<<" += "<<_partSizeVar<<";"<<"}"
                             << " while(1){"
                             << "MPI_Recv(&"<<_partSizeVar<<", 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &"<<_statVar<<");"
                             << "int "<<_sourceVar<<" = "<<_statVar<<".MPI_SOURCE;";
@@ -1355,7 +1355,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                 for(int x=1; x<_ioVars[i].size.size();++x) {
                                     size<<" * (" <<_ioVars[i].size[x]<<")";
                                 }
-                          
+                                
                                 
                                 if(functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_array() || functionScope.get_symbol_from_name(_ioVars[i].name).get_type().is_pointer()) {
                                     mpiVariantStructurePart1 << "MPI_Recv(&"<<varSent.str()<<", "<<size.str()<<", MPI_"<<upperType<<","<<_sourceVar<<","<<_ATAG<<",MPI_COMM_WORLD, &"<<_statVar<<");";
@@ -1379,7 +1379,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                         
                         
                     }
-
+                    
                     for(int i = 0; i<_reducedVars.size(); ++i){
                         string upperType = std::string(_reducedVars[i].type);
                         std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
@@ -1413,14 +1413,14 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 mpiFixStructurePart1 <<"}";
                 //pragma2mpi.prepend(ASTmpiFixStructurePart1);
-               
+                
                 AST_t ast2start = mpiFixStructurePart1.parse_statement(function_body.get_ast(), function_body.get_scope_link());
                 if(_construct_inside_bucle){
                     newASTStart = ast2start;
                 } else {
                     newASTStart = ast2start;
                 }
-                
+                construct.get_ast().prepend(ast2start);
                 for(int k=0 ;k<_prmters.size();k++) {
                     cout<<"k:"<<_prmters[k].get_name()<<endl;
                 }
@@ -1798,10 +1798,10 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 AST_t ASTmpiFixStructurePart2 = mpiFixStructurePart2.parse_statement(function_body.get_ast(), function_body.get_scope_link());
                 construct.get_ast().replace_with(ASTmpiFixStructurePart2);
-//                construct.get_ast().prepend(ast2start);
-//                cout<<function_body.prettyprint()<<endl;
-//                cin.get();
-               
+                //                construct.get_ast().prepend(ast2start);
+                //                cout<<function_body.prettyprint()<<endl;
+                //                cin.get();
+                
             }
             putBarrier(minLine, staticC, block_line, construct, function_sym, function_body, minAST, newASTStart);
             
@@ -1837,7 +1837,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 checkS=" check";
                 preHMPPstart=1;
             }
-
+            
             if(preHMPPstart) {
                 Source newConstructSource;
                 string contructSourceWithoutKeys = construct.get_statement().get_ast().prettyprint();
@@ -1852,13 +1852,13 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     contructSourceWithoutKeys =  contructSourceWithoutKeys.substr(0,contructSourceWithoutKeys.length()-1);
                     cout<<"yes on fin"<<endl;
                 } 
-                    
+                
                 
                 newConstructSource<< contructSourceWithoutKeys;
-//                cout<<contructSourceWithoutKeys<<endl;
+                //                cout<<contructSourceWithoutKeys<<endl;
                 AST_t nAST;
                 nAST = newConstructSource.parse_statement(construct.get_ast(),construct.get_scope_link());
-//                cin.get();
+                //                cin.get();
                 construct.get_ast().replace_with(nAST);
                 //construct.get_ast().replace_with(construct.get_statement().get_ast());
                 TraverseASTFunctor4LocateOMP expr_traverse(construct.get_scope_link());
@@ -2081,19 +2081,19 @@ void TransPhase::putBarrier(int minLine, int staticC, int block_line, PragmaCust
     lA._num_loop = _construct_num_loop;
     lA._inside_bucle = _construct_inside_bucle;
     if(minLine != std::numeric_limits<int>::max() && staticC!=2) {
-//        cout<<"Hi"<<endl;
+        //        cout<<"Hi"<<endl;
         if(_construct_inside_bucle) {
-//            cout<<"1"<<endl;
+            //            cout<<"1"<<endl;
             lA._wherePutFinal=_construct_loop;  
         } else {
             lA._wherePutFinal = minAST;
-//            cout<<"2"<<endl;
+            //            cout<<"2"<<endl;
         }
         lA._lastModifiedAST = minAST;
-//        cout<<lA._lastModifiedAST.prettyprint()<<endl; 
-//        cin.get();
+        //        cout<<lA._lastModifiedAST.prettyprint()<<endl; 
+        //        cin.get();
     } else {
-//        cout<<"Hi2"<<endl;
+        //        cout<<"Hi2"<<endl;
         if(_construct_inside_bucle) {
             lA._wherePutFinal=_construct_loop;  
             
@@ -2102,7 +2102,7 @@ void TransPhase::putBarrier(int minLine, int staticC, int block_line, PragmaCust
         }
         lA._lastModifiedAST=construct.get_ast();  
     }
-//        cin.get();
+    //        cin.get();
     lA._lastFunctionNameList=function_sym.get_name();
     _lastTransformInfo.push_back(lA);
 }
@@ -2163,6 +2163,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
     vector<Source> copyVariables;
     int hasChanges = 0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();it != expr_list.end(); it++, l++) {
+        //debugPoint(expr_list[l].prettyprint());
         
         PragmaCustomConstruct test(expr_list[l],construct.get_scope_link());
         if(test.is_construct()){
@@ -2195,7 +2196,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
             Source variableInit;
             string line;
             line =  expr_list[l].prettyprint();
-           
+            
             int partVars = 0;
             int thisHasChanges = 0;
             if(expr_list[l].prettyprint().find_first_of("=")>= 0 && expr_list[l].prettyprint().find_first_of("=")<expr_list[l].prettyprint().length()) {
@@ -2297,22 +2298,22 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     break;
                                 }
                             }
-//                            if(!rV) {
-//                                for(int n = 0; n<operands.size();++n) {
-//                                    cout<<std::string(operands[n])<<" vs. "<<firstO<<endl;
-//                                    if(std::string(operands[n]).compare(firstO) == 0) {
-////                                        from(int e=0;e<operands.size();++e) {
-////                                            string firstIT = std::string(operands[e]).substring(0, std::string(operands[e]).find_first_of("]"));
-////                                            
-////                                        }
-//                                        _secureWrite = 1;
-//                                        isInRange = 0;
-////                                        cout<<"secure write activated"<<endl;
-////                                        cin.get();
-//                                    }
-//    //                                cin.get();
-//                                }
-//                            }
+                            //                            if(!rV) {
+                            //                                for(int n = 0; n<operands.size();++n) {
+                            //                                    cout<<std::string(operands[n])<<" vs. "<<firstO<<endl;
+                            //                                    if(std::string(operands[n]).compare(firstO) == 0) {
+                            ////                                        from(int e=0;e<operands.size();++e) {
+                            ////                                            string firstIT = std::string(operands[e]).substring(0, std::string(operands[e]).find_first_of("]"));
+                            ////                                            
+                            ////                                        }
+                            //                                        _secureWrite = 1;
+                            //                                        isInRange = 0;
+                            ////                                        cout<<"secure write activated"<<endl;
+                            ////                                        cin.get();
+                            //                                    }
+                            //    //                                cin.get();
+                            //                                }
+                            //                            }
                             if(!_secureWrite) {
                                 int f = 0;
                                 for(int x = 0; x<_downloadVars.size();++x){
@@ -2324,8 +2325,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 if(!f) {
                                     transferInfo down;
                                     down.name = actArg;
-
-                                   
+                                    
+                                    
                                     for(int y=0;y<_ioVars.size();++y) {
                                         if(std::string(_ioVars[y].name).compare(actArg)==0) {
                                             numVar = y;
@@ -2335,7 +2336,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                                 }
                                             }
                                         }
-
+                                        
                                     }
                                     if(itDependent) {
                                         down.start = _offsetVar;
@@ -2448,7 +2449,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             hasChanges = 1;
                             thisHasChanges = 1;
                             string s2change = firstO.substr(0,firstO.find_first_of(iterators));
-                    
+                            
                             if(!isInRange || !_fullArrayWrites) {
                                 line = replaceAll(line, s2change, rectifiedVarName);
                             }
@@ -2472,12 +2473,12 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 int f1 = 0;
                                 cout<<expr_list[l].prettyprint()<<endl;
                                 for(int itIO=0;itIO<_ioVars[finded].iterVar.size();++itIO) {
-//                                    cout<<std::string(_ioVars[finded].iterVar[itIO])<<" vs. "<<std::string(initVar)<<endl;
+                                    //                                    cout<<std::string(_ioVars[finded].iterVar[itIO])<<" vs. "<<std::string(initVar)<<endl;
                                     if(std::string(_ioVars[finded].iterVar[itIO]).compare(std::string(initVar))==0)
                                         f1 = 1;
                                 }
                                 
-//                                cin.get();
+                                //                                cin.get();
                                 if(f1 && _ioVars[finded].size.size()>0){
                                     mpiWrites<<"if ("<<firstIterator<<">= "<<_offsetVar<<
                                             " && "<<firstIterator<<" < "<<_partSizeVar<<" + "<<_offsetVar<<" )"
@@ -2501,31 +2502,31 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                             <<"[0] = "
                                             << rangeInitialValue <<" < "<< _downloadVars[numIoVar].start<<");\n";
                                     //_downloadVars[numIoVar].start = std::string(rangeInitialValue);
-                                        
+                                    
                                     if(_downloadVars[numIoVar].start.compare( _ioVars[numVar].size[0]) !=0 && _expandFullArrayReadWrite) {
                                         preWrite << "("<<_coordVectorVar
-                                            <<_num_transformed_blocks
-                                            <<"[1] = ("<<_downloadVars[numIoVar].start<<" > "<<rangeFinishValue<<") ? ("
-                                            <<rangeFinishValue<<" - "<<rangeInitialValue<<") : ("<<_downloadVars[numIoVar].start
-                                            <<" -"<<rangeInitialValue<<")"
-                                            <<");\n";
-                                    
+                                                <<_num_transformed_blocks
+                                                <<"[1] = ("<<_downloadVars[numIoVar].start<<" > "<<rangeFinishValue<<") ? ("
+                                                <<rangeFinishValue<<" - "<<rangeInitialValue<<") : ("<<_downloadVars[numIoVar].start
+                                                <<" -"<<rangeInitialValue<<")"
+                                                <<");\n";
+                                        
                                         preWrite <<"if (("<<rangeInitialValue<<") <= "<<_downloadVars[numIoVar].start<<" && "<<_coordVectorVar
-                                            <<_num_transformed_blocks<<"[1] > 0) {";
+                                                <<_num_transformed_blocks<<"[1] > 0) {";
                                     } else {
-                                         preWrite << "("<<_coordVectorVar
-                                            <<_num_transformed_blocks
-                                            <<"[1] = (("<<rangeFinishValue<<") - "<<_coordVectorVar
-                                            <<_num_transformed_blocks
-                                            <<"[0]));";
-                                         _downloadVars[numIoVar].end = std::string(rangeFinishValue);
+                                        preWrite << "("<<_coordVectorVar
+                                                <<_num_transformed_blocks
+                                                <<"[1] = (("<<rangeFinishValue<<") - "<<_coordVectorVar
+                                                <<_num_transformed_blocks
+                                                <<"[0]));";
+                                        _downloadVars[numIoVar].end = std::string(rangeFinishValue);
                                     }
-                                            preWrite <<"MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_FWTAG<<", MPI_COMM_WORLD);\n "
+                                    preWrite <<"MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_FWTAG<<", MPI_COMM_WORLD);\n "
                                             <<"MPI_Send(&"<<_coordVectorVar<<_num_transformed_blocks<<",2, MPI_INT, 0, "<<_FWTAG<<", MPI_COMM_WORLD);"
                                             //<<"MPI_Send(&"<<actArg<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<", ("<<_coordVectorVar<<_num_transformed_blocks<<"[1] -" <<_coordVectorVar<<_num_transformed_blocks<<"[0])"<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_FWTAG<<", MPI_COMM_WORLD);\n";
                                             <<"MPI_Send(&"<<actArg<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<","<<_coordVectorVar<<_num_transformed_blocks<<"[1] "<<dimensions<<" , MPI_"<<upperType<<", 0, "<<_FWTAG<<", MPI_COMM_WORLD);\n";
                                     if(_downloadVars[numIoVar].start.compare( _ioVars[numVar].size[0]) !=0 && _expandFullArrayReadWrite) {
-                                            preWrite<<"}";
+                                        preWrite<<"}";
                                     }
                                     if(_downloadVars[numIoVar].start.compare( _ioVars[numVar].size[0]) !=0 && _expandFullArrayReadWrite) {
                                         postWrite <<" (idxForReadWriteSwitch ="<<finded<<");\n";
@@ -2539,7 +2540,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                                 <<"[1] = (("<<_downloadVars[numIoVar].end<<") > ("<<rangeInitialValue<<")) ? ("
                                                 <<rangeFinishValue<<" - ("<<_downloadVars[numIoVar].end<<") ) : ("<<rangeFinishValue<<" - "<<rangeInitialValue<<")"
                                                 <<");\n";
-
+                                        
                                         postWrite <<"if (("<<rangeFinishValue<<") >= "<<_downloadVars[numIoVar].end<<" && "<<_coordVectorVar
                                                 <<_num_transformed_blocks<<"[1] > 0) {"
                                                 << "MPI_Send(&idxForReadWriteSwitch, 1, MPI_INT, 0, "<<_FWTAG<<", MPI_COMM_WORLD);\n "
@@ -2554,8 +2555,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     //                                    cin.get();
                                     
                                     if(!_outsideAditionalWrites) {
-//                                                                            cout<<"NO additional"<<endl;
-//                                                                            cin.get();
+                                        //                                                                            cout<<"NO additional"<<endl;
+                                        //                                                                            cin.get();
                                         cout<<forIterated.get_line()<<endl;
                                         cout<<construct_ast.get_line()<<endl;
                                         //                                        cout<<"append"<<endl;
@@ -2564,14 +2565,14 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         forIterated.append(writeAST);
                                         
                                     } else {
-//                                                                            cout<<"additional"<<endl;
-//                                                                            cin.get();
+                                        //                                                                            cout<<"additional"<<endl;
+                                        //                                                                            cin.get();
                                         Source start, end;
                                         start << "(("<<_offsetVar<<" > "<<rangeInitialValue<<") ? "<<rangeInitialValue<<" : "<<_offsetVar<<")";
                                         end << "((("<<_offsetVar<<" + "<<_partSizeVar<<") < "<<rangeFinishValue<<") ? "<<rangeFinishValue<<" : ("<<_offsetVar<<" + "<<_partSizeVar<<"))";
                                         _downloadVars[numIoVar].start = std::string(start);
                                         _downloadVars[numIoVar].end = std::string(end);
-                                       
+                                        
                                         _aditionalLinesWrite << write;
                                         //                                       cout<<"Will be outside construct"<<endl;
                                     } 
@@ -2621,11 +2622,11 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 for (int e=0;e<operands.size();e++){ //second Operand
                     
                     Source operandMPIReads;
-//                    cout<<"O("<<e<<"): "<<std::string(operands[e])<<endl;
-//                        cin.get();
+                    //                    cout<<"O("<<e<<"): "<<std::string(operands[e])<<endl;
+                    //                        cin.get();
                     int old_outsideAditionalReads = _outsideAditionalReads;
                     if(std::string(operands[e]).find_first_of("[")>= 0 && std::string(operands[e]).find_first_of("[")<std::string(operands[e]).length()) {
-                       
+                        
                         string firstIterator; 
                         
                         string actArg = std::string(operands[e]).substr(0,std::string(operands[e]).find_first_of("["));
@@ -2641,7 +2642,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             }
                         }
                         if(finded>-1) {
-                          
+                            
                             Source variableNewName, variableDeclaration, dimensions;
                             int isInRange = 0;
                             string rangeInitialValue = "0";
@@ -2661,22 +2662,22 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             int numUploadedVar = 0;
                             int isNewUploadedVar=0;
                             if(_fullArrayReads && !_secureWrite) {
-                                 ObjectList<string> itList;
+                                ObjectList<string> itList;
                                 itList.push_back(std::string(initVar)); 
                                 if(_construct_inside_bucle) {
                                     int exprLine =  construct_ast.get_line();
                                     isInRange = checkIfIteratedByOutsideIterators(firstIterator, _construct_loop, scopeL, 0, exprLine);
-                                  
+                                    
                                 }
                                 cout<<"...--------------------..."<<endl;
                                 if(!isInRange) {
-                                   
+                                    
                                     int exprLine =  construct_ast.get_line();
                                     cout<<std::string(operands[e])<<endl;
                                     cout<<"Construct on--"<<exprLine<<endl;
                                     cout<<"Expression on--"<<expr_list[l].get_line()<<endl;
                                     cout<<"Is expression n--"<<l<<endl;
-//                                    cin.get();
+                                    //                                    cin.get();
                                     isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg, 0, itList, std::string(operands[e]));
                                 } else {
                                     cout<<std::string(operands[e])<<endl;
@@ -2688,7 +2689,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 forIterated = _forIter;
                                 if(isInRange) {
                                     cout<<"inRange: "<<std::string(operands[e])<<" from "<<_rI<< " to "<<_rF<<endl;
-
+                                    
                                     if(!isUploadedVar(actArg)){
                                         transferInfo up;
                                         up.start = "("+rangeInitialValue+")";
@@ -2697,10 +2698,10 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         _uploadedVars.push_back(up);
                                         isNewUploadedVar = 1;
                                         cout<<rangeInitialValue<<" to "<<rangeFinishValue<<endl;
-
+                                        
                                         numUploadedVar = _uploadedVars.size()-1;
                                     } 
-                                  
+                                    
                                 } else if(firstIterator.compare(std::string(initVar))!=0){
                                     cout<<"not inRange "<<std::string(operands[e])<<endl;
                                     
@@ -2708,10 +2709,10 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     cout<<"Uploaded Var by this range"<<endl;
                                     
                                 }
-                               
+                                
                             }
                             if((isINVar(actArg)|| !_smartUploadDownload)) {
-                                    //TEST THAT&& expr_list[l].get_line()>=minLine && (isINVar(actArg))) {
+                                //TEST THAT&& expr_list[l].get_line()>=minLine && (isINVar(actArg))) {
                                 for(int x = 0; x<_uploadedVars.size();++x){
                                     if(_uploadedVars[x].name.compare(actArg)==0)
                                         numUploadedVar = x;
@@ -2723,7 +2724,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             } else {
                                 cout<<"this var has to be individually loaded"<<endl;
                             }
-                           
+                            
                             
                             variableNewName <<actArg;
                             variableDeclaration << std::string(_inVars[finded].type)<<" ";
@@ -2762,8 +2763,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                                 "] = "
                                                 <<actIt<<");\n";
                                     } 
-                                        if(n>0)
-                                            dimensions <<"* ("<<_inVars[finded].size[n]<<")";
+                                    if(n>0)
+                                        dimensions <<"* ("<<_inVars[finded].size[n]<<")";
                                     
                                 }
                                 if(iterators.find("[")>=0 && iterators.find("[")<iterators.length())
@@ -2808,8 +2809,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 thisHasChanges = 1;
                                 
                                 if(_withMemoryLimitation || !isUploadedVar(actArg)) {
-//                                    cout<<"hi"<<endl;
-//                                    cin.get();
+                                    //                                    cout<<"hi"<<endl;
+                                    //                                    cin.get();
                                     mpiReads << operandMPIReads;  
                                     
                                 } else {
@@ -2822,24 +2823,24 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     } else {
                                         variableCopyName << actArg<<"["<<firstIterator<<"]";
                                     }
-//                                    cout<<std::string(operands[e])<<endl;
-//                                            cin.get();
+                                    //                                    cout<<std::string(operands[e])<<endl;
+                                    //                                            cin.get();
                                     
                                     if(_fullArrayReads && isInRange) {
                                         //                                    cout<<actArg<<endl;
                                         //                                    cin.get();
-//                                        if(_outsideAditionalReads) {
-//                                            cout<<"HI"<<endl;
-//                                            cin.get();
-//                                        }
+                                        //                                        if(_outsideAditionalReads) {
+                                        //                                            cout<<"HI"<<endl;
+                                        //                                            cin.get();
+                                        //                                        }
                                         if(!isNewUploadedVar && !_outsideAditionalReads  && (firstIterator.compare(std::string(initVar))==0 || !_expandFullArrayReadWrite)) {
                                             
-                                           
+                                            
                                             _uploadedVars[numUploadedVar].start = _offsetVar;
                                             _uploadedVars[numUploadedVar].end = _offsetVar +" + "+ _partSizeVar;
-                                           
+                                            
                                         }
-                                         
+                                        
                                         Source preRead;
                                         Source postRead;
                                         Source stSource;
@@ -2850,17 +2851,17 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                                 <<rangeInitialValue<<");\n";
                                         
                                         if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) ==0 || !_expandFullArrayReadWrite || isNewUploadedVar) {
-                                          
+                                            
                                             preRead << "("<<_coordVectorVar
                                                     <<_num_transformed_blocks
                                                     <<"[1] = (("<<rangeFinishValue<<") - "<<_coordVectorVar
-                                                <<_num_transformed_blocks
-                                                <<"[0]));\n";
-                                             if(isNewUploadedVar) {
-//                                            cout<<std::string(preRead)<<endl;
-//                                            cin.get();
-                                         }
-                                           
+                                                    <<_num_transformed_blocks
+                                                    <<"[0]));\n";
+                                            if(isNewUploadedVar) {
+                                                //                                            cout<<std::string(preRead)<<endl;
+                                                //                                            cin.get();
+                                            }
+                                            
                                             
                                         } else if(_expandFullArrayReadWrite){
                                             
@@ -2871,7 +2872,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                             preRead << "("<<_coordVectorVar
                                                     <<_num_transformed_blocks
                                                     <<"[1] = "<<stSource<<";\n";
-//                                           _uploadedVars[numUploadedVar].start = std::string(stSource);
+                                            //                                           _uploadedVars[numUploadedVar].start = std::string(stSource);
                                         } 
                                         if(_uploadedVars[numUploadedVar].start.compare(rangeFinishValue) !=0 && _expandFullArrayReadWrite && !isNewUploadedVar) {
                                             preRead <<"if (("<<rangeInitialValue<<") < "<<_uploadedVars[numUploadedVar].start<<" && "<<_coordVectorVar
@@ -2909,19 +2910,19 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         
                                         Source read;
                                         read << preRead << postRead;
-//                                                                            cout<< "R: "<<std::string(read)<<endl;
-//                                                                            cin.get();
+                                        //                                                                            cout<< "R: "<<std::string(read)<<endl;
+                                        //                                                                            cin.get();
                                         
                                         if(!_outsideAditionalReads) {
                                             
-//                                            cout<<forIterated.get_line()<<endl;
-//                                            cout<<construct_ast.get_line()<<endl;
-//                                            cin.get();
+                                            //                                            cout<<forIterated.get_line()<<endl;
+                                            //                                            cout<<construct_ast.get_line()<<endl;
+                                            //                                            cin.get();
                                             //                                        cout<<"append"<<endl;
                                             AST_t readAST;
                                             readAST = read.parse_statement(construct.get_scope(),construct.get_enclosing_function().get_scope_link());
                                             forIterated.prepend(readAST);
-                                           
+                                            
                                             
                                         } else {
                                             if(!isNewUploadedVar) {
@@ -2930,12 +2931,12 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                                 end <<"("<< _uploadedVars[numUploadedVar].end <<" < "<< rangeFinishValue << " ? "
                                                         <<rangeFinishValue<<" : "
                                                         <<_uploadedVars[numUploadedVar].end<<")";//"("<<rangeFinishValue<<")";//"((("<<_offsetVar<<" + "<<_partSizeVar<<") < "<<rangeFinishValue<<") ? "<<rangeFinishValue<<" : ("<<_offsetVar<<" + "<<_partSizeVar<<"))";
-
+                                                
                                                 _uploadedVars[numUploadedVar].start = std::string(start);
                                                 _uploadedVars[numUploadedVar].end = std::string(end);
                                             }
                                             _aditionalLinesRead << read;
-                                                                                  
+                                            
                                         }
                                         
                                         //                                    cin.get();  
@@ -2949,25 +2950,25 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         
                                         variableCopyName <<restIters;
                                         if(isUploadedVar(actArg)) {
-//                                            cout<<actArg<<endl;
-//                                            cin.get();
+                                            //                                            cout<<actArg<<endl;
+                                            //                                            cin.get();
                                             mpiReads << "if ("<<firstIterator<<">"<< _uploadedVars[numUploadedVar].end<<" || "<<firstIterator<<"<"<< _uploadedVars[numUploadedVar].start<<"){"<<operandMPIReads<<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}";
                                         } else {
                                             mpiReads<<operandMPIReads;
                                         }
-                                       
+                                        
                                     }
                                 }
                                 
                                 if(!_fullArrayReads || !isInRange) {
-//                                                                    cout<<line<<endl;
-//                                                                    cout<<std::string(operands[e])<<endl;
-//                                                                    cout<<rectifiedVarName<<endl;
+                                    //                                                                    cout<<line<<endl;
+                                    //                                                                    cout<<std::string(operands[e])<<endl;
+                                    //                                                                    cout<<rectifiedVarName<<endl;
                                     
                                     line = replaceAll(line, operands[e], rectifiedVarName);
-//                                                                    cout<<actArg<<endl;
-//                                                                    cout<<line<<endl;
-//                                                                    cin.get();
+                                    //                                                                    cout<<actArg<<endl;
+                                    //                                                                    cout<<line<<endl;
+                                    //                                                                    cin.get();
                                 }
                                 
                             } else {
@@ -3259,14 +3260,14 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                 int finded = 0;
                 int exprLineUse = minLine;
                 for (ObjectList<AST_t>::iterator it2 = expr_listUse.begin();it2 != expr_listUse.end(); it2++, l++) { 
-                      exprLineUse = expr_listUse[l].get_line();
-//                    cout<<ast.prettyprint()<<" vs. "<<expr_listUse[l].prettyprint()<<endl;
-//                    cout<< ast.get_line() <<" vs. "<<exprLineUse<<endl;
-//                    cout<<"------------------"<<endl;
-//                    cout<<get_real_line(astWhereSearch.get_enclosing_block(), scopeL, ast,1,0,0)<<endl;
-//                    cout<<get_real_line(astWhereSearch.get_enclosing_block(), scopeL, expr_listUse[l],1,0,0)<<endl;
+                    exprLineUse = expr_listUse[l].get_line();
+                    //                    cout<<ast.prettyprint()<<" vs. "<<expr_listUse[l].prettyprint()<<endl;
+                    //                    cout<< ast.get_line() <<" vs. "<<exprLineUse<<endl;
+                    //                    cout<<"------------------"<<endl;
+                    //                    cout<<get_real_line(astWhereSearch.get_enclosing_block(), scopeL, ast,1,0,0)<<endl;
+                    //                    cout<<get_real_line(astWhereSearch.get_enclosing_block(), scopeL, expr_listUse[l],1,0,0)<<endl;
                     
-//                    cin.get();
+                    //                    cin.get();
                     if(ast.prettyprint().compare(expr_listUse[l].prettyprint())==0) {
                         if(ast.get_line() == exprLineUse) {
                             finded = 1;
@@ -3275,44 +3276,44 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                         if(get_real_line(astWhereSearch, scopeL, ast,1,0,0) == get_real_line(astWhereSearch, scopeL, expr_listUse[l],1,0,0)) {
                             
                             if(io) {
-                              if(ast.prettyprint().find(operatorS)>=0 && ast.prettyprint().find(operatorS)<ast.prettyprint().find("="))   {
-                                  finded = 1;
-                                  break;
-                              }
+                                if(ast.prettyprint().find(operatorS)>=0 && ast.prettyprint().find(operatorS)<ast.prettyprint().find("="))   {
+                                    finded = 1;
+                                    break;
+                                }
                             } else {
                                 if(ast.prettyprint().find(operatorS)>=ast.prettyprint().find("=") && ast.prettyprint().find(operatorS)<ast.prettyprint().length())   {
-                                  finded = 1;
-                                  break;
+                                    finded = 1;
+                                    break;
                                 }
                             }
-
+                            
                         }
                     }
                 }
                 if(finded) {
-//                    cout<<"finded"<<endl;
-//                    cin.get();
-//                    cout<<exprLineUse<<endl;
-//                    cout<<minLine<<endl;
-//                    cout<<l<<endl;
-//                    cout<<minLineReal<<endl;
+                    //                    cout<<"finded"<<endl;
+                    //                    cin.get();
+                    //                    cout<<exprLineUse<<endl;
+                    //                    cout<<minLine<<endl;
+                    //                    cout<<l<<endl;
+                    //                    cout<<minLineReal<<endl;
                     if(io) {
                         if(exprLineUse>minLine) {
                             
                             _forIter = expr_listFor[lF];
                             //cout<<"HI1"<<endl;
                             _outsideAditionalWrites = 0;
-                                                      
+                            
                         }
                     } else if(exprLineUse>minLine) {
-//                         cout<<"HI2"<<endl;
+                        //                         cout<<"HI2"<<endl;
                         _forIter = expr_listFor[lF];
                         _outsideAditionalReads = 0;
                         
                         
-                                               
+                        
                     }
-//                                        cin.get();
+                    //                                        cin.get();
                     Source initS;
                     AST_t init = fS.get_iterating_init();
                     Expression exprInit(init, fS.get_scope_link());
@@ -3358,9 +3359,9 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                         exit(-1);
                     }
                     conditionToWork =  cleanWhiteSpaces(conditionToWork);
-                   
                     
-//                    cout<<fS.get_enclosing_statement().get_ast().prettyprint()<<endl;
+                    
+                    //                    cout<<fS.get_enclosing_statement().get_ast().prettyprint()<<endl;
                     if(iteratorOutside.size()>0) {
                         ObjectList<Source> listOfSources;
                         listOfSources= splitMathExpression(scopeL.get_scope(fS.get_enclosing_statement().get_ast()),conditionToWork, 0);
@@ -3375,7 +3376,7 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                                         _forIter = expr_listFor[lF];
                                         _outsideAditionalReads = 0;              
                                     }
-        //                            cout<<_forIter.prettyprint()<<endl;
+                                    //                            cout<<_forIter.prettyprint()<<endl;
                                 }
                             }
                         }
@@ -3391,16 +3392,16 @@ int TransPhase::isInForIteratedBy(string principalIt, AST_t ast, AST_t astWhereS
                                         _forIter = expr_listFor[lF];
                                         _outsideAditionalReads = 0;              
                                     }
-        //                            cout<<_forIter.prettyprint()<<endl;
+                                    //                            cout<<_forIter.prettyprint()<<endl;
                                 }
                             }
                         }
                     }
                     _rI = tempInitValue;
                     _rF = conditionToWork;
-//                    cout<< _rF<< endl;
-//                    //                    cout<< _forIter.prettyprint()<< endl;
-//                    cin.get();
+                    //                    cout<< _rF<< endl;
+                    //                    //                    cout<< _forIter.prettyprint()<< endl;
+                    //                    cin.get();
                     return 1;
                 }
                 //                _forIter = fS.get_ast();
@@ -3426,7 +3427,7 @@ int TransPhase::checkIfIteratedByOutsideIterators(string principalIt, AST_t _con
     TraverseASTFunctor4LocateFor expr_traverseFor(scopeL);
     ObjectList<AST_t> expr_listFor = _construct_loop.depth_subtrees(expr_traverseFor);
     int lF = 0;
-//    cout<<_construct_loop.prettyprint()<<endl;
+    //    cout<<_construct_loop.prettyprint()<<endl;
     for (ObjectList<AST_t>::iterator it = expr_listFor.begin();it != expr_listFor.end(); it++, lF++) { 
         if(ForStatement::predicate(expr_listFor[lF])) {
             Statement s(expr_listFor[lF],scopeL);
@@ -3436,67 +3437,67 @@ int TransPhase::checkIfIteratedByOutsideIterators(string principalIt, AST_t _con
             AST_t maxAST = get_last_ast(fS.get_loop_body().get_ast(), scopeL);
             int minL = minAST.get_line();
             int maxL = maxAST.get_line();
-//            cout<<inductionVar<<endl;
-//            cout<<"min: "<<minL<<endl;
-//            cout<<"max: "<<maxL<<endl;
-//            cout<<"expr: "<<exprLine<<endl;
-//            
-//            cout<<"construct: "<<_constructLine<<endl;
-//            
-//            cin.get();
+            //            cout<<inductionVar<<endl;
+            //            cout<<"min: "<<minL<<endl;
+            //            cout<<"max: "<<maxL<<endl;
+            //            cout<<"expr: "<<exprLine<<endl;
+            //            
+            //            cout<<"construct: "<<_constructLine<<endl;
+            //            
+            //            cin.get();
             if(inductionVar.compare(principalIt) == 0 && minL < _constructLine && maxL > _constructLine) {
-                    Source initS;
-                    AST_t init = fS.get_iterating_init();
-                    Expression exprInit(init, fS.get_scope_link());
+                Source initS;
+                AST_t init = fS.get_iterating_init();
+                Expression exprInit(init, fS.get_scope_link());
+                
+                initS << exprInit.prettyprint();
+                string tempInitValue = std::string(initS).substr(std::string(initS).find_first_of("=")+1,std::string(initS).length());
+                if(tempInitValue.find_first_of(";")>=0 && tempInitValue.find_first_of(";")<tempInitValue.length()) {
+                    //                        cout<<"; found"<<endl;
+                    tempInitValue = tempInitValue.substr(0,tempInitValue.find_first_of(";"));
+                }
+                tempInitValue = cleanWhiteSpaces(tempInitValue);
+                string varToWork;
+                Expression condition = fS.get_iterating_condition();
+                string conditionToWork = condition.prettyprint();
+                
+                
+                if(conditionToWork.find_first_of(";")>=0 && conditionToWork.find_first_of(";")<conditionToWork.length()){
+                    conditionToWork.substr(0,conditionToWork.find_first_of(";")-1);
+                }
+                if(conditionToWork.find_first_of("=")>=0 && conditionToWork.find_first_of("=")<conditionToWork.length()){
+                    cerr<<"OMP2MPI is only able to work with < comparissions in for loops(please normalize loops)"<<endl;
+                    exit(-1);
+                    varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("="));
+                    conditionToWork = conditionToWork.substr(conditionToWork.find_first_of("=")+1,conditionToWork.length());
                     
-                    initS << exprInit.prettyprint();
-                    string tempInitValue = std::string(initS).substr(std::string(initS).find_first_of("=")+1,std::string(initS).length());
-                    if(tempInitValue.find_first_of(";")>=0 && tempInitValue.find_first_of(";")<tempInitValue.length()) {
-                        //                        cout<<"; found"<<endl;
-                        tempInitValue = tempInitValue.substr(0,tempInitValue.find_first_of(";"));
-                    }
-                    tempInitValue = cleanWhiteSpaces(tempInitValue);
-                    string varToWork;
-                    Expression condition = fS.get_iterating_condition();
-                    string conditionToWork = condition.prettyprint();
                     
+                }
+                if(conditionToWork.find_first_of("<")>=0 && conditionToWork.find_first_of("<")<conditionToWork.length()){
+                    varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("<"));
+                    conditionToWork =conditionToWork.substr(conditionToWork.find_first_of("<")+1,conditionToWork.length());
                     
-                    if(conditionToWork.find_first_of(";")>=0 && conditionToWork.find_first_of(";")<conditionToWork.length()){
-                        conditionToWork.substr(0,conditionToWork.find_first_of(";")-1);
-                    }
-                    if(conditionToWork.find_first_of("=")>=0 && conditionToWork.find_first_of("=")<conditionToWork.length()){
-                        cerr<<"OMP2MPI is only able to work with < comparissions in for loops(please normalize loops)"<<endl;
-                        exit(-1);
-                        varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("="));
-                        conditionToWork = conditionToWork.substr(conditionToWork.find_first_of("=")+1,conditionToWork.length());
-                        
-                        
-                    }
-                    if(conditionToWork.find_first_of("<")>=0 && conditionToWork.find_first_of("<")<conditionToWork.length()){
-                        varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("<"));
-                        conditionToWork =conditionToWork.substr(conditionToWork.find_first_of("<")+1,conditionToWork.length());
-                        
-                    }
-                    if(conditionToWork.find_first_of(">")>=0 && conditionToWork.find_first_of(">")<conditionToWork.length()){
-                        cerr<<"OMP2MPI is only able to work with < comparissions in for loops(please normalize loops)"<<endl;
-                        exit(-1);
-                        varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("<"));
-                        conditionToWork =conditionToWork.substr(conditionToWork.find_first_of(">")+1,conditionToWork.length());
-                        
-                    }
-                    varToWork = cleanWhiteSpaces(varToWork);
-                    if(varToWork.compare(principalIt)!=0){
-                        cerr << "Complex for not supported -"<<varToWork<<"- is not -"<<principalIt<<"-"<<endl;
-                        exit(-1);
-                    }
-                    conditionToWork =  cleanWhiteSpaces(conditionToWork);
-                    _rI = tempInitValue;
-                    _rF = conditionToWork;
-                     if(io) {        
-                        _outsideAditionalWrites = 1;
-                     } else {
-                        _outsideAditionalReads = 1;              
-                     }
+                }
+                if(conditionToWork.find_first_of(">")>=0 && conditionToWork.find_first_of(">")<conditionToWork.length()){
+                    cerr<<"OMP2MPI is only able to work with < comparissions in for loops(please normalize loops)"<<endl;
+                    exit(-1);
+                    varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("<"));
+                    conditionToWork =conditionToWork.substr(conditionToWork.find_first_of(">")+1,conditionToWork.length());
+                    
+                }
+                varToWork = cleanWhiteSpaces(varToWork);
+                if(varToWork.compare(principalIt)!=0){
+                    cerr << "Complex for not supported -"<<varToWork<<"- is not -"<<principalIt<<"-"<<endl;
+                    exit(-1);
+                }
+                conditionToWork =  cleanWhiteSpaces(conditionToWork);
+                _rI = tempInitValue;
+                _rF = conditionToWork;
+                if(io) {        
+                    _outsideAditionalWrites = 1;
+                } else {
+                    _outsideAditionalReads = 1;              
+                }
                 return 1;
                 
             } else {
@@ -3675,17 +3676,17 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
             if(findedS.is_valid()){
                 
                 declaration = std::string(findedS.get_type().get_declaration(globalScope,newR.name));
-//                cout<<"d1:"<<declaration<<endl;
+                //                cout<<"d1:"<<declaration<<endl;
                 declaration = declaration.substr(0, declaration.find(n2find));
-//                cout<<"d1:"<<declaration<<endl;
+                //                cout<<"d1:"<<declaration<<endl;
             } else {
                 findedS = construct.get_enclosing_statement().get_scope().get_symbol_from_name(newR.name);
                 if(findedS.is_valid()){
-                
+                    
                     declaration = std::string(findedS.get_type().get_declaration(globalScope,newR.name));
-    //                cout<<"d1:"<<declaration<<endl;
+                    //                cout<<"d1:"<<declaration<<endl;
                     declaration = declaration.substr(0, declaration.find(n2find));
-    //                cout<<"d1:"<<declaration<<endl;
+                    //                cout<<"d1:"<<declaration<<endl;
                 } else {
                     cerr<<"Symbol with name ("<<std::string(newR.name)<<" must be at least in function scope"<<endl;
                     exit(-1);
@@ -3694,9 +3695,9 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
         } else {
             declaration = std::string(findedS.get_type().get_declaration(functionScope,newR.name));
             
-//            cout<<"d2:"<<declaration<<endl;
+            //            cout<<"d2:"<<declaration<<endl;
             declaration = declaration.substr(0, declaration.find(n2find));
-//            cout<<"d2:"<<declaration<<endl;
+            //            cout<<"d2:"<<declaration<<endl;
         }
         if(findedS.is_valid()) {
             
@@ -3747,10 +3748,10 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
         newR.type <<  declaration;
         cout<<"Size: ";
         for(int si = 0; si <newR.size.size(); si++) {
-             cout<<std::string(newR.size[si])<<", ";
+            cout<<std::string(newR.size[si])<<", ";
         }
         cout<<endl;
-//        cin.get();
+        //        cin.get();
         //
         if(!isReducedVar(std::string(newR.name))  && !isPrivateVar(std::string(newR.name))){
             
@@ -3813,57 +3814,57 @@ int TransPhase::isPrivateVar(string name) {
 int TransPhase::isIOVar(string name) {
     
     if(_smart_use_table[name].row_first_read_master.row>0) {
-       // if((_smart_use_table[name].row_first_write_master.row>=_smart_use_table[name].row_first_read_master.row || _smart_use_table[name].row_first_write_master.row<=0))
-            return 1;
+        // if((_smart_use_table[name].row_first_write_master.row>=_smart_use_table[name].row_first_read_master.row || _smart_use_table[name].row_first_write_master.row<=0))
+        return 1;
     } else if(_construct_inside_bucle) {
         if(_smart_use_table[name].row_last_read_master.for_num == _construct_num_loop)
             if(_smart_use_table[name].row_last_read_master.row<_smart_use_table[name].row_last_write_master.row)
                 return 1;
     } else {
-//        if(_smart_use_table[name].row_first_read_cpu.row>0) {
-//            cout<<name<<endl;
-//        }
+        //        if(_smart_use_table[name].row_first_read_cpu.row>0) {
+        //            cout<<name<<endl;
+        //        }
     }
-//    cout<<name<<" discarted as OUT var"<<endl;
-//    cin.get();
+    //    cout<<name<<" discarted as OUT var"<<endl;
+    //    cin.get();
     return 0;
 }
 int TransPhase::isINVar(string name) {
     if(_smart_use_table[name].row_last_write_master.row>0 
             || (_construct_inside_bucle && _smart_use_table[name].row_first_write_master.for_num == _construct_num_loop)) {
-//        cout<<name<< " is in var"<<endl;
-//        cin.get();
+        //        cout<<name<< " is in var"<<endl;
+        //        cin.get();
         return 1;  
     }
-//    else  {
-        //TEST THAT
-//        if(!_withMemoryLimitation) {
-//            transferInfo newTI;
-//            for(int i = 0; i<_inVars.size();++i) {
-//                if(_inVars[i].size.size()>0) {
-//                    if(std::string(_inVars[i].name).compare(name)==0) {
-//                        newTI.name = name;
-//                        newTI.start = "0";
-//                        newTI.end = _inVars[i].size[0];
-//                        _uploadedVars.push_back(newTI);
-//                        return 0;
-//                    }
-//                }
-//            }
-//        }
-        //TODO check if is global
-//        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_valid() && _divideWork && _smartUploadDownload){
-//            if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_defined()){
-//                cout<<"Detected "<<name<<" as global variable (this will be allways transfered to ensure proper value updates)"<<endl;
-//                cin.get();
-//                return 1;
-//            }
-//        }
-        //        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_()) {
-        //            cout<<name <<": "<<_smart_use_table[name].row_last_write_cpu.row<<endl;
-        //            cin.get();
-        //        }
-//    }
+    //    else  {
+    //TEST THAT
+    //        if(!_withMemoryLimitation) {
+    //            transferInfo newTI;
+    //            for(int i = 0; i<_inVars.size();++i) {
+    //                if(_inVars[i].size.size()>0) {
+    //                    if(std::string(_inVars[i].name).compare(name)==0) {
+    //                        newTI.name = name;
+    //                        newTI.start = "0";
+    //                        newTI.end = _inVars[i].size[0];
+    //                        _uploadedVars.push_back(newTI);
+    //                        return 0;
+    //                    }
+    //                }
+    //            }
+    //        }
+    //TODO check if is global
+    //        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_valid() && _divideWork && _smartUploadDownload){
+    //            if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_defined()){
+    //                cout<<"Detected "<<name<<" as global variable (this will be allways transfered to ensure proper value updates)"<<endl;
+    //                cin.get();
+    //                return 1;
+    //            }
+    //        }
+    //        if(_scope_link.get_scope(_translation_unit).get_symbol_from_name(name).is_()) {
+    //            cout<<name <<": "<<_smart_use_table[name].row_last_write_cpu.row<<endl;
+    //            cin.get();
+    //        }
+    //    }
     return 0;
 }
 
@@ -4268,7 +4269,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
         
         
         
-       
+        
         //        cout<<ppExpr<<endl;
         //        cout<<"L: "<<line<<endl;
         //        cout<<"OL: "<<outline_num_line<<endl;
@@ -4408,18 +4409,18 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     //                                    
                     
                 }
-//                if(l==19){
-//                    cin.get();
-//                }
+                //                if(l==19){
+                //                    cin.get();
+                //                }
                 PragmaCustomConstruct test(expr.get_ast(),expr.get_scope_link());
                 if(test.is_construct() && f==0 && outline_num_line !=line){
                     cout<<"Detected Future MPI work"<<endl;
-//                    cin.get();
+                    //                    cin.get();
                     f=1;
                     if(kind == 2) 
                         _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
                     
-                   
+                    
                     
                     
                     std::istringstream actASTtext(test.prettyprint());
@@ -4558,12 +4559,12 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     }
                     cout<<"------------------"<<endl;
                     if(check_clause.is_defined()) {
-//                        cout<<test.get_ast().prettyprint()<<endl;
-//                        cin.get();
-
+                        //                        cout<<test.get_ast().prettyprint()<<endl;
+                        //                        cin.get();
+                        
                         _insideMaster = 1;
                     }
-                        
+                    
                     AST_t nouse =fill_smart_use_table(test.get_ast(), test.get_scope_link(), test.get_scope(), outline_num_line, prmters, hmpp, line, actAst);
                     _insideMaster = 0;
                     //cout<<"Hola"<<endl;
@@ -4738,36 +4739,89 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                         cout<<"Detected function call by brute force"<<endl;
                         Expression exprUndetected(expr_listFunc[0], _ifScopeL);
                         cout<<exprUndetected.get_called_expression().prettyprint()<<endl;
-//                        cout<<"Detected function call by brute force"<<endl;
-//                        if(exprUndetected.get_called_expression().is_named_function_call()) {
-//                            cout<<"HI"<<endl;
-//                        }
+                        //                        cout<<"Detected function call by brute force"<<endl;
+                        //                        if(exprUndetected.get_called_expression().is_named_function_call()) {
+                        //                            cout<<"HI"<<endl;
+                        //                        }
                         string cE = exprUndetected.get_called_expression().prettyprint();
                         Symbol sym;
                         sym = sC.get_symbol_from_name(cE);
                         if(sym.is_valid()) {
                             if(sym.is_defined()){
                                 f = 1;
-
+                                
                                 FunctionDefinition fD(sym.get_definition_tree(),_scope_link);
-                                //                            cout<<"S: "<<fD.get_function_body().get_ast()<<endl;
-                                //                            cin.get();
-                                //                            f=1;
+
                                 Statement fBS = fD.get_function_body();
-                                //                            TL::HLT::Outline outlineF(fBS.get_scope_link(), fBS,_outline_line);
-                                //                            
-                                //                            _prmtersOutlinedFunc.push_back(outlineF.get_parameter_list());
-                                //                            for(int p = 0; p<_prmtersOutlinedFunc[_levelFunc].size();++p){
-                                //                                if(_prmtersOutlinedFunc[_levelFunc][p].is_valid()){
-                                //                                    cout<<_prmtersOutlinedFunc[_levelFunc][p].get_name()<<endl;
-                                //                                    cin.get();
-                                //                                }
-                                //                            }
-                                //                            cout<<"------------------"<<endl;
+
                                 _levelFunc++;
                                 fill_smart_use_table(fBS.get_ast(), fD.get_scope_link(), fD.get_scope(), outline_num_line, prmters, 3, line, actAst);
                                 _levelFunc--;
                                 cout<<"------------------"<<endl;
+                            } else {
+                                cout<<"Function Call Detected"<<endl;
+                                
+                                f=1;
+                                
+                                if(kind == 2) 
+                                    _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
+                                std::string exprS =expr.prettyprint();
+                                
+                                exprS = exprS.substr(exprS.find_first_of("(")+1, exprS.length());
+                                exprS = exprS.substr(0,exprS.find_last_of(")"));
+                                
+                                //                    exprS = cleanWhiteSpaces(exprS);
+                                //                                        cout<<expr.prettyprint()<<" is function call"<<endl;
+                                //                                        cout<<"-"<<exprS<<"-"<<endl;
+                                //                                        cin.get();
+                                if(exprS.compare("")!=0) {
+                                    
+                                    
+                                    std::string actWord;
+                                    while(exprS.find_first_of(",")>0 && exprS.find_first_of(",")<exprS.length()){
+                                        actWord = exprS.substr(0,exprS.find_first_of(","));
+                                        if((exprS.find_first_of("\"")<0 || exprS.find_first_of("\"")>exprS.length()) && actWord.compare("")!=0) {
+                                            actWord = cleanWhiteSpaces(actWord);
+                                            if(actWord.find_first_of("[")>=0 && actWord.find_first_of("[")<actWord.length())
+                                                actWord = actWord.substr(0,actWord.find_first_of("["));
+                                            if(line<outline_num_line) {
+                                                if(!kind || kind == 2) {
+                                                    
+                                                    if((_smart_use_table[actWord].row_last_read_master.row < line || _smart_use_table[actWord].row_last_read_master.row == 0) && isParam(actWord)) {
+                                                        _smart_use_table[actWord].row_last_read_master = fill_use(line,actAst);
+                                                    }
+                                                } 
+                                            } else {
+                                                if(!kind || kind == 2) {
+                                                    if((_smart_use_table[actWord].row_first_read_master.row > line || _smart_use_table[actWord].row_first_read_master.row == 0) && isParam(actWord)) {
+                                                        _smart_use_table[actWord].row_first_read_master = fill_use(line,actAst);    
+                                                    }
+                                                } 
+                                            }
+                                        }
+                                        exprS = exprS.substr(exprS.find_first_of(",")+1,exprS.length());
+                                    }
+                                    actWord = exprS;
+                                    if((exprS.find("\"")<0 || exprS.find_first_of("\"")>exprS.length()) && actWord.compare("")!=0){
+                                        actWord = cleanWhiteSpaces(actWord);
+                                        if(actWord.find_first_of("[")>=0 && actWord.find_first_of("[")<actWord.length())
+                                            actWord = actWord.substr(0,actWord.find_first_of("["));
+                                        if(line<outline_num_line) {
+                                            if(!kind || kind == 2) {
+                                                if((_smart_use_table[actWord].row_last_read_master.row < line || _smart_use_table[actWord].row_last_read_master.row == 0) && isParam(actWord)) {
+                                                    _smart_use_table[actWord].row_last_read_master = fill_use(line,actAst); 
+                                                }
+                                            } 
+                                        } else {
+                                            if(!kind || kind == 2) {
+                                                if((_smart_use_table[actWord].row_first_read_master.row > line || _smart_use_table[actWord].row_first_read_master.row == 0) && isParam(actWord)) {
+                                                    _smart_use_table[actWord].row_first_read_master = fill_use(line,actAst); 
+                                                }
+                                            } 
+                                        }
+                                    }
+                                    
+                                }
                             }
                         }
                         //                        cin.get();
@@ -4789,11 +4843,11 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                 
                 if (f==0 && regexec(&expEqual, ppExpr.c_str(), 1, matchesEqual, 0) == 0 ){
                     cout<<"Uncertain expression"<<endl;
-                                                        std::cout<<"regex expr: "<<ppExpr<<endl;
+                    std::cout<<"regex expr: "<<ppExpr<<endl;
                     
                     
-//                                    cout<<"PP1: " << ppExpr<<endl;
-//                                    cin.get();
+                    //                                    cout<<"PP1: " << ppExpr<<endl;
+                    //                                    cin.get();
                     if(kind == 2)  
                         _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
                     f=1;
@@ -4812,17 +4866,17 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                             stringstream pattern, pattern2,pattern3;
                             //pattern<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9][ \r\t\n\f]*[\r\t\n\f]*";
                             //pattern2<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9]\\s*\\[[\\d+]*[a-z]*\\]";
-//                            pattern<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
-//                            pattern2<<"\\s*[^a-zA-Z0-9]*"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
-//                            pattern3<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
-//                            pattern<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
-//                            pattern2<<"\\s*[^a-zA-Z0-9]*"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
-//                            pattern3<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
-                             pattern<<"\\b"<<prmters[k].get_name()<<"\\b";
+                            //                            pattern<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
+                            //                            pattern2<<"\\s*[^a-zA-Z0-9]*"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
+                            //                            pattern3<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
+                            //                            pattern<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
+                            //                            pattern2<<"\\s*[^a-zA-Z0-9]*"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
+                            //                            pattern3<<"[^a-zA-Z0-9]"<<prmters[k].get_name()<<"[^a-zA-Z0-9=]";
+                            pattern<<"\\b"<<prmters[k].get_name()<<"\\b";
                             pattern2<<"\\b"<<prmters[k].get_name()<<"\\b";
                             pattern3<<"\\b"<<prmters[k].get_name()<<"\\b";
-//                                                        std::cout<<"P: "<<pattern.str()<<endl;
-//                                                        cin.get();
+                            //                                                        std::cout<<"P: "<<pattern.str()<<endl;
+                            //                                                        cin.get();
                             int rv1,rv2,rv3;
                             regex_t exp, exp2, exp3; //Our compiled expression
                             
@@ -4851,13 +4905,13 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                     if(sym.is_defined()){
                                         
                                         var2Procced = 1;
-//                                        cout<<"Detected "<<actWord<<" as global variable (this will be allways transfered to ensure proper value updates)"<<endl;
-//                                        cin.get();
+                                        //                                        cout<<"Detected "<<actWord<<" as global variable (this will be allways transfered to ensure proper value updates)"<<endl;
+                                        //                                        cin.get();
                                     }
                                 } 
                                 
-//                                                                cout<<actWord<<" found"<<endl;
-//                                                                cin.get();
+                                //                                                                cout<<actWord<<" found"<<endl;
+                                //                                                                cin.get();
                                 //      
                                 if(var2Procced || !inside) {
                                     if(ppExpr.find(prmters[k].get_name())<ppExpr.find("=")) {
@@ -5148,7 +5202,7 @@ TransPhase::use TransPhase::fill_use(int line, AST_t actAst){
 
 int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct) {
     cout<< ast2check<<endl;
-   
+    
     TraverseASTFunctor4LocateFor expr_traverseFor(scopeL);
     ObjectList<AST_t> expr_listFor = _file_tree.depth_subtrees(expr_traverseFor);
     _for_min_line =-1;
@@ -5167,9 +5221,9 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
             string nameF = fdF.get_function_name().get_symbol().get_name();
             string nameI = fdI.get_function_name().get_symbol().get_name();
             
-//            cout <<"nF: -"<<nameF<<"- vs nI: -"<<nameI<<"-"<<endl;
+            //            cout <<"nF: -"<<nameF<<"- vs nI: -"<<nameI<<"-"<<endl;
             if (nameF.compare(nameI)==0){
-//                cout<<"******************************\nFOR: "<<exprF.prettyprint()<<endl;
+                //                cout<<"******************************\nFOR: "<<exprF.prettyprint()<<endl;
                 AST_t loopAst;
                 Statement s(expr_listFor[lF],scopeL);
                 if(ForStatement::predicate(expr_listFor[lF])) {
@@ -5190,7 +5244,7 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
                 if(loopAst.prettyprint().compare("")!=0 && _for_min_line==-1){
                     
                     _for_min_line = get_real_line(loopAst, scopeL, exprI.get_ast(), 0, searching_construct,searching_construct);
-//                    cout<<"LS: "<<_for_min_line<<"***********************"<<endl;
+                    //                    cout<<"LS: "<<_for_min_line<<"***********************"<<endl;
                     if(_for_min_line>=0) {
                         _for_internal_ast_last = get_last_ast(loopAst, scopeL);
                         _for_internal_ast_first = get_first_ast(loopAst, scopeL);
@@ -5202,8 +5256,8 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
                         }
                         
                         num_for= expr_listFor[lF].get_line();
-//                        cout<<"NF: "<<_for_min_line<<endl;
-//                        cin.get();
+                        //                        cout<<"NF: "<<_for_min_line<<endl;
+                        //                        cin.get();
                         _for_ast = expr_listFor[lF];
                     }
                 }
@@ -5215,13 +5269,13 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
     cout<<exprLine<<endl;
     if(_for_min_line>-1 || _for_min_line==exprLine){
         _for_num = num_for;
-//        cout<<"inside bucle "<< _for_num<<endl;
-//        cin.get();
+        //        cout<<"inside bucle "<< _for_num<<endl;
+        //        cin.get();
         return 1;
     }else{
         _for_num = -1;
-//        cout<< "Not inside bucle"<<endl;
-//        cin.get();
+        //        cout<< "Not inside bucle"<<endl;
+        //        cin.get();
         return 0;
     }
 }
@@ -5310,7 +5364,7 @@ int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int
         std::string ppExpr;
         ppExpr=expr.prettyprint();
         if(ppExpr.find(_myidVar+ " == 0")>=0 && ppExpr.find(_myidVar+ " == 0")<ppExpr.length()){
-             myidLines++;
+            myidLines++;
         }
         if(update) {
             if(ppExpr.find("#pragma hmpp ")>=0 && ppExpr.find("#pragma hmpp ")<ppExpr.length()){
@@ -5368,12 +5422,12 @@ int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int
                         cout<<line<<endl;
                         
                         line-=myidLines;
-//                        cout<<line<<endl;
+                        //                        cout<<line<<endl;
                         line+=(_num_transformed_blocks);
-//                        cout<<line<<endl;
+                        //                        cout<<line<<endl;
                         line-=(_num_non_trasformed_blocks);
-//                        cout<<line<<endl;
-//                        cin.get();
+                        //                        cout<<line<<endl;
+                        //                        cin.get();
                         //                                cout<<"Incrementing line in: "<<expr_list2.size()<<endl;
                         
                         //            }
@@ -5446,7 +5500,7 @@ Source TransPhase::generateMPIVariableMessagesSend(vector<infoVar> vars, Source 
         for(int i = 0; i<_reducedVars.size(); ++i){
             string upperType = std::string(_reducedVars[i].type);
             std::transform(upperType.begin(), upperType.end(),upperType.begin(), ::toupper);
-           upperType = concatenateUnsigned(upperType);
+            upperType = concatenateUnsigned(upperType);
             if(std::string(_reducedVars[i].operation).compare("+") == 0 || std::string(_reducedVars[i].operation).compare("-") == 0) {
                 mpiMessages<<_reducedVars[i].name << " = "<< "0;";
             }else{
@@ -5594,17 +5648,17 @@ Source TransPhase::handleMemory(string source) {
             //if(_inVars[i].size.size()>0) {
             if(_inVars[i].size.size()>0) {
                 memorySource<< "case  "<<i<<": \n";
-
-                    memorySource<<"MPI_Recv(&"<<_coordVectorVar<<_num_transformed_blocks<<",2,MPI_INT,"<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD, &"<<_statVar<<");\n";
-
-
+                
+                memorySource<<"MPI_Recv(&"<<_coordVectorVar<<_num_transformed_blocks<<",2,MPI_INT,"<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD, &"<<_statVar<<");\n";
+                
+                
                 for(int x=1; x<_inVars[i].size.size();++x) {
                     dimensions<<" * ("<<std::string(_inVars[i].size[x])<<")";
                 }
                 //memorySource << "MPI_Send(&"<<_inVars[i].name<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<", ("<<_coordVectorVar<<_num_transformed_blocks<<"[1] -" <<_coordVectorVar<<_num_transformed_blocks<<"[0])"<<dimensions<<", MPI_"<<upperType<<", "<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD);\n";
-                    memorySource << "MPI_Send(&"<<_inVars[i].name<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<", "<<_coordVectorVar<<_num_transformed_blocks<<"[1]"<<dimensions<<", MPI_"<<upperType<<", "<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD);\n";
+                memorySource << "MPI_Send(&"<<_inVars[i].name<<"["<<_coordVectorVar<<_num_transformed_blocks<<"[0]]"<<", "<<_coordVectorVar<<_num_transformed_blocks<<"[1]"<<dimensions<<", MPI_"<<upperType<<", "<<source<<", "<<_FRTAG<<", MPI_COMM_WORLD);\n";
                 memorySource << "break;";
-                }
+            }
             //}
             
             //}
