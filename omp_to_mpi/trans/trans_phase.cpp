@@ -44,14 +44,14 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     _FRTAG = "FRTAG";
     _FWTAG = "FWTAG";
     _withMemoryLimitation = 0;
-    _oldMPIStyle = 0;
+    _oldMPIStyle = 1;
     _secureWrite = 0;
     _workWithCopiesOnSlave = 0;
     _sendComputedIndices = 0;
     _smartUploadDownload = 1;
     _fullArrayReads = 1;
     _fullArrayWrites = 1;
-    _divideWork = 0;
+    _divideWork = 1;
     _expandFullArrayReadWrite = 1;
     
 }
@@ -232,6 +232,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
     masterWork << "{"<<initAST.prettyprint();
     _initializedFunctions[functionName]=initAST;
     int opened = 0;
+    int _hasInit =0;
     int lastLine = 0;
     for (int l = 0;l < expr_list.size(); l++) {
         //        cout<<l<<endl;
@@ -267,6 +268,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                             
                         }
                         opened++;
+                        _hasInit =1;
                         masterWork << (expr_list[l].prettyprint())<<"\n";
                         expr_list[l].remove_in_list();
                     }
@@ -280,6 +282,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         
                     }
                     opened++;
+                    _hasInit =1;
                     masterWork << addCommaIfNeeded(expr_list[l].prettyprint())<<"\n";
                     expr_list[l].remove_in_list();
                 }
@@ -315,6 +318,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                             
                         }
                         opened++;
+                        _hasInit =1;
                         masterWork << addCommaIfNeeded(expr_list[l].prettyprint());
                         //                                   cout<<"ACCEPTED NOT CHECK CONSTRUCT: ("<<expr_list[l].get_line()<<")"<<expr_list[l].prettyprint()<<endl;
                         
@@ -369,6 +373,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                     if(opened==0 && !check) {
                         masterWork << "if("<<_myidVar<<" == 0) {\n";
                         opened++;
+                        _hasInit =1;
                     } else if(opened>0 && check) {
                         //                                       if(opened==1)
                         //                                        masterWork << "int test=0;";
@@ -908,6 +913,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             declaration = declaration.substr(0, declaration.find(newR.name));
                         } else {
                             cout<<"-"<<std::string(newR.name)<<"- not found in global scope"<<endl;
+                            cin.get();
                         }
                     } else {
                         declaration = std::string(findedS.get_type().get_declaration(functionScope,newR.name));
@@ -1014,7 +1020,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         
         cout<<"Creating initializations"<<endl;
         if(!_initialized) {
-            if(!_divideWork) {
+            if(!_divideWork || !_hasInit) {
                 varInitialization<<
                         "MPI_Status "<<_statVar<<";"
                         "int "<<_sizeVar <<", "<<_myidVar<<";"
@@ -1103,7 +1109,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 if(fixDivided) {
                     varInitialization << "int "<<_partSizeVar<<" = ("<<partSizeDivisionString<<");";
                 } else {
-                    varInitialization << "int "<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) / "<<partSizeDivisionString<<": 1;";
+                    varInitialization << "int "<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0) ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString<<") : 1;";
                 }
                 varInitialization << "int "<<_offsetVar<<";";
                 //varInitialization << "int "<<_partSizeVar<<" = ("<<maxS<<") / 100000 * "<<_sizeVar<<"), "<<_offsetVar<<";";
@@ -1114,7 +1120,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 if(fixDivided) {
                     varInitialization << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
                 } else {
-                    varInitialization << "("<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) / "<<partSizeDivisionString <<": 1);";
+                    varInitialization << "("<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0) ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString <<") : 1);";
                 }
             }
             varInitialization << "int "<<_coordVectorVar << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
@@ -1154,7 +1160,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                  if(fixDivided) {
                                     partSizeSource << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
                                 } else {
-                                    partSizeSource << "("<<_partSizeVar<<" = ("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0 ? ("<<maxS<<")/ ("<<_sizeVar<<"-1) / "<<partSizeDivisionString <<": 1);";
+                                    partSizeSource << "("<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1)) > 0 ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString <<") : 1);";
                                 }
                                 construct.get_ast().prepend(partSizeSource.parse_statement(function_body.get_ast(), function_body.get_scope_link()));
                             }
@@ -1203,8 +1209,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         // 
         if(_isForDirective) {
             cout<<"Generating MPI Master code"<<endl;
-            
            
+            
             mpiFixStructurePart1 << "if("<<_myidVar<<" == 0) {\n ";
             if(_oldMPIStyle)
             {
@@ -1414,7 +1420,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 } else {
                     newASTStart = ast2start;
                 }
-                construct.get_ast().prepend(ast2start);
+                
                 for(int k=0 ;k<_prmters.size();k++) {
                     cout<<"k:"<<_prmters[k].get_name()<<endl;
                 }
@@ -1768,6 +1774,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 //                cout<<"2: "<<construct.get_ast().prettyprint()<<endl;
                 //                cin.get();
                 //
+                
                 completeLoopsInAST(construct.get_ast(), function_def.get_function_body().get_scope_link());
                 constructASTS = transformConstructAST(construct, function_def.get_function_body().get_scope_link(), functionScope, initVar); 
                 
@@ -1791,6 +1798,9 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 AST_t ASTmpiFixStructurePart2 = mpiFixStructurePart2.parse_statement(function_body.get_ast(), function_body.get_scope_link());
                 construct.get_ast().replace_with(ASTmpiFixStructurePart2);
+//                construct.get_ast().prepend(ast2start);
+//                cout<<function_body.prettyprint()<<endl;
+//                cin.get();
                
             }
             putBarrier(minLine, staticC, block_line, construct, function_sym, function_body, minAST, newASTStart);

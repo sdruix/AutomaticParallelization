@@ -4,13 +4,13 @@
 
 /* Default problem size. */
 #ifndef CZ
-# define CZ 500
+# define CZ 400
 #endif
 #ifndef CYM
-# define CYM 500
+# define CYM 400
 #endif
 #ifndef CXM
-# define CXM 500
+# define CXM 400
 #endif
 
 double ch;

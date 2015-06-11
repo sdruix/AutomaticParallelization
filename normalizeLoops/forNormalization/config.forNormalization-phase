@@ -7,7 +7,7 @@ compiler_name = gcc
 compiler_options =  -lmpi 
 linker_name = gcc 
 linker_options =  -lmpi 
-compiler_phase=/home/sdruix/mcxx/normalizeLoops/forNormalization/trans-phase.so 
+compiler_phase=/home/sdruix/mcxx/normalizeLoops/forNormalization/forNormalization-phase.so 
 pragma_prefix=omp
 
 [forNormalization-phasec++] 

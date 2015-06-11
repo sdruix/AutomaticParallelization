@@ -5,7 +5,7 @@
 
 /* Default problem size. */
 #ifndef N
-# define N 4096
+# define N 8192
 #endif
 
 /* Array declaration. Enable malloc if POLYBENCH_TEST_MALLOC. */
@@ -17,7 +17,7 @@ static void init_array() {
   int i, j;
 
   for (i = 0; i < N;) {
-    c[i] = ((double)i) / N;
+    c[i] = ((double)i) / (double)N;
     for (j = 0; j < N;) {
       A[i][j] = ((double)i * j) / N;
       j++;

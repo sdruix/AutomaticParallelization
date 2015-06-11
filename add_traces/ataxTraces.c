@@ -551,6 +551,7 @@ int main(int argc, char **argv)
     init_array();
     mem_trace_def_array2d("B", 4000, 4000);
     mem_trace_def_mem("B", &B, sizeof(double), sizeof (B));
+    mem_trace_def_mem("alpha", &alpha, sizeof(double), sizeof (alpha));
     for (i = 1;
         i < n;
         i++)
@@ -567,12 +568,10 @@ int main(int argc, char **argv)
                         k < i;
                         k++)
                     {
-                        if (1)
-                        {
-                            mem_trace_read("B", &B[i][j]);
-                            mem_trace_write("B", &B[i][j]);
-                            (B[i][j]++);
-                        }
+                        mem_trace_read("alpha", &alpha);
+                        mem_trace_write("alpha", &alpha);
+                        (alpha++);
+                        mem_trace_read("alpha", &alpha);
                         mem_trace_read("B", &B[j][k]);
                         mem_trace_read("B", &B[i][j]);
                         mem_trace_write("B", &B[i][j]);

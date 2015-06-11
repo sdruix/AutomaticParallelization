@@ -4,10 +4,10 @@
 
 /* Default problem size. */
 #ifndef X
-# define X 4000
+# define X 20
 #endif
 #ifndef Y
-# define Y 4000
+# define Y 20
 #endif
 
 
@@ -42,9 +42,8 @@ int main(int argc, char** argv) {
 
 
 #define sqrt_of_array_cell(x,j) sqrt(x[j])
-#pragma omp parallel schedule(static) check
   /* Determine mean of column vectors of input data matrix */
-  #pragma omp for private (i)
+//  #pragma omp parallel for private (i) check
   for (j = 1; j <= m; j++) {
     mean[j] = 0.0;
     for (i = 1; i <= n; i++)
@@ -53,7 +52,7 @@ int main(int argc, char** argv) {
   }
 
   /* Determine standard deviations of column vectors of data matrix. */
-  #pragma omp for private (i) schedule(static) check
+//  #pragma omp parallel for private (i) check
   for (j = 1; j <= m; j++) {
     stddev[j] = 0.0;
     for (i = 1; i <= n; i++)
@@ -67,7 +66,7 @@ int main(int argc, char** argv) {
   }
 
   /* Center and reduce the column vectors. */
-  #pragma omp for private (j) schedule(static) check
+//  #pragma omp parallel for private (j)  check
   for (i = 1; i <= n; i++)
     for (j = 1; j <= m; j++) {
       data[i][j] -= mean[j];
@@ -75,7 +74,7 @@ int main(int argc, char** argv) {
     }
 
   /* Calculate the m * m correlation matrix. */
-  #pragma omp for private (j2, i) schedule(static) check
+  #pragma omp parallel for private (j2, i) check
   for (j1 = 1; j1 <= m - 1; j1++) {
     for (j2 = j1; j2 <= m; j2++) {
       symmat[j1][j2] = 0.0;

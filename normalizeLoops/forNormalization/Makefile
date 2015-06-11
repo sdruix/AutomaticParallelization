@@ -53,7 +53,7 @@ config.$(PHASE_NAME) : config.myphase.in
 	@echo "compiler_options =  -lmpi " >> config.$(PHASE_NAME)
 	@echo "linker_name = gcc " >> config.$(PHASE_NAME)
 	@echo "linker_options =  -lmpi " >> config.$(PHASE_NAME)
-	@echo "compiler_phase="$(path)"/trans-phase.so ">> config.$(PHASE_NAME)
+	@echo "compiler_phase="$(path)"/forNormalization-phase.so ">> config.$(PHASE_NAME)
 	@echo "pragma_prefix=omp" >> config.$(PHASE_NAME)
 	@echo "" >> config.$(PHASE_NAME)
 	@echo "["$(PHASE_NAME)"c++] ">> config.$(PHASE_NAME)

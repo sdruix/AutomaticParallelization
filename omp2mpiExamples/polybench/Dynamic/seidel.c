@@ -5,7 +5,7 @@
 
 /* Default problem size. */
 #ifndef TSTEPS
-# define TSTEPS 50//100//25
+# define TSTEPS 100//100//25
 #endif
 #ifndef N
 # define N 4096//4000//1000

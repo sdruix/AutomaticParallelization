@@ -4,7 +4,7 @@
 
 /* Default problem size. */
 #ifndef Y
-# define Y 4096
+# define Y 8192
 #endif
 
 

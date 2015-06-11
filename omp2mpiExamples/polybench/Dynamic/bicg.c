@@ -4,10 +4,10 @@
 
 /* Default problem size. */
 #ifndef NX
-# define NX 4096
+# define NX 8192
 #endif
 #ifndef NY
-# define NY 4096
+# define NY 8192
 #endif
 #ifndef M_PI
 # define M_PI 3.14159265358979323846

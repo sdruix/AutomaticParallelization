@@ -28,26 +28,43 @@ ForNormalizationPhase::ForNormalizationPhase() {
     
     
 }
+void ForNormalizationPhase::normalizeNestedLevel(ObjectList<AST_t> expr_listFor, ScopeLink scope_link){
+    for (int lF = 0;lF < expr_listFor.size(); lF++) {
 
+        Statement s(expr_listFor[lF],scope_link);
+        ForStatement fS(s);
+        int check = normalizeFor(fS);
+        TraverseASTFunctor4LocateFor expr_traverseFor(scope_link);
+        if(fS.get_loop_body().get_ast().depth_subtrees(expr_traverseFor).size()>0) {
+            normalizeNestedLevel(fS.get_loop_body().get_ast().depth_subtrees(expr_traverseFor), fS.get_scope_link());
+        }
+    }
+}
 void ForNormalizationPhase::run(DTO& dto) {
     
     AST_t translation_unit = dto["translation_unit"];
     ScopeLink scope_link = dto["scope_link"];
     TraverseASTFunctor4LocateFor expr_traverseFor(scope_link);
-    ObjectList<AST_t> expr_listFor = translation_unit.depth_subtrees(expr_traverseFor);
-    
+    normalizeNestedLevel(translation_unit.depth_subtrees(expr_traverseFor), scope_link);
 //    int lF=0;
-    for (int lF = 0;lF < expr_listFor.size(); lF++) {
-        
-        Statement s(expr_listFor[lF],scope_link);
-        ForStatement fS(s);
-        int check = normalizeFor(fS);
-    }
     
     
+//    cout<<translation_unit.prettyprint()<<endl;
+//    cin.get();
 }
 string ForNormalizationPhase::getSimplifiedMathExpression(Expression iterating, string name, int doInverse) {
+    
     string iteratingExpression = iterating.prettyprint();
+    string opS;
+    switch(iteratingExpression[iteratingExpression.find_first_of("=")-1]) {
+        case '+':
+        case '-':
+        case '/':
+        case '*':
+            opS = iteratingExpression[iteratingExpression.find_first_of("=")-1];
+            return (opS+iteratingExpression.substr(iteratingExpression.find_first_of("=")+1, iteratingExpression.length()));
+            break;
+    }
     string mathExpr = "ERROR";
     regex_t expEqualPlusPrev, expEqualPlusPost, expEqualSubPrev, expEqualSubPost, expEqualMath, expEqualMathWithComma; //Our compiled expression
     stringstream equalPlusPrev, equalPlusPost, equalSubPrev, equalSubPost, equalMath, equalMathWithComma;
@@ -155,6 +172,47 @@ string ForNormalizationPhase::getSimplifiedMathExpression(Expression iterating, 
     return mathExpr;
 }
 
+string ForNormalizationPhase::getExpressionOnLoop(Statement loopBody, ScopeLink sL, string name, int doInverse){
+//    cout<<"Looking for the step expression"<<endl;
+//    cin.get();
+    string mathOp = "ERROR";
+    TraverseASTFunctor4LocateAssigmentUse expr_traverseUse(sL);
+    ObjectList<AST_t> expr_listUse = loopBody.get_ast().depth_subtrees(expr_traverseUse);
+    
+//    int lF=0;
+    int numChanges = 0;
+    for (int l = 0;l < expr_listUse.size(); l++) {
+        Expression expr(expr_listUse[l], sL);
+        
+        string ppExpr = expr.prettyprint();
+//        cout<<ppExpr<<endl;
+//        cin.get();
+        string check2Change = mathOp;
+        if(expr.is_assignment()) {
+            if(expr.get_first_operand().prettyprint().compare(name)==0) {
+                
+                mathOp = getSimplifiedMathExpression(expr, name, doInverse);
+            }
+        } else if(expr.is_operation_assignment()){
+            //mathOp = mathOp + ppExpr[ppExpr.find_first_of("=")-1] + "(" + getSimplifiedMathExpression(expr, name, doInverse) + ")";
+            mathOp = getSimplifiedMathExpression(expr, name, doInverse);
+        } else if((ppExpr.find_first_of("++")>= 0 && ppExpr.find_first_of("++")<ppExpr.length()) 
+                    || (ppExpr.find_first_of("--")>= 0 && ppExpr.find_first_of("--")<ppExpr.length())) {      
+                mathOp = getSimplifiedMathExpression(expr, name, doInverse);
+        }
+        if(check2Change.compare(mathOp)!=0){
+            expr_listUse[l].remove_in_list();
+            numChanges++;
+        }
+//        cout <<mathOp<<endl;
+        
+    }
+    if(numChanges!=1) {
+        cerr<<"Complex step found on loop, please keep loops simpler as possible"<<endl;
+        exit(-1);
+    }
+    return mathOp;
+}
 
 int ForNormalizationPhase::normalizeFor(ForStatement fS){
     
@@ -184,9 +242,11 @@ int ForNormalizationPhase::normalizeFor(ForStatement fS){
     string logicOperation = findLogicalOperation(condition.prettyprint(), std::string(initVar));
     //logicOperation = ">";
     //                cout<<conditionToWork<<endl;
+    int hasEqual = 0;
     if(conditionToWork.find_first_of("=")>=0 && conditionToWork.find_first_of("=")<conditionToWork.length()){
         varToWork = conditionToWork.substr(0, conditionToWork.find_first_of("="));
         conditionToWork = conditionToWork.substr(conditionToWork.find_first_of("=")+1,conditionToWork.length());
+        hasEqual = 1;
         
     }
     if(conditionToWork.find_first_of("<")>=0 && conditionToWork.find_first_of("<")<conditionToWork.length()){
@@ -205,9 +265,15 @@ int ForNormalizationPhase::normalizeFor(ForStatement fS){
              << std::string(initVar) << logicOperation <<conditionToWork << " ; "
              << iterating.prettyprint()<<")"<<endl;
      string mathExpressiononIteratingVariable;
+     int hasChanges = 0;
      if(logicOperation.find_first_of(">")>=0 && logicOperation.find_first_of(">")<logicOperation.length()) {
+         cout<<"Finded > on ("<<logicOperation<<")"<<endl;
+         hasChanges = 1;
 //         cout<<"Inverse iterator"<<endl;
         mathExpressiononIteratingVariable= getSimplifiedMathExpression(iterating, std::string(initVar),1);
+        if(mathExpressiononIteratingVariable.compare("ERROR") == 0) {
+            mathExpressiononIteratingVariable= getExpressionOnLoop(fS.get_loop_body(), fS.get_scope_link(), std::string(initVar), 1);
+        }
         if(logicOperation.find_first_of("=")>=0 && logicOperation.find_first_of("=")<logicOperation.length()) {
            initValue << "+("<<mathExpressiononIteratingVariable<<")";
         } else {
@@ -219,24 +285,38 @@ int ForNormalizationPhase::normalizeFor(ForStatement fS){
         initValue = nullS;
         initValue << tempCondition;
      } else if(logicOperation.find_first_of("!")>=0 && logicOperation.find_first_of("!")<logicOperation.length()) {
+         hasChanges = 1;
+         cout<<"Finded ! on ("<<logicOperation<<")"<<endl;
          //cout<<"Uncertainty on iterator"<<endl;
-         mathExpressiononIteratingVariable= getSimplifiedMathExpression(iterating, std::string(initVar),2);  
-     } else {
+         mathExpressiononIteratingVariable= getSimplifiedMathExpression(iterating, std::string(initVar),2); 
+          if(mathExpressiononIteratingVariable.compare("ERROR") == 0) {
+            mathExpressiononIteratingVariable= getExpressionOnLoop(fS.get_loop_body(), fS.get_scope_link(), std::string(initVar), 2);
+        }
+     } else if (hasEqual){
+         hasChanges = 1;
+         cout<<"Finded == or <= on ("<<logicOperation<<")"<<endl;
          //cout<<"Keep iterator"<<endl;
         mathExpressiononIteratingVariable= getSimplifiedMathExpression(iterating, std::string(initVar),0);  
+         if(mathExpressiononIteratingVariable.compare("ERROR") == 0) {
+            mathExpressiononIteratingVariable= getExpressionOnLoop(fS.get_loop_body(), fS.get_scope_link(), std::string(initVar), 0);
+        }
         if(logicOperation.find_first_of("=")>=0 && logicOperation.find_first_of("=")<logicOperation.length()) {
             conditionToWork= conditionToWork +mathExpressiononIteratingVariable;
         }
      }
-     Source newForLoop;
-     newForLoop<<"for("<<std::string(initType)<<" "<<std::string(initVar)<<" = " <<std::string(initValue)<<" ; " 
-             << std::string(initVar) << " < " <<conditionToWork << " ; "
-             << std::string(initVar) << " = " << std::string(initVar) << mathExpressiononIteratingVariable<<")";
-     cout<<"Post: "<<std::string(newForLoop)<<endl;
-     newForLoop << "{" <<fS.get_loop_body()<<"}";
-     AST_t newForAST = newForLoop.parse_statement(fS.get_enclosing_statement().get_ast(),fS.get_scope_link());
-     cout<<"---------------------------------"<<endl;
-     fS.get_ast().replace(newForAST);
+     
+     if(hasChanges) {
+        Source newForLoop;
+        newForLoop<<"for("<<std::string(initType)<<" "<<std::string(initVar)<<" = " <<std::string(initValue)<<" ; " 
+                << std::string(initVar) << " < " <<conditionToWork << " ; "
+                << std::string(initVar) << " = " << std::string(initVar) << mathExpressiononIteratingVariable<<")";
+        cout<<"Post: "<<std::string(newForLoop)<<endl;
+        newForLoop << "{" <<fS.get_loop_body()<<"}";
+        AST_t newForAST = newForLoop.parse_statement(fS.get_enclosing_statement().get_ast(),fS.get_scope_link());
+        cout<<"---------------------------------"<<endl;
+        fS.get_ast().replace(newForAST);
+     }
+//     cin.get();
 //    cout<<std::string(initType)
 //            <<" "<<std::string(initVar)
 //            <<" ("<<std::string(initValue)

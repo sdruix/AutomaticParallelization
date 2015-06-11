@@ -25,12 +25,12 @@ AddTracesOnForPhase::AddTracesOnForPhase() : PragmaCustomCompilerPhase("omp") {
     _groupInside = 0;
     _numLoop = 0;
 
-    register_construct("acpa");
+    register_construct("analyze_access_pattern");
     register_directive("var");
     register_directive("iter");
     //register_directive("iter");
 
-    on_directive_post["acpa"].connect(functor(&AddTracesOnForPhase::pragma_postorder, *this));
+    on_directive_post["analyze_access_pattern"].connect(functor(&AddTracesOnForPhase::pragma_postorder, *this));
     //on_directive_post["check"].connect(functor(&AddTracesOnForPhase::pragma_postorder, *this));
     
     
@@ -44,6 +44,23 @@ void AddTracesOnForPhase::run(DTO& dto) {
     //_translation_unit = dto["translation_unit"];
     _scope_link = dto["scope_link"];  
     PragmaCustomCompilerPhase::run(dto);  
+    Symbol main = _scope_link.get_scope(_translation_unit).get_symbol_from_name("main");
+    if(main.is_valid()) {
+//        cout<<"main found"<<endl;
+        FunctionDefinition mainD(main.get_point_of_declaration(),_scope_link);
+        AST_t mainAST;
+        mainAST = mainD.get_function_body().get_ast();
+        TraverseASTFunctor4LocateUse expr_traverse(mainD.get_scope_link());
+        ObjectList<AST_t> expr_list = mainAST.depth_subtrees(expr_traverse);
+        Source flush;
+        flush<<"mem_trace_flush();\n";
+        if(expr_list[expr_list.size()-1].prettyprint().find("return ")>=0 
+                && expr_list[expr_list.size()-1].prettyprint().find("return ")<expr_list[expr_list.size()-1].prettyprint().length()) {
+            expr_list[expr_list.size()-1].prepend(flush.parse_statement(mainD.get_scope(),mainD.get_scope_link()));
+        } else {
+            expr_list[expr_list.size()-1].append(flush.parse_statement(mainD.get_scope(),mainD.get_scope_link()));
+        }
+    }
 }
 
 
@@ -59,7 +76,7 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
     Scope globalScope = function_def.get_scope();
     cout<<"OMP("<<pragmaInstruction<<" in: "<<function_sym.get_name()<<") ->" <<construct.get_ast().get_line()<<endl;
     if (!block_clause.is_defined()) {
-    _numLoop++;
+//    _numLoop++;
     
 //    cin.get();
     int block_line = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), construct.get_ast(),0,0,1);
@@ -189,8 +206,8 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             
                             
                         } else {
-                            cerr<<"Error determining size of Dynamic Variable: "<<name<<endl;
-                            exit(-1);
+                            cerr<<"Warning could not determine size of var: "<<name<< ". Not array, dynamic or unidentified scope (considering 1) "<<endl;
+                            cin.get();
                         }
                     }
                     //cout<< "FS1: -"<<declaration<<"-"<<endl;
@@ -218,6 +235,7 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
 //    cout<< construct.get_ast()<<endl;
 //    cout<<construct.get_statement().get_ast().prettyprint()<<endl;
 //    cin.get();
+     
      construct.get_ast().replace(construct.get_statement().get_ast());
 //    cout<< construct.get_ast()<<endl;
 //    cout<<"HI"<<endl;
@@ -255,9 +273,9 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
         string principalIt = iter_arguments[y].prettyprint();
         if(!putIteratedVarsOfInterest(principalIt, construct.get_ast(), functionScopeLink)) {
             Source newBodySource;
-                newBodySource << "mem_trace_iter_start(\"loop"<<_numLoop<<"\", \""<<principalIt<<"\", "<<principalIt<<");"
+                newBodySource << "mem_trace_iter_start(\""<<principalIt<<"\", "<<principalIt<<");"
                         << construct.get_ast().prettyprint()
-                        << "mem_trace_iter_end(\"loop"<<_numLoop<<"\", \""<<principalIt<<"\", "<<principalIt<<");";
+                        << "mem_trace_iter_end(\""<<principalIt<<"\", "<<principalIt<<");";
             construct.get_ast().replace(newBodySource.parse_statement(functionScope,functionScopeLink));
         }
     }
@@ -298,6 +316,10 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
 //                cout<<translation_unit.prettyprint()<<endl;
                 _groupInside = 0;
     }
+//     Source constructAST;
+//    constructAST <<"mem_trace_loop_start(\"loop"<<_numLoop<<"\");\n"<<construct.get_ast().prettyprint()<<"mem_trace_loop_end(\"loop"<<_numLoop<<"\");\n";
+//    
+//     construct.get_ast().replace(constructAST.parse_statement(functionScope,functionScopeLink));
 }
 
 int AddTracesOnForPhase::putIteratedVarsOfInterest(string principalIt,  AST_t astWhereSearch, ScopeLink scopeL) {
@@ -312,12 +334,19 @@ int AddTracesOnForPhase::putIteratedVarsOfInterest(string principalIt,  AST_t as
             ForStatement fS(expr_listBucle[lF],scopeL);
             inductionVar = fS.get_induction_variable().prettyprint();
             if(inductionVar.compare(principalIt) == 0) {
-                Source newBodySource;
-                newBodySource << "{mem_trace_iter_start(\"loop"<<_numLoop<<"\", \""<<principalIt<<"\", "<<principalIt<<");"
+                Source newBodySource,newloopAST;
+                newBodySource << "{mem_trace_iter_start( \""<<principalIt<<"\", "<<principalIt<<");"
                         << fS.get_loop_body().get_ast().prettyprint()
-                        << "mem_trace_iter_end(\"loop"<<_numLoop<<"\", \""<<principalIt<<"\", "<<principalIt<<");}";
+                        << "mem_trace_iter_end( \""<<principalIt<<"\", "<<principalIt<<");}";
                 fS.get_loop_body().get_ast().replace(newBodySource.parse_statement(astWhereSearch,scopeL));
+               
+                newloopAST<<"mem_trace_loop_start(\"loop"<<_numLoop<<"\");\n"
+                        <<fS.prettyprint()<<"\n"
+                        <<"mem_trace_loop_end(\"loop"<<_numLoop<<"\");\n";
+                 cout<<std::string(newloopAST)<<endl;
+                fS.get_ast().replace_with(newloopAST.parse_statement(astWhereSearch,scopeL));
                 finded = 1;
+                _numLoop++;
             } else if(putIteratedVarsOfInterest(principalIt, fS.get_loop_body().get_ast(), scopeL)) {
                         return 1;
             }

@@ -24,32 +24,40 @@ int _firstExecuted;
 
 class Timer {
     timeval timer[2];
-
+    
 public:
-
+    
     timeval start() {
         gettimeofday(&this->timer[0], NULL);
         return this->timer[0];
     }
-
+    
     timeval stop() {
         gettimeofday(&this->timer[1], NULL);
         return this->timer[1];
     }
-
+    
     int duration() const {
         int secs(this->timer[1].tv_sec - this->timer[0].tv_sec);
         int usecs(this->timer[1].tv_usec - this->timer[0].tv_usec);
-
+        
         if (usecs < 0) {
             --secs;
             usecs += 1000000;
         }
-
+        
         return static_cast<int> (secs * 1000 + usecs / 1000.0 + 0.5);
     }
 };
 
+string replaceAll(std::string str, const std::string& from, const std::string& to) {
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
+    }
+    return str;
+}
 void createFolders(string codesFolder, string logFolder, string execFolder) {
     std::stringstream createCodesFolder, createExecFolder, createLogFolder, cleanCodesFolder, cleanExecutablesFolder;
     createCodesFolder << "mkdir " << codesFolder << " > /dev/null";
@@ -67,13 +75,13 @@ void createFolders(string codesFolder, string logFolder, string execFolder) {
 }
 
 void testFile(string filename, string logFolder, int extKind, int step, string logFilename, int energy, int folderTest, int numProcsMin, int numMax, int withNOOMP, string name) {
-
+    
     std::stringstream checkFile2trans, checkFile2transMP, timeFilePath, logPath;
     Timer tm;
     ofstream csvOut;
     logPath << logFolder << "/";
     timeFilePath << logPath.str() << logFilename;
-
+    
     if (!step && folderTest == 1) {
         csvOut.open(timeFilePath.str().c_str(), ios::trunc);
         if (energy)
@@ -83,9 +91,9 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
     } else {
         csvOut.open(timeFilePath.str().c_str(), ios::app);
     }
-
+    
     system("clear");
-
+    
     if (!step) {
         cout << "---------------------------Compiling original file without transforms---------------------------\n";
     } else {
@@ -93,8 +101,8 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
     }
     std::stringstream filename_justOMP, filename_withoutOMP;
     int check;
-
-
+    
+    
     ifstream origFile(filename.c_str());
     std::string lineF;
     std::ofstream ompFile, noOmpFile;
@@ -110,7 +118,7 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
         filename_justOMP << shortName << "OMP.cpp";
         filename_withoutOMP << shortName << "noOMP.cpp";
     }
-
+    
     std::cout << "Generated File OpenMP: " << filename_justOMP.str() << std::endl;
     ompFile.open(filename_justOMP.str().c_str(), std::ios::trunc);
     noOmpFile.open(filename_withoutOMP.str().c_str(), std::ios::trunc);
@@ -136,7 +144,7 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
     ompFile.close();
     noOmpFile.close();
     origFile.close();
-
+    
     if (!step) {
         std::cout << "With OpenMP...\n";
         if (extKind) {
@@ -178,11 +186,11 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
         int thread_qty = std::max(atoi(std::getenv("OMP_NUM_THREADS")), 1);
         if (thread_qty != i) {
             cerr << "ERROR: threads not set to: " << i << " actThreads = " << thread_qty << endl;
-
+            
         } else {
             cout << "Num threads correctly set to: " << i << endl;
         }
-
+        
         if (!step) {
             if (i == numProcsMin && withNOOMP)
                 csvOut << filename << " Orig without OpenMP;1;";
@@ -204,11 +212,11 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
                 } else {
                     cout << "execution OK\n";
                 }
-
+                
                 csvOut << tm.duration() << ";";
-
-
-
+                
+                
+                
                 if (energy) {
                     std::cout << "Measuring ENERGY..." << std::endl;
                     double numexec = (10000 / tm.duration())*10;
@@ -250,8 +258,8 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
                 std::cout << "DOne" << std::endl;
             }
         }
-
-
+        
+        
         if (!step) {
             cout << "With OpenMP..." << endl;
             csvOut << filename << " with OpenMP;" << i << ";";
@@ -266,9 +274,9 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
             } else {
                 cout << "execution OK\n";
             }
-
+            
             csvOut << tm.duration() << ";";
-
+            
             if (energy) {
                 std::cout << "Measuring energy..." << std::endl;
                 double numexec = (10000 / tm.duration())*10;
@@ -310,14 +318,14 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
         }
         csvOut.close();
     }
-
+    
     //    cout<<"OMP: "<<filename_justOMP.str()<<endl;
     //    cout<<"noOMP: "<<filename_withoutOMP.str()<<endl;
     //    cin.get();
     stringstream rmOMPfile;
     rmOMPfile << " rm " << filename_justOMP.str() << endl;
     system(rmOMPfile.str().c_str());
-
+    
     //    stringstream rmNoOMPfile;
     //    rmNoOMPfile <<" rm "<< filename_withoutOMP.str()<<endl;
     //    system(rmNoOMPfile.str().c_str());
@@ -330,7 +338,7 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
     //        system(rmExecNoOMP.str().c_str());
     //        rmExecNoOMP << "rm ./noMP.out";
     //     }
-
+    
 }
 
 std::string getFileExtension(const std::string& FileName) {
@@ -352,7 +360,7 @@ string cleanWhiteSpaces(string toClean) {
 }
 
 void doPause() {
-
+    
     cin.get(); //pausa
     cout << "Press Key to Continue...\n";
 }
@@ -365,7 +373,7 @@ int getdir(string dir, vector<string> &files, int withSubDir) {
         cout << "Error(" << errno << ") opening " << dir << endl;
         return errno;
     }
-
+    
     while ((dirp = readdir(dp)) != NULL) {
         string fileName = dir + "/" + string(dirp->d_name);
         if (string(dirp->d_name).compare(".") != 0
@@ -385,19 +393,19 @@ int getdir(string dir, vector<string> &files, int withSubDir) {
         }
     }
     closedir(dp);
-
+    
     return 0;
 }
 
 void compile(vector<string> files, string cP, string codesDir, string execDir, int pause, int verbose) {
     ofstream compFile;
     int numFiles = 0;
-
+    
     for (int i = 0; i < (signed)files.size(); i++) {
         if (files[i].length() > 4) {
             string extension = files[i].substr(files[i].length() - 4, files[i].length());
             if (extension == ".cpp") {
-
+                
                 if (numFiles > 0) {
                     compFile.open(cP.c_str(), ios::app);
                 } else {
@@ -430,11 +438,11 @@ void compile(vector<string> files, string cP, string codesDir, string execDir, i
                             << files[i] << "\n";
                     system(complilationCommandV.str().c_str());
                 }
-
+                
             }
             extension = files[i].substr(files[i].length() - 2, files[i].length());
             if (extension == ".c") {
-
+                
                 if (numFiles > 0) {
                     compFile.open(cP.c_str(), ios::app);
                 } else {
@@ -465,12 +473,12 @@ void compile(vector<string> files, string cP, string codesDir, string execDir, i
                             << "/" << name << ".out " << files[i] << "\n";
                     system(complilationCommandV.str().c_str());
                 }
-
-
+                
+                
             }
             numFiles++;
         }
-
+        
     }
     if (numFiles <= 0) {
         cerr << "------------------------------------------------\n";
@@ -478,7 +486,7 @@ void compile(vector<string> files, string cP, string codesDir, string execDir, i
         cerr << "------------------------------------------------\n";
         exit(-1);
     }
-
+    
 }
 
 void execute(vector<string> files, string csvP, string errP, string codesDir, string execDir, int rep, int tries, int pause, int energy, int numProcs, string executeInstrucction) {
@@ -486,23 +494,23 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
     int numFiles = 0;
     Timer tm;
     ofstream csvOut, execErrorsFile;
-
-
+    
+    
     ifstream inFile(csvP.c_str());
     string line;
     std::stringstream cpuTimes;
-
-
+    
+    
     int n = std::count(std::istreambuf_iterator<char>(inFile), std::istreambuf_iterator<char>(), '\n') + 1;
     ifstream inFile2(csvP.c_str());
     string legend = "Version/Measure";
     cout << "Analizing log file..." << endl;
     if (n > 1) {
         for (int nL = 0; nL < n; ++nL) {
-
+            
             getline(inFile2, line);
             // cout<<line<<endl;
-
+            
             istringstream linestream(line);
             string item;
             getline(linestream, item, ';');
@@ -534,22 +542,22 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
         csvOut.close();
         _firstExecuted = 0;
     }
-
+    
     double cpu_time_used;
-
+    
     for (unsigned int i = 0; i < files.size(); i++) {
-
+        
         if (files[i].length() > 4) {
             string extension = files[i].substr(files[i].length() - 4, files[i].length());
             if (extension == ".out") {
-
+                
                 numFiles++;
                 csvOut.open(csvP.c_str(), ios::app);
-
+                
                 execErrorsFile.open(errP.c_str(), ios::app);
-
+                
                 cout << "------------------------------------------------\n";
-                cout << "Executing (" << codesDir << ") " << files[i] << endl;
+                cout << "Executing (" << codesDir << ") " << files[i] <<" and " <<numProcs<<" process"<< endl;
                 csvOut << files[i]
                         << ";";
                 //Create signature
@@ -563,7 +571,7 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
                 executeCommand << executeInstrucction << " -np " << numProcs << " " << files[i] << " --run  >> " << errP;
                 executeErrorsCommand << executeInstrucction << " -np " << numProcs << " " << files[i] << " --run  2>> " << errP;
                 cpu_time_used = 0;
-
+                
                 int failed = 0, totalFail = 0;
                 for (int it = 0; it < rep; ++it) {
                     cout << "*Repetition(Time): " << it + 1 << "*\n" << endl;
@@ -582,7 +590,7 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
                             cerr << "------------------------------------------------\n";
                         }
                         tm.stop();
-
+                        
                         if (tm.duration() < minimumTime) {
                             minimumTime = (double) tm.duration();
                         }
@@ -597,7 +605,7 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
                     }
                     failed = 0;
                 }
-
+                
                 execErrorsFile.open(errP.c_str(), ios::app);
                 execErrorsFile << system(executeErrorsCommand.str().c_str());
                 execErrorsFile.close();
@@ -635,9 +643,9 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
                             //                    cerr << "------------------------------------------------\n";
                         }
                         cout << "------------------------------------------------\n";
-
+                        
                         ifstream auxCsv("temp.txt");
-
+                        
                         getline(auxCsv, line);
                         getline(auxCsv, line);
                         istringstream linestream(line);
@@ -650,7 +658,7 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
                         getline(linestream1, item1, ':');
                         getline(linestream1, item1, ':');
                         item1 = item1.substr(0, item1.find(" J"));
-
+                        
                         totalE += atoi(item1.c_str());
                         cout << "E: " << atoi(item1.c_str()) << endl;
                     }
@@ -660,7 +668,7 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
                     //cin.get();
                     //csvOut.open(csvP.c_str(), ios::app);
                     csvOut << energyString.str().c_str() << ";";
-
+                    
                 }
                 csvOut << "\n";
                 csvOut.close();
@@ -672,13 +680,13 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
         cerr << "No *.out files in folder: " << codesDir << "/" << execDir << "\n" << endl;
         cerr << "------------------------------------------------\n";
     }
-
-
+    
+    
 }
-void normalizeLoopsFunction(string tempName, int extKind, string firstLine, vector<string> includeVector) {
-//    cout<<"Normalizing For loops"<<endl;
+void normalizeLoopsFunction(string tempName, int extKind, string firstLine, string firstLineAlternative, vector<string> includeVector) {
+    //    cout<<"Normalizing For loops"<<endl;
     string normTempName = "normalized"+ tempName;
-//    cin.get();
+    //    cin.get();
     std::stringstream loopNormCommand, commandK;
     if(extKind) {
         commandK << "forNormalization-phasec++";
@@ -700,33 +708,33 @@ void normalizeLoopsFunction(string tempName, int extKind, string firstLine, vect
     int lines = 0;
     string line;
     while (getline(postprocessFile, line)) {
-        if (line.find(firstLine) == 0 || found) {
+        if (line.find(firstLine) == 0 || line.find(firstLineAlternative) == 0 || found) {
             includeVector.push_back(line);
             found = 1;
             lines++;
             //cout<< line<<endl;
         }
-
+        
     }
     postprocessFile.close();
-
-
+    
+    
     ofstream transFile;
     transFile.open(tempName, ios::trunc);
-
+    
     for (unsigned int incN = 0; incN < includeVector.size(); ++incN) {
         transFile << includeVector[incN] << "\n";
         lines++;
     }
     transFile.close();
-//    cin.get();
+    //    cin.get();
 }
 inline bool exists(const std::string& name) {
     return ( access(name.c_str(), F_OK) != -1);
 }
 
 int main(int argc, char *argv[]) {
-
+    
     int rep = 1, tries = 1, checkOri = 0, energy = 0, verbose = 0, pause = 0, toDo = 3, numProcsMin = 2, numProcsMax = 2, withSubdir = 0, scalability = 0;
     string filename, execFolder, codesFolder, logFolder, logFilename, fileFolder, executeCommand;
     vector<string> filesToTransform = vector<string > ();
@@ -743,8 +751,9 @@ int main(int argc, char *argv[]) {
     int normalizeLoops = 0;
     int numDivisions = -1;
     int partSize = -1;
+    int startDivisionValue = 1, endDivisionValue = -1;
     
-    while ((nextOption = getopt(argc, argv, "r:t:f:F:c:e:n:N:l:E:oOhHivL:xp01234wszd:D:")) != -1) {
+    while ((nextOption = getopt(argc, argv, "r:t:f:F:c:e:n:N:l:E:oOhHivL:xp01234wszd:D:q:Q:")) != -1) {
         switch (nextOption) {
             case 'r':
                 rep = atoi(optarg);
@@ -830,6 +839,12 @@ int main(int argc, char *argv[]) {
             case 'D':
                 partSize = atoi(optarg);
                 break;
+            case 'q':
+                startDivisionValue = atoi(optarg);
+                break;
+            case 'Q':
+                endDivisionValue = atoi(optarg);
+                break;
                 
             case 'H':
             case 'h':
@@ -893,13 +908,13 @@ int main(int argc, char *argv[]) {
                         " -v --verbose St0 Verbose MPI compilation errors(on/off)\n"
                         " -[h|H] --help Display this usage information. \n" << endl;
                 exit(0);
-
+                
         }
-
+        
     }
     if (toDo == 0 || toDo == 3)
         createFolders(codesFolder, logFolder, execFolder);
-
+    
     if (fileFolder.compare("") != 0) {
         cout << "Getting Folder: " << fileFolder << endl;
         getdir(fileFolder, filesToTransform, withSubdir);
@@ -912,24 +927,24 @@ int main(int argc, char *argv[]) {
         }
         filesToTransform.push_back(filename);
     }
-
+    
     string logFilenameBack = logFilename;
     for (unsigned int numF = 0; numF < filesToTransform.size(); ++numF) {
-
+        
         filename = filesToTransform[numF];
-
+        
         if (!exists(filename.c_str())) {
             cerr << "The filename specified does not exist" << endl;
             exit(-1);
         }
-
+        
         string name;
         int error = 0;
         if (filename.find_last_of("/") >= 0 && filename.find_last_of("/") < filename.length())
             name = filename.substr(filename.find_last_of("/"), filename.length());
         else
             name = filename;
-
+        
         int extKind = 0;
         string extension = getFileExtension(filename);
         if (extension.compare("c") == 0) {
@@ -943,13 +958,13 @@ int main(int argc, char *argv[]) {
             //  cout << "Just allowed .c and .cpp files\n";
             error = 1;
         }
-
+        
         if (!error) {
             stringstream tempLogName;
             tempLogName << name << "-" << logFilenameBack;
             logFilename = tempLogName.str();
             cout << "Starting transformation of file: " << filename << endl;
-            string line, firstLine;
+            string line, firstLine, firstLineAlternative;
             ifstream preprocessFile(filename);
             int found = 0;
             string includeS = "#include";
@@ -957,9 +972,9 @@ int main(int argc, char *argv[]) {
             includeVector.push_back("#include <mpi.h>");
             includeVector.push_back("#include <stdlib.h>");
             while (getline(preprocessFile, line) && !found) {
-
+                
                 // line = cleanWhiteSpaces(line);
-
+                
                 string subline = line.substr(0, includeS.length());
                 string subsubline = line.substr(0, 2);
                 string firstChar = line.substr(0, 1);
@@ -971,7 +986,7 @@ int main(int argc, char *argv[]) {
                         //cout<<"Not found in "<< line <<" ("<<line.find_first_of("mpi.h")<<")"<< endl;
                     }
                 }
-
+                
                 if (subline.compare(includeS) != 0 && line.compare("") != 0
                         && subsubline.compare("//") != 0
                         && subsubline.compare("/*") != 0
@@ -979,10 +994,15 @@ int main(int argc, char *argv[]) {
                     if (line.find_first_of("[") >= 0 && line.find_first_of("[") < line.size())
                         line = line.substr(0, line.find_first_of("[") + 1);
                     firstLine = line;
+//                    cout<<"1: "<<firstLine.substr(0,firstLine.find_first_of(" ")+1)<<endl;
+//                    cout<<"2: "<<replaceAll(firstLine.substr(firstLine.find_first_of(" "),firstLine.length())," ","")<<endl;
+                    firstLineAlternative = firstLine.substr(0,firstLine.find_first_of(" ")+1) + replaceAll(firstLine.substr(firstLine.find_first_of(" "),firstLine.length())," ","");
+//                    cout<<firstLine<<endl;
+//                    cin.get();
                     found = 1;
                 }
             }
-
+            
             preprocessFile.close();
             std::stringstream mergeToAddMPI, deleteTempFile, createTempFile;
             string tempName;
@@ -991,13 +1011,13 @@ int main(int argc, char *argv[]) {
             else
                 tempName = "temp.c";
             createTempFile << "echo \"#include <mpi.h>\" >" << tempName;
-
+            
             system(createTempFile.str().c_str());
-
-
-
+            
+            
+            
             int check;
-
+            
             mergeToAddMPI << "cat " << filename << " >> " << tempName;
             check = system(mergeToAddMPI.str().c_str());
             if (!(check == 0 || check == 256)) {
@@ -1005,128 +1025,173 @@ int main(int argc, char *argv[]) {
                 exit(-1);
                 cerr << "------------------------------------------------\n";
             }
-           
+            
             if (checkOri && toDo != 0 && toDo != 1) {
                 if (scalability)
                     testFile(filename, logFolder, extKind, 0, logFilename, energy, 1, numProcsMin, numProcsMax, withNOOMP, name);
                 else
                     testFile(filename, logFolder, extKind, 0, logFilename, energy, 1, numProcsMax, numProcsMax, withNOOMP, name);
             }
-
-            ofstream divFile;
-            divFile.open("div.data", ios::trunc);
-            if(numDivisions>0) {
-                divFile << numDivisions << "\n";
-            } else {
-                divFile << "1\n";
+            std::stringstream  nameOUT, commandOUT, loopNormCommand;
+            int end = endDivisionValue>1 ? endDivisionValue : 1;
+            if((toDo == 0 || toDo == 3) && normalizeLoops) {
+                normalizeLoopsFunction(tempName, extKind, firstLine, firstLineAlternative, includeVector);
             }
-            if(partSize > 0) {
-                divFile << partSize;
-            }
-            divFile.close();
-            std::stringstream nameF, nameOUT, commandOUT, loopNormCommand;
-            if (extKind) {
-                nameOUT << codesFolder << "/" << name << ".cpp";
-                if((toDo == 0 || toDo == 3) && normalizeLoops) {
-                    normalizeLoopsFunction(tempName, extKind, firstLine, includeVector);
+            vector<string> initialincludeVector = includeVector;
+            
+            for(int dV = startDivisionValue;dV<=end;dV*=2) {
+                if(partSize > 0) {
+                    cout<<"Fixed problem division to "<<partSize<<endl;
+                } else if(endDivisionValue!=1) {
+                    cout<<"Dividing partSize by "<<dV<<endl;
+                }
+//                cin.get();
+                ofstream divFile;
+                divFile.open("div.data", ios::trunc);
+                if(numDivisions>0) {
+                    divFile << numDivisions << "\n";
+                } else {
+                    if(endDivisionValue==1)
+                        divFile << "1\n";
+                    else 
+                        divFile << dV<<"\n";
+                }
+                if(partSize > 0) {
+                    divFile << partSize;
                 }
                 
-                commandOUT << "trans-phasec++ -y " << tempName << " -o " << nameOUT.str() << "  -I/usr/lib/openmpi/include/ " << std::endl;
-            } else {
-                nameOUT << codesFolder << "/" << name << ".c";
-                if((toDo != 0 || toDo != 3) && normalizeLoops) {
-                    normalizeLoopsFunction(tempName, extKind, firstLine, includeVector);
+                divFile.close();
+                std::stringstream hola;
+                nameOUT.str("");
+                commandOUT.str("");
+                loopNormCommand.str("");
+                if (extKind) {
+                    nameOUT << codesFolder << "/" << name <<"-"<< dV<<".cpp";
+                    cout<<nameOUT.str()<<endl;
+                    commandOUT << "trans-phasec++ -y " << tempName << " -o " << nameOUT.str() << "  -I/usr/lib/openmpi/include/ " << std::endl;
+                } else {
+                    nameOUT << codesFolder << "/" << name <<"-"<< dV<< ".c";
+                    cout<<nameOUT.str()<<endl;
+                    commandOUT << "trans-phasecc -y " << tempName << " -o " << nameOUT.str() << " -std=c99 -I/usr/lib/openmpi/include/ " << std::endl;
                 }
-                commandOUT << "trans-phasecc -y " << tempName << " -o " << nameOUT.str() << " -std=c99 -I/usr/lib/openmpi/include/ " << std::endl;
+//                cin.get();
+                if (toDo == 0 || toDo == 3) {
+                    
+                    
+                    
+                    cout << commandOUT.str() << endl;
+                    commandOUT << " > /dev/null";
+                    //std::cin.get();
+                    check = system(commandOUT.str().c_str());
+                    if (!(check == 0 || check == 256)) {
+                        cerr << "Error using command: " << commandOUT.str().c_str() << "\n";
+                        exit(-1);
+                        cerr << "------------------------------------------------\n";
+                    }
+                    cout << "------------------------------------------------\n";
+                    
+                    ifstream postprocessFile(nameOUT.str());
+                    found = 0;
+//                    cout <<"FL: "<< firstLine << endl;
+//                    cin.get();
+                    int lines = 0;
+                    includeVector = initialincludeVector;
+                    while (getline(postprocessFile, line)) {
+                        if (line.find(firstLine) == 0 || line.find(firstLineAlternative) == 0 || found) {
+                            includeVector.push_back(line);
+                            found = 1;
+                            lines++;
+                            cout<< line<<endl;
+                        }
+                        
+                    }
+                    postprocessFile.close();
+                    
+                    
+                    //                deleteTempFile << " rm "<<tempName.c_str();
+                    //                check = system(deleteTempFile.str().c_str());
+                    //                if (!(check == 0 || check == 256)) {
+                    //                    cerr << "Error using command: " << deleteTempFile.str().c_str() << "\n";
+                    //                    exit(-1);
+                    //                    cerr << "------------------------------------------------\n";
+                    //                }
+                    if(found) {
+                        ofstream transFile;
+                        transFile.open(nameOUT.str(), ios::trunc);
+
+                        for (unsigned int incN = 0; incN < includeVector.size(); ++incN) {
+                            transFile << includeVector[incN] << "\n";
+                            lines++;
+                        }
+                        transFile.close();
+                        if (lines == 0) {
+                            stringstream rmFile;
+                            rmFile << "rm " << nameOUT.str();
+                            system(rmFile.str().c_str());
+                        }
+                    } else {
+                        cerr<<"Input file includes could not be compressed again after transformation, please substitute the expansion on these on"
+                                "the generated output file before execution.";
+                        cin.get();
+                               
+                    }
+                    
+                }
+                
             }
             if (toDo == 0 || toDo == 3) {
-
-
-
-                cout << commandOUT.str() << endl;
-                commandOUT << " > /dev/null";
-                //std::cin.get();
-                check = system(commandOUT.str().c_str());
-                if (!(check == 0 || check == 256)) {
-                    cerr << "Error using command: " << commandOUT.str().c_str() << "\n";
-                    exit(-1);
-                    cerr << "------------------------------------------------\n";
-                }
-                cout << "------------------------------------------------\n";
-
-                ifstream postprocessFile(nameOUT.str());
-                found = 0;
-                //cout <<"FL: "<< firstLine << endl;
-                //cin.get();
-                int lines = 0;
-                while (getline(postprocessFile, line)) {
-                    if (line.find(firstLine) == 0 || found) {
-                        includeVector.push_back(line);
-                        found = 1;
-                        lines++;
-                        //cout<< line<<endl;
-                    }
-
-                }
-                postprocessFile.close();
-
-
-                //                deleteTempFile << " rm "<<tempName.c_str();
-                //                check = system(deleteTempFile.str().c_str());
-                //                if (!(check == 0 || check == 256)) {
-                //                    cerr << "Error using command: " << deleteTempFile.str().c_str() << "\n";
-                //                    exit(-1);
-                //                    cerr << "------------------------------------------------\n";
-                //                }
-                ofstream transFile;
-                transFile.open(nameOUT.str(), ios::trunc);
-
-                for (unsigned int incN = 0; incN < includeVector.size(); ++incN) {
-                    transFile << includeVector[incN] << "\n";
-                    lines++;
-                }
-                transFile.close();
-                if (lines == 0) {
-                    stringstream rmFile;
-                    rmFile << "rm " << nameOUT.str();
-                    system(rmFile.str().c_str());
-                }
-
+                cout<<"Generated Transformed files of input file: "<<filename<<endl;
+//                cin.get();
             }
             vector<string> files = vector<string > ();
+            std::stringstream compFilePath;
+            compFilePath << logFolder << "/compilation.txt";
+            string cP = compFilePath.str();
             if (toDo == 1 || toDo == 3 || toDo == 4) {
-                std::stringstream compFilePath;
                 //getdir(codesFolder, files, 0);
-                if (exists(nameOUT.str().c_str())) {
-                    files.push_back(nameOUT.str());
-                    compFilePath << logFolder << "/compilation.txt";
-                    string cP = compFilePath.str();
-
-                    compile(files, cP, codesFolder, execFolder, pause, verbose);
+                for(int dV = startDivisionValue;dV<=end;dV*=2) {
+                    nameOUT.str("");
+                    if (extKind) {
+                        nameOUT << codesFolder << "/" << name <<"-"<< dV<<".cpp";
+                    }else {
+                        nameOUT << codesFolder << "/" << name <<"-"<< dV<<".c";
+                    }
+                    if (exists(nameOUT.str().c_str())) {
+                        files.push_back(nameOUT.str());
+                    } else {
+                        cout<<"Error not found: "<<nameOUT.str()<<endl;
+                    }
                 }
+                compile(files, cP, codesFolder, execFolder, pause, verbose);
             }
+            
             files.clear();
             if (toDo == 2 || toDo == 3 || toDo == 4) {
                 std::stringstream csvFilePath, execErrorsPath, execF;
                 execF << codesFolder << "/" << execFolder;
                 //getdir(execF.str().c_str(), files, 0);
-                stringstream nameExec;
-                nameExec << codesFolder << "/" << execFolder << "/" << name << ".out";
-                //                cout<< nameExec.str()<<endl;
-                //                cin.get();
-                if (exists(nameExec.str().c_str())) {
-                    files.push_back(nameExec.str());
-                    csvFilePath << logFolder << "/" << logFilename;
-                    execErrorsPath << logFolder << "/" << name << "-execErrors.txt";
+                for(int dV = startDivisionValue;dV<=end;dV*=2) {
+                    stringstream nameExec;
+                    nameExec << codesFolder << "/" << execFolder << "/" << name<<"-"<< dV << ".out";
+//                    cout<< nameExec.str()<<endl;
+                    
+                    if (exists(nameExec.str().c_str())) {
+                        files.push_back(nameExec.str());
+                        if(dV == startDivisionValue)
+                        csvFilePath << logFolder << "/" << logFilename;
+                        execErrorsPath.str("");
+                        execErrorsPath << logFolder << "/" << name<<"-"<< dV  << "-execErrors.txt";
 
-                    string csvFP = csvFilePath.str();
-                    string errP = execErrorsPath.str();
-                    _firstExecuted = 1;
-                    for (int n = numProcsMin; n <= numProcsMax; n *= 2) {
-                        cout << "Executing using " << n << " processors" << endl;
-                        execute(files, csvFP, errP, codesFolder, execFolder, rep, tries, pause, energy, n, executeCommand);
+                        string csvFP = csvFilePath.str();
+                        string errP = execErrorsPath.str();
+                        _firstExecuted = 1;
+                        for (int n = numProcsMin; n <= numProcsMax; n *= 2) {
+                            cout << "Executing using " << n << " processors" << endl;
+                            execute(files, csvFP, errP, codesFolder, execFolder, rep, tries, pause, energy, n, executeCommand);
+                        }
+                        files.clear();
                     }
-
+//                    cin.get();
                 }
             }
             files.clear();
@@ -1139,11 +1204,11 @@ int main(int argc, char *argv[]) {
             //            system(rmExec.str().c_str());
             //cin.get();
         }
-
-
+        
+        
     }
-
-
+    
+    
     return 0;
 }
 

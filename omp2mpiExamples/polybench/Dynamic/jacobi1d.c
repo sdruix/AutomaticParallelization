@@ -3,10 +3,10 @@
 #include <sys/time.h>
 /* Default problem size. */
 #ifndef TSTEPS
-# define TSTEPS 50//100//25
+# define TSTEPS 100//100//25
 #endif
 #ifndef Y
-# define Y 4096//4000//1000
+# define Y 8192//4000//1000
 #endif
 
 

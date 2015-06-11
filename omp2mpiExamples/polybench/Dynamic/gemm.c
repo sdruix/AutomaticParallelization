@@ -4,13 +4,13 @@
 
 /* Default problem size. */
 #ifndef NI
-# define NI 4096//4096
+# define NI 4096
 #endif
 #ifndef NJ
-# define NJ 4096//4096
+# define NJ 4096
 #endif
 #ifndef NK
-# define NK 4096//4096
+# define NK 4096
 #endif
 
 
