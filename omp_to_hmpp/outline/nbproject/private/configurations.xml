@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="90">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <df root="." name="0">
+      <in>outline_phase.cpp</in>
+      <in>outline_phase.hpp</in>
+    </df>
+  </logicalFolder>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <developmentServer>localhost</developmentServer>
+        <platform>2</platform>
+      </toolsSet>
+      <compile>
+        <compiledirpicklist>
+          <compiledirpicklistitem>.</compiledirpicklistitem>
+          <compiledirpicklistitem>${AUTO_FOLDER}</compiledirpicklistitem>
+        </compiledirpicklist>
+        <compiledir>${AUTO_FOLDER}</compiledir>
+        <compilecommandpicklist>
+          <compilecommandpicklistitem>${MAKE} ${ITEM_NAME}.o</compilecommandpicklistitem>
+          <compilecommandpicklistitem>${AUTO_COMPILE}</compilecommandpicklistitem>
+        </compilecommandpicklist>
+        <compilecommand>${AUTO_COMPILE}</compilecommand>
+      </compile>
+      <dbx_gdbdebugger version="1">
+        <gdb_pathmaps>
+        </gdb_pathmaps>
+        <gdb_interceptlist>
+          <gdbinterceptoptions gdb_all="false" gdb_unhandled="true" gdb_unexpected="true"/>
+        </gdb_interceptlist>
+        <gdb_options>
+          <DebugOptions>
+          </DebugOptions>
+        </gdb_options>
+        <gdb_buildfirst gdb_buildfirst_overriden="false" gdb_buildfirst_old="false"/>
+      </dbx_gdbdebugger>
+      <nativedebugger version="1">
+        <engine>gdb</engine>
+      </nativedebugger>
+      <runprofile version="9">
+        <runcommandpicklist>
+          <runcommandpicklistitem>"${OUTPUT_PATH}"  ./synk/synk.c</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}"  /home/sdruix/Desktop/Phd/polybench/fail/synk/synk.c</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" </runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" /home/sdruix/Desktop/Phd/polybench/fail</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" /home/sdruix/Desktop/Phd/polybench/correctes/2mm/2mm.c</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" /home/sdruix/Desktop/Phd/polybench/fail/syrk/syrk.c</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" /home/sdruix/Desktop/Phd/polybench/fail/correlation/correlation.c</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}"/home/sdruix/allB/21/3mm/3mm.c</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" /home/sdruix/allB/21/3mm/3mm.c -o a.c</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" /home/sdruix/allB/21/3mm/3mm.c</runcommandpicklistitem>
+        </runcommandpicklist>
+        <runcommand>"${OUTPUT_PATH}" /home/sdruix/allB/21/3mm/3mm.c</runcommand>
+        <rundir>/home/sdruix/allB/21/3mm</rundir>
+        <buildfirst>true</buildfirst>
+        <terminal-type>0</terminal-type>
+        <remove-instrumentation>0</remove-instrumentation>
+        <environment>
+        </environment>
+      </runprofile>
+    </conf>
+  </confs>
+</configurationDescriptor>

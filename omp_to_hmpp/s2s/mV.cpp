@@ -4,6 +4,7 @@
 #include <string>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
 #include <vector>
@@ -104,15 +105,19 @@ public:
 int getdir(string dir, vector<string> &files) {
     DIR *dp;
     struct dirent *dirp;
+    struct stat st;
     if ((dp = opendir(dir.c_str())) == NULL) {
         cout << "Error(" << errno << ") opening " << dir << endl;
         return errno;
     }
-
+    
     while ((dirp = readdir(dp)) != NULL) {
-     //   cout << string(dirp->d_name)<<" in " << dir << endl;
-     //   cin.get();
-        files.push_back(string(dirp->d_name));
+        if(string(dirp->d_name).compare(".")!=0
+                && string(dirp->d_name).compare("..")!=0)
+            
+            lstat(dirp->d_name, &st);
+            if(!S_ISDIR(st.st_mode))
+                files.push_back(string(dirp->d_name));
     }
     closedir(dp);
     return 0;

@@ -1,5 +1,5 @@
 #include "inline_phase.hpp"
-#include "FunctionDefinitionPred.hpp"
+
 #include "FunctionCallsPred.hpp"
 #include <stdlib.h>
 #include "hlt/hlt-common.hpp"
@@ -24,42 +24,73 @@ InlinePhase::InlinePhase() {
    ompP.register_directive("check");
    ompP.register_directive("for check");
     ompP.register_directive("for fixed");
+    ompP.register_directive("critical");
+
+    ompP.register_directive("threadprivate");
+    ompP.register_directive("atomic");
+    ompP.register_directive("master");
 
     _callNum=0;
     _retid = 0;
     _varid = 0;
 }
-
+inline bool InlinePhase::exists(const std::string& name) {
+    return ( access(name.c_str(), F_OK) != -1);
+}
 void InlinePhase::run(DTO& dto) {
 
     ofstream params;
    
     string line;
-    AST_t translation_unit = dto["translation_unit"];
+    _translation_unit = dto["translation_unit"];
     ScopeLink scope_link = dto["scope_link"];
 
-    FunctionDefinitionPred function_def_pred;
-    ObjectList<AST_t> list_of_fun_defs = translation_unit.depth_subtrees(function_def_pred);
-
+    ObjectList<AST_t> list_of_fun_defs = _translation_unit.depth_subtrees(_function_def_pred);
+    std::stringstream name;
+    name << "../outline/fun2Outline.data";
+    _forced = 0;
+    if (!exists(name.str().c_str())) {
+        ofstream outFile;
+        outFile.open("fun2Outline.data", ios::trunc);
+        outFile << "main";
+        outFile.close();
+        name.str("fun2Outline.data");
+        _forced = 1;
+    }
     for (ObjectList<AST_t>::iterator it = list_of_fun_defs.begin(); it != list_of_fun_defs.end(); it++) {
         FunctionDefinition function_def(*it, scope_link);
         TL::Symbol function_sym = function_def.get_function_symbol();
         TL::Statement function_body = function_def.get_function_body();
         std::cout<<"Chech if is oulined: "<<function_def.get_function_name()<<"\n";
-        ifstream inFile("../outline/fun2Outline.data");
+        ifstream inFile(name.str().c_str());
         while(getline(inFile, line)) {
            if(std::string(function_def.get_function_name()).compare(line)==0){
-                std::cout<<"Starting inlines if function body named: "<< function_def.get_function_name() <<"\n";
+                std::cout<<"Starting inlines in function body named: "<< function_def.get_function_name() <<"\n {\n";
                
                 find_functions(function_def, scope_link);
+                cout<<"Continue"<<endl;
                 inFile.seekg (0, ios::end);
             }
         }
        
         inFile.close();
+//        if(_forced) {
+////            cout<<"forced"<<endl;
+//            for(int fN=0; fN<_inlinedFunctions.size();++fN){
+////                cout<<function_def.get_function_name() << " vs. "<<_inlinedFunctions[fN].get_name()<<endl;
+//                if(std::string(function_def.get_function_name()).compare(_inlinedFunctions[fN].get_name())==0){
+//                    std::cout<<"Starting inlines in inlined function body named by force: "<< function_def.get_function_name() <<"\n";
+//                    cin.get();
+//                    find_functions(function_def, scope_link);
+//                }
+//            }
+//        }
 
     }
-    system("rm ../outline/fun2Outline.data");
+    string temp = name.str().c_str();
+    name.str("");
+    name << "rm "<<temp;
+    system(name.str().c_str());
     int j=0;
    
     for (ObjectList<Symbol>::iterator it = _inlinedFunctions.begin(); it != _inlinedFunctions.end(); it++, j++) {
@@ -105,27 +136,54 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
     ObjectList<AST_t> list_of_calls = function_body.get_ast().depth_subtrees(function_calls_pred);
 
     for (ObjectList<AST_t>::iterator it = list_of_calls.begin(); it != list_of_calls.end(); it++, _callNum++) {
+//        cout<<_callNum<<endl;
         AST_t element = *it;
 
 
         Expression expr(element, scope_link);
-
+        
         // We already know it is a function call, no need to check again
         Expression _function_call = expr.get_called_expression();
         set_FCall(&_function_call);
+        
+//        cin.get();
         if (_function_call.is_id_expression()) {
 
             IdExpression id_expr = _function_call.get_id_expression();
             Symbol called_sym = id_expr.get_symbol();
             set_FSym(&called_sym);
-
-           
+//            cout<<called_sym.is_valid()<<endl;
+//            cout<<called_sym.is_function()<<endl;
+//            cout<<called_sym.is_defined()<<endl;
+           cout<<"HI"<<endl;
             if (called_sym.is_valid() && called_sym.is_function() && called_sym.is_defined()) {
-                cout << "\nApplying inlining for function '" << id_expr << "' in " << element.get_locus() << "\n";
+                cout << "\nFinding if necessary forward inline for function '" << id_expr << "' in " << element.get_locus() << "\n";
                 _functionName = called_sym.get_name();
                 _rowOfCall = element.get_line();
+                int fnd = 0;
+                for(int fN = 0; fN<_inlinedFunctions.size();++fN){
+                    if(_inlinedFunctions[fN].get_name().compare(std::string(_functionName))==0){
+                     fnd = 1;
+                     break;
+                    }
+                }
+               
+                if(!fnd) {
+                     _inlinedFunctions.push_back(called_sym);
+                    cout << "\nForward inline of "<<called_sym.get_name()<<" called on: "<<function_def.get_function_name().get_symbol().get_name()<<" \n";
+                    ObjectList<AST_t> list_of_fun_defs = _translation_unit.depth_subtrees(_function_def_pred);
+                    for (ObjectList<AST_t>::iterator it = list_of_fun_defs.begin(); it != list_of_fun_defs.end(); it++) {
+                        FunctionDefinition function_defNF(*it, scope_link);
+                        TL::Symbol function_sym = function_defNF.get_function_symbol();
+                        if(function_sym.get_name().compare(called_sym.get_name())==0) {
+                            find_functions(function_defNF,scope_link);
+//                            cout<<"HI2s"<<endl;
+                        }
+                    }
+                }
+                cout << "\nApplying inlining for function" << called_sym.get_name() << "\n {";
                 inlineFunction(called_sym, expr);
-                _inlinedFunctions.push_back(called_sym);
+                cout<<"} \n";
             } else if(called_sym.is_defined()){
                 cerr << "************************************"<<
                         "\n You can not use "<<called_sym.get_name()<<"inside HMPP codelet.\n"
@@ -133,6 +191,11 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
                 exit(-1);
             }
         }
+    }
+    if(list_of_calls.size()==0) {
+        cout<<"} \n No function calls in : "<<function_def.get_function_name().get_symbol().get_name()<<endl;
+    } else {
+        cout<<"} \n"<<function_def.get_function_name().get_symbol().get_name()<< " finished -------------"<<endl;
     }
 }
 
@@ -148,13 +211,13 @@ void InlinePhase::inlineFunction(Symbol& called_sym, Expression& expr) {
     //////////////////////////////////////////7
 
     Symbol _function_symbol = called_sym;
-
+   
     AST_t definition_tree = _function_symbol.get_definition_tree();
     FunctionDefinition funct_def(definition_tree, expr.get_scope_link());
     Statement funct_body = funct_def.get_function_body();
     Scope funct_scope = funct_def.get_scope();
     Scope funct_scopeB = funct_body.get_scope();
-
+     
     Source result;
     Source parameter_declarations,
             inlined_function_body,
@@ -182,7 +245,7 @@ void InlinePhase::inlineFunction(Symbol& called_sym, Expression& expr) {
     if (c != NULL) {
         inlined_function_body << std::string(c);
     }
-
+   
     Source resultR;
     resultR
             << parameter_declarations << "\n"

@@ -13,8 +13,8 @@
 #include <tl-source.hpp>
 #include <tl-datareference.hpp>
 #include <tr1/regex>
+#include "FunctionDefinitionPred.hpp"
 
-//#include "printTraverse.hpp"
 using namespace TL;
 using namespace TL::HLT;
 using namespace std;
@@ -31,12 +31,19 @@ public:
             Symbol* _function_symbol2add);
     void set_PSym(
             ObjectList< Symbol>* param_symbols2add);
+    void inlineFunction(
+            Symbol &called_sym,
+            Expression &expr);
 private:
+    inline bool exists(const std::string& name);
     Source _nameReturn;
     ObjectList<string> _deletedFuncs;
     ObjectList<Source> _referenceVars;
     ObjectList<Symbol> _inlinedFunctions;
+    FunctionDefinitionPred _function_def_pred;
     int _retid;
+    int _forced;
+    AST_t _translation_unit;
     int _varid;
     Source _functionName;
     int _callNum;
@@ -49,9 +56,7 @@ private:
     void find_functions(
             FunctionDefinition function_def,
             ScopeLink scope_link);
-    void inlineFunction(
-            Symbol &called_sym,
-            Expression &expr);
+    
     void getParamSymbols(
             ObjectList< Symbol> &param_symbols,
             Scope &funct_scopeB);
