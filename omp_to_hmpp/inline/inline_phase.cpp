@@ -144,6 +144,7 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
         
         // We already know it is a function call, no need to check again
         Expression _function_call = expr.get_called_expression();
+        Expression last_function_call = _function_call;
         set_FCall(&_function_call);
         
 //        cin.get();
@@ -151,6 +152,7 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
 
             IdExpression id_expr = _function_call.get_id_expression();
             Symbol called_sym = id_expr.get_symbol();
+            Symbol last_called_sym =  called_sym;
             set_FSym(&called_sym);
 //            cout<<called_sym.is_valid()<<endl;
 //            cout<<called_sym.is_function()<<endl;
@@ -177,6 +179,8 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
                         TL::Symbol function_sym = function_defNF.get_function_symbol();
                         if(function_sym.get_name().compare(called_sym.get_name())==0) {
                             find_functions(function_defNF,scope_link);
+                            set_FCall(&last_function_call);
+                            set_FSym(&last_called_sym);
 //                            cout<<"HI2s"<<endl;
                         }
                     }
@@ -240,8 +244,10 @@ void InlinePhase::inlineFunction(Symbol& called_sym, Expression& expr) {
     solve_return(function_type, parameter_declarations, return_code, funct_scope);
 
     ////////////////////////////Arbre d'execucio
+//    cout<<funct_body.get_ast().prettyprint()<<endl;
     const char *c = prettyprint_in_buffer_callback(funct_body.get_ast().get_internal_ast(),
             &InlinePhase::inline_prettyprint_callback, (void*) this);
+//    cout<<"HI2"<<endl;
     if (c != NULL) {
         inlined_function_body << std::string(c);
     }
@@ -429,13 +435,15 @@ ObjectList< Symbol>* InlinePhase::get_PSym() {
 
 const char* InlinePhase::inline_prettyprint_callback(AST _a, void* data) {
     AST_t a(_a);
+    
     InlinePhase* _this = reinterpret_cast<InlinePhase*> (data);
     Expression function_call = *_this->get_FCall();
     Symbol function_symbol = *_this->get_FSym();
     if (ReturnStatement::predicate(a)) {
+        std::cout<<a.prettyprint(false)<<"\n";
         return solve_result_predicate(a, &function_call, &function_symbol, data);
     } else if (IdExpression::predicate(a)) {
-//        std::cout<<a.prettyprint(false)<<"\n";
+        std::cout<<a.prettyprint(false)<<"\n";
         return solve_predicate(a, function_call, function_symbol, data);
     } else
         return NULL;
