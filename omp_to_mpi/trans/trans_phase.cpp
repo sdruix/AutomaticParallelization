@@ -753,7 +753,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             if(_construct_inside_bucle) {
                 cout<<"num Loop:"<<_construct_num_loop<<endl;
                 cout<<"Construct inside bucle"<<endl;
-                //            debugPoint("inside bucle");
+             
             }
             
             for(int i = 0; i<_prmters.size();++i)
@@ -803,7 +803,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     cout<<it->first<<endl;
                 }
             }
-            
+          
             //        cin.get();
             //            cout<<"InVars:"<<endl;
             //            typedef std::unordered_map <std::string,AST_t> iter4in; 
@@ -2627,8 +2627,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     
                                 } else {
                                     if(_secureWrite)
-                                        secureWrite << "if ("<<firstIterator<<">="<<_offsetVar<<" + "<<_partSizeVar<<""<<" || "<<firstIterator<<"<"<<_offsetVar<<"){"<<operandMPISecureWrite<<"}";
-                                    mpiWrites << "if ("<<firstIterator<<">="<<_offsetVar<<" + "<<_partSizeVar<<""<<" || "<<firstIterator<<"<"<<_offsetVar<<"){"<<operandMPIWrites<<"} else {("<<variableCopyName<<"="<<rectifiedVarName<<");}";
+                                        secureWrite << "if ("<<firstIterator<<" >= "<<_offsetVar<<" + "<<_partSizeVar<<""<<" || "<<firstIterator<<"<"<<_offsetVar<<"){"<<operandMPISecureWrite<<"}";
+                                    mpiWrites << "if ("<<firstIterator<<" >= "<<_offsetVar<<" + "<<_partSizeVar<<""<<" || "<<firstIterator<<"<"<<_offsetVar<<"){"<<operandMPIWrites<<"} else {("<<variableCopyName<<"="<<rectifiedVarName<<");}";
                                 }
                             }
                         } else {
@@ -2999,7 +2999,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         if(isUploadedVar(actArg)) {
                                             //                                            cout<<actArg<<endl;
                                             //                                            cin.get();
-                                            mpiReads << "if ("<<firstIterator<<">"<< _uploadedVars[numUploadedVar].end<<" || "<<firstIterator<<"<"<< _uploadedVars[numUploadedVar].start<<"){"<<operandMPIReads<<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}";
+                                            mpiReads << "if ("<<firstIterator<<" >= "<< _uploadedVars[numUploadedVar].end<<" || "<<firstIterator<<"<"<< _uploadedVars[numUploadedVar].start<<"){"<<operandMPIReads<<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}";
                                         } else {
                                             mpiReads<<operandMPIReads;
                                         }
@@ -3210,7 +3210,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             else
                                 exprS =operatorAS+exprString+";";
                             Source condition;
-                            condition << "if ("<<firstIterator<<">"<<_offsetVar<<" + "<<_partSizeVar<<""<<" || "<<firstIterator<<"<"<<_offsetVar<<"){";
+                            condition << "if ("<<firstIterator<<">="<<_offsetVar<<" + "<<_partSizeVar<<""<<" || "<<firstIterator<<"<"<<_offsetVar<<"){";
                             newExprSource  << condition <<operandMPIReads <<"} else {("<<rectifiedVarName<<"="<<variableCopyName<<");}"
                                     <<"("<<exprString<<operatorAS<<");" <<"\n"
                                     << condition << operandMPIWrites <<"} else {("<<variableCopyName<<"="<<rectifiedVarName<<");}";
@@ -3835,7 +3835,7 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                 }
                 cout<<endl;
             } else {
-                cout<<"DISCARTED: "<<std::string(newR.name);
+                cout<<"DISCARTED: "<<std::string(newR.name)<<endl;;
             }
 //            cin.get();
             
@@ -4339,16 +4339,20 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     cout<<expr.prettyprint()<<" is inside master"<<endl;
                     
                 } else {
+                    
                     cout<<expr.prettyprint()<<" is not inside master"<<endl;  
+                    
                 }
                 //            cin.get();
             }
+            
         } else {
             // _insideMaster = is_inside_master(expr_list[l],scopeL, line, 0);
             if(_insideMaster) {
                 cout<<"Expression on function: "<<expr.prettyprint()<<" is inside master"<<endl;
                 
             } else {
+               
                 cout<<"Expression on function: "<<expr.prettyprint()<<" is not inside master"<<endl;  
             }
         }
@@ -4357,15 +4361,26 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
         cout<<"-"<<ppExpr<<"-"<<endl;
         cout<<"____________"<<endl;
         //Check if is inside Master(slave does not have the updated value) or next reads/writes 
-        if(_insideMaster || line > outline_num_line) {
+        if(kind == 2) 
+            _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
+        int sameLoop = 0;
+        if(!_insideMaster && _inside_loop) {
+            cout<<_for_num <<" vs. "<<_construct_num_loop<<endl;
+            if(_for_num = _construct_num_loop) {
+                cout<<" but in the same loop"<<endl;
+                sameLoop = 1;
+                //cin.get();
+            }
+        }
+        if(_insideMaster || line > outline_num_line || sameLoop) {
             
             
             if(line!=outline_num_line) {
                 if((expr.is_assignment() || expr.is_operation_assignment()) && f==0) {
                     cout<<"Operation assignment: "<<ppExpr<<endl;
                     f=1; 
-                    if(kind == 2) 
-                        _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
+                    
+                    
                     Expression firstOperand = expr.get_first_operand();
                     
                     Expression secondOperand = expr.get_second_operand();
@@ -4388,19 +4403,23 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     if(!findedS.is_invalid()) {
                         actWord = findedS.get_name();
                         
-                        //                    std::cout<<"(ass)Var use "<< findedS.get_name()<<" in "<<line<<endl;
+                        
                         if(line<outline_num_line) {
                             
                             if(!kind || kind == 2) {
+//                                std::cout<<"(ass)Var use "<< findedS.get_name()<<" in "<<line<<endl;
+//                                cin.get();
                                 if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                    if(_insideMaster) {
+                                    if(_insideMaster || sameLoop) {
                                         _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst);
                                     }
                                 }
                             } else {
+//                                std::cout<<"(ass2)Var use "<< findedS.get_name()<<" in "<<line<<endl;
+//                                cin.get();
                                 if(inside) {
                                     if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                        if(_insideMaster) {
+                                        if(_insideMaster || sameLoop ) {
                                             _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst);
                                         }
                                     }
@@ -4474,8 +4493,8 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     cout<<"Detected Future MPI work"<<endl;
                     //                    cin.get();
                     f=1;
-                    if(kind == 2) 
-                        _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
+//                    if(kind == 2) 
+//                        _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
                     
                     
                     
@@ -4659,14 +4678,14 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     if(line<outline_num_line) {
                         if(!kind || kind == 2) {
                             if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                if(_insideMaster)
+                                if(_insideMaster || sameLoop)
                                     _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst);
                             }
                         } else {
                             
                             if(inside) {
                                 if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                    if(_insideMaster)
+                                    if(_insideMaster || sameLoop)
                                         _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst);
                                 }
                             }
@@ -4678,8 +4697,8 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     
                     f=1;
                     
-                    if(kind == 2) 
-                        _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
+//                    if(kind == 2) 
+//                        _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
                     std::string exprS =expr.prettyprint();
                     
                     exprS = exprS.substr(exprS.find_first_of("(")+1, exprS.length());
@@ -4702,7 +4721,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                 if(line<outline_num_line) {
                                     if(!kind || kind == 2) {
                                         if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                            if(_insideMaster)
+                                            if(_insideMaster || sameLoop)
                                                 _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst);
                                         }
                                         if((_smart_use_table[actWord].row_last_read_master.row < line || _smart_use_table[actWord].row_last_read_master.row == 0) && isParam(actWord)) {
@@ -4712,7 +4731,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                         
                                         if(inside) {
                                             if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                                if(_insideMaster)
+                                                if(_insideMaster || sameLoop)
                                                     _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst);
                                             }
                                         }
@@ -4730,7 +4749,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                         
                                         if(inside) {
                                             if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                                if(_insideMaster)
+                                                if(_insideMaster || sameLoop)
                                                     _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst); 
                                             }
                                         }
@@ -4756,7 +4775,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                     
                                     if(inside) {
                                         if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                            if(_insideMaster)
+                                            if(_insideMaster || sameLoop)
                                                 _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst); 
                                         }
                                     }
@@ -4764,7 +4783,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                             } else {
                                 if(!kind || kind == 2) {
                                     if((_smart_use_table[actWord].row_first_write_master.row > line || _smart_use_table[actWord].row_first_write_master.row == 0) && isParam(actWord)) {
-                                        if(_insideMaster)
+                                        if(_insideMaster || sameLoop)
                                             _smart_use_table[actWord].row_first_write_master = fill_use(line,actAst); 
                                     }
                                     if((_smart_use_table[actWord].row_first_read_master.row > line || _smart_use_table[actWord].row_first_read_master.row == 0) && isParam(actWord)) {
@@ -4774,7 +4793,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                     
                                     if(inside) {
                                         if((_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) && isParam(actWord)) {
-                                            if(_insideMaster)
+                                            if(_insideMaster || sameLoop)
                                                 _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst); 
                                         }
                                     }
@@ -4820,8 +4839,8 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                 
                                 f=1;
                                 
-                                if(kind == 2) 
-                                    _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
+//                                if(kind == 2) 
+//                                    _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
                                 std::string exprS =expr.prettyprint();
                                 
                                 exprS = exprS.substr(exprS.find_first_of("(")+1, exprS.length());
@@ -4905,8 +4924,8 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     
                     //                                    cout<<"PP1: " << ppExpr<<endl;
                     //                                    cin.get();
-                    if(kind == 2)  
-                        _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
+//                    if(kind == 2)  
+//                        _inside_loop=is_inside_bucle(expr_list[l],scopeL, line, 0);
                     f=1;
                     if(prmters.size()>0){
                         k=0;
@@ -4976,14 +4995,14 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                         if(line<outline_num_line) {
                                             if(!kind || kind==2){
                                                 if(_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0 && isParam(actWord)) {
-                                                    if(_insideMaster)
+                                                    if(_insideMaster || sameLoop)
                                                         _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst); 
                                                 }
                                             } else {
                                                 
                                                 if(inside) {
                                                     if(_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0 && isParam(actWord)) {
-                                                        if(_insideMaster)
+                                                        if(_insideMaster || sameLoop)
                                                             _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst); 
                                                     }
                                                 }
@@ -5005,7 +5024,7 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                             } else {
                                                 if(inside) {
                                                     if(_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0 && isParam(actWord)) {
-                                                        if(_insideMaster)
+                                                        if(_insideMaster || sameLoop)
                                                             _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst);
                                                     }
                                                 }
@@ -5063,14 +5082,14 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                     if(line<outline_num_line) {
                         if(!kind || kind==2){
                             if(_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) {
-                                if(_insideMaster)
+                                if(_insideMaster || sameLoop)
                                     _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst); 
                             }
                         } else {
                             
                             if(inside) {
                                 if(_smart_use_table[actWord].row_last_write_master.row < line || _smart_use_table[actWord].row_last_write_master.row == 0) {
-                                    if(_insideMaster)
+                                    if(_insideMaster || sameLoop)
                                         _smart_use_table[actWord].row_last_write_master = fill_use(line,actAst); 
                                 }
                             }
