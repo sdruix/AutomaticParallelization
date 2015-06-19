@@ -19,7 +19,9 @@
 #include "math.h"
 #include <cstring>
 #include <locale>
+
 using namespace std;
+string _includesOnExec;
 int _firstExecuted;
 
 class Timer {
@@ -152,6 +154,8 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
         } else {
             checkFile2transMP << "gcc " << filename_justOMP.str().c_str() << " -std=c99  -fopenmp -lm -o MP.out";
         }
+        if(_includesOnExec.compare("")!=0)
+            checkFile2transMP << _includesOnExec;
         check = system(checkFile2transMP.str().c_str());
         if (!(check == 0)) {
             cerr << "Error compiling original file (OpenMP): " << filename_justOMP.str() << "\n";
@@ -167,6 +171,8 @@ void testFile(string filename, string logFolder, int extKind, int step, string l
         } else {
             checkFile2trans << "gcc " << filename_withoutOMP.str().c_str() << " -std=c99 -lm -o noMP.out";
         }
+        if(_includesOnExec.compare("")!=0)
+            checkFile2transMP << _includesOnExec;
         check = system(checkFile2trans.str().c_str());
         if (!(check == 0 || check == 768)) {
             cerr << "Error compiling original file (No OpenMP): " << filename_withoutOMP << "\n";
@@ -397,7 +403,7 @@ int getdir(string dir, vector<string> &files, int withSubDir) {
     return 0;
 }
 
-void compile(vector<string> files, string cP, string codesDir, string execDir, int pause, int verbose) {
+void compile(vector<string> files, string cP, string codesDir, string execDir, int pause, int verbose, string originalFileIncludesPath) {
     ofstream compFile;
     int numFiles = 0;
     
@@ -419,7 +425,12 @@ void compile(vector<string> files, string cP, string codesDir, string execDir, i
                 std::stringstream complilationCommand, complilationCommandV;
                 string name = files[i].substr(0, files[i].length() - 4);
                 name = name.substr(name.find_last_of("/") + 1, name.length());
-                complilationCommand << "mpic++ -fopenmp -lm -o ./"
+                complilationCommand << "mpic++ -fopenmp -lm ";
+                if(_includesOnExec.compare("")!=0)
+                    complilationCommand << _includesOnExec;
+                
+                complilationCommand<<" -I"<<originalFileIncludesPath
+                        <<" -o ./"
                         << codesDir << "/" << execDir
                         << "/" << name << ".out ./"
                         << files[i]
@@ -432,7 +443,11 @@ void compile(vector<string> files, string cP, string codesDir, string execDir, i
                 }
                 cout << "------------------------------------------------\n";
                 if (verbose) {
-                    complilationCommand << "mpic++  -fopenmp -lm -o ./"
+                    complilationCommand << "mpic++ -fopenmp -lm ";
+                    if(_includesOnExec.compare("")!=0)
+                        complilationCommand << _includesOnExec;
+                    complilationCommand <<" -I"<<originalFileIncludesPath
+                            <<" -o ./"
                             << codesDir << "/" << execDir
                             << "/" << name << ".out ./"
                             << files[i] << "\n";
@@ -456,7 +471,11 @@ void compile(vector<string> files, string cP, string codesDir, string execDir, i
                 std::stringstream complilationCommand, complilationCommandV;
                 string name = files[i].substr(0, files[i].length() - 2);
                 name = name.substr(name.find_last_of("/") + 1, name.length());
-                complilationCommand << "mpicc -std=c99 -fopenmp -lm -o ./"
+                complilationCommand << "mpicc -std=c99 -fopenmp -lm ";
+                if(_includesOnExec.compare("")!=0)
+                    complilationCommand << _includesOnExec;
+                complilationCommand<<" -I"<<originalFileIncludesPath
+                        <<" -o ./"
                         << codesDir << "/" << execDir
                         << "/" << name << ".out " << files[i]
                         << " 2>> " << cP << "\n";
@@ -468,7 +487,11 @@ void compile(vector<string> files, string cP, string codesDir, string execDir, i
                 }
                 cout << "------------------------------------------------\n";
                 if (verbose) {
-                    complilationCommand << "mpicc -std=c99 -fopenmp -lm -o ./"
+                    complilationCommand << "mpicc -std=c99 -fopenmp -lm ";
+                    if(_includesOnExec.compare("")!=0)
+                        complilationCommand << _includesOnExec;
+                    complilationCommand <<" -I"<<originalFileIncludesPath
+                            <<" -o ./"
                             << codesDir << "/" << execDir
                             << "/" << name << ".out " << files[i] << "\n";
                     system(complilationCommandV.str().c_str());
@@ -683,7 +706,7 @@ void execute(vector<string> files, string csvP, string errP, string codesDir, st
     
     
 }
-void normalizeLoopsFunction(string tempName, int extKind, string firstLine, string firstLineAlternative, vector<string> includeVector) {
+void normalizeLoopsFunction(string tempName, int extKind, string firstLine, string firstLineAlternative, string firstLineNoKeys, string firstLineAlternativeNoKeys, vector<string> includeVector) {
     //    cout<<"Normalizing For loops"<<endl;
     string normTempName = "normalized"+ tempName;
     //    cin.get();
@@ -694,13 +717,16 @@ void normalizeLoopsFunction(string tempName, int extKind, string firstLine, stri
         commandK << "forNormalization-phasecc";
     }
     
-    loopNormCommand << commandK.str() << " -y " << tempName << " -o " << normTempName << "  -I/usr/lib/openmpi/include/ " << std::endl;
+    loopNormCommand << commandK.str() << " -y " << tempName << " -o " << normTempName << "  -I/usr/lib/openmpi/include/ "; 
+    if(_includesOnExec.compare("")!=0)
+       loopNormCommand << _includesOnExec;
     int check = system(loopNormCommand.str().c_str());
-    if (!(check == 0 || check == 256)) {
+    if (check != 0) {
         cerr << "Error using command: " << loopNormCommand.str().c_str() << "\n";
         exit(-1);
         cerr << "------------------------------------------------\n";
     }
+    
     ifstream postprocessFile(normTempName);
     int found = 0;
     //cout <<"FL: "<< firstLine << endl;
@@ -708,7 +734,60 @@ void normalizeLoopsFunction(string tempName, int extKind, string firstLine, stri
     int lines = 0;
     string line;
     while (getline(postprocessFile, line)) {
-        if (line.find(firstLine) == 0 || line.find(firstLineAlternative) == 0 || found) {
+        if (line.find(firstLine) == 0 || line.find(firstLineAlternative) == 0 ||
+                line.find(firstLineNoKeys) == 0 || line.find(firstLineAlternativeNoKeys) == 0
+                || found) {
+            includeVector.push_back(line);
+            found = 1;
+            lines++;
+            //cout<< line<<endl;
+        }
+        
+    }
+    postprocessFile.close();
+    
+    
+    ofstream transFile;
+    transFile.open(tempName, ios::trunc);
+    
+    for (unsigned int incN = 0; incN < includeVector.size(); ++incN) {
+        transFile << includeVector[incN] << "\n";
+        lines++;
+    }
+    transFile.close();
+    //    cin.get();
+}
+
+void inlineFunctions(string tempName, int extKind, string firstLine, string firstLineAlternative, string firstLineNoKeys, string firstLineAlternativeNoKeys, vector<string> includeVector) {
+    //    cout<<"Normalizing For loops"<<endl;
+    string normTempName = "inlined"+ tempName;
+    //    cin.get();
+    std::stringstream loopNormCommand, commandK;
+    if(extKind) {
+        commandK << "inline-phasec++";
+    } else {
+        commandK << "inline-phasecc";
+    }
+    
+    loopNormCommand << commandK.str() << " -y " << tempName << " -o " << normTempName << "  -I/usr/lib/openmpi/include/ ";
+    if(_includesOnExec.compare("")!=0)
+       loopNormCommand <<_includesOnExec;
+    int check = system(loopNormCommand.str().c_str());
+     if (!(check == 0)) {
+        cerr << "Error using command: " << loopNormCommand.str().c_str() << "\n";
+        exit(-1);
+        cerr << "------------------------------------------------\n";
+    }
+    ifstream postprocessFile(normTempName);
+    int found = 0;
+//    cout <<"FL: "<< firstLine << endl;
+//    cin.get();
+    int lines = 0;
+    string line;
+    while (getline(postprocessFile, line)) {
+        if (line.find(firstLine) == 0 || line.find(firstLineAlternative) == 0 ||
+                line.find(firstLineNoKeys) == 0 || line.find(firstLineAlternativeNoKeys) == 0
+                || found) {
             includeVector.push_back(line);
             found = 1;
             lines++;
@@ -751,9 +830,10 @@ int main(int argc, char *argv[]) {
     int normalizeLoops = 0;
     int numDivisions = -1;
     int partSize = -1;
+    int inlineF = 0;
     int startDivisionValue = 1, endDivisionValue = -1;
-    
-    while ((nextOption = getopt(argc, argv, "r:t:f:F:c:e:n:N:l:E:oOhHivL:xp01234wszd:D:q:Q:")) != -1) {
+    _includesOnExec = "";
+    while ((nextOption = getopt(argc, argv, "r:t:f:F:c:e:n:N:l:E:oOhHivL:xp01234wszd:D:q:Q:iI:")) != -1) {
         switch (nextOption) {
             case 'r':
                 rep = atoi(optarg);
@@ -831,7 +911,14 @@ int main(int argc, char *argv[]) {
                 break;
             case 'z':
                 normalizeLoops = 1;
-                
+                break;
+            case 'I':
+                _includesOnExec = _includesOnExec + " -I" + optarg;
+//                cout<<_includesOnExec<<endl;
+//                cin.get();
+                break;
+            case 'i':
+                inlineF = 1;    
                 break;
             case 'd':
                 numDivisions = atoi(optarg);
@@ -869,6 +956,7 @@ int main(int argc, char *argv[]) {
                         " -t <number of tries for each execution repetition to get just the best execution time>\n"
                         " -n <number of minumum processors to evaluate in execution>\n"
                         " -N <number of maximum processors to evaluate in execution>\n"
+                        " -i Inline functions\n"
                         " -p Pause after each processed file\n"
                         " -x Report energy. \n"
                         " -d Normal part divided by.\n"
@@ -900,6 +988,7 @@ int main(int argc, char *argv[]) {
                         " -t <number of tries for each execution repetition to get just the best execution time>\n"
                         " -n <number of minumum processors to evaluate in execution>\n"
                         " -N <number of maximum processors to evaluate in execution>\n"
+                        " -i Inline functions\n"
                         " -p Pause after each processed file\n"
                         " -x Report energy. \n"
                         " -z Normalize For loops.\n"
@@ -964,13 +1053,14 @@ int main(int argc, char *argv[]) {
             tempLogName << name << "-" << logFilenameBack;
             logFilename = tempLogName.str();
             cout << "Starting transformation of file: " << filename << endl;
-            string line, firstLine, firstLineAlternative;
+            string line, firstLine, firstLineAlternative, firstLineNoKeys, firstLineAlternativeNoKeys;
             ifstream preprocessFile(filename);
             int found = 0;
             string includeS = "#include";
             vector<string> includeVector;
             includeVector.push_back("#include <mpi.h>");
             includeVector.push_back("#include <stdlib.h>");
+            int opened = 0;
             while (getline(preprocessFile, line) && !found) {
                 
                 // line = cleanWhiteSpaces(line);
@@ -990,19 +1080,58 @@ int main(int argc, char *argv[]) {
                 if (subline.compare(includeS) != 0 && line.compare("") != 0
                         && subsubline.compare("//") != 0
                         && subsubline.compare("/*") != 0
-                        && firstChar.compare("#") != 0) {
+                        && firstChar.compare("#") != 0 && (line.find_first_of("*/")<0 || line.find_first_of("*/")>line.length()) && !opened) {
                     if (line.find_first_of("[") >= 0 && line.find_first_of("[") < line.size())
                         line = line.substr(0, line.find_first_of("[") + 1);
-                    firstLine = line;
-//                    cout<<"1: "<<firstLine.substr(0,firstLine.find_first_of(" ")+1)<<endl;
-//                    cout<<"2: "<<replaceAll(firstLine.substr(firstLine.find_first_of(" "),firstLine.length())," ","")<<endl;
-                    firstLineAlternative = firstLine.substr(0,firstLine.find_first_of(" ")+1) + replaceAll(firstLine.substr(firstLine.find_first_of(" "),firstLine.length())," ","");
-//                    cout<<firstLine<<endl;
+                    int correct = 0;
+                    for(int n=0;n<line.length();++n){
+                        if(line[n]!=' ') {
+                            correct = 1;
+                            break;
+                        }
+                    }
+//                    cout<<line<<endl;
+//                        cin.get();
+                    if(correct) {
+                        firstLine = line;
+    //                    cout<<"1: "<<firstLine.substr(0,firstLine.find_first_of(" ")+1)<<endl;
+    //                    cout<<"2: "<<replaceAll(firstLine.substr(firstLine.find_first_of(" "),firstLine.length())," ","")<<endl;
+                        firstLineAlternative = firstLine.substr(0,firstLine.find_first_of(" ")+1) + replaceAll(firstLine.substr(firstLine.find_first_of(" "),firstLine.length())," ","");
+                        
+                        if(line.find("{")>=0 && line.find("{")<line.length()) {
+                            firstLineNoKeys = cleanWhiteSpaces(firstLine.substr(0,firstLine.find_first_of("{")));
+                            firstLineAlternativeNoKeys = cleanWhiteSpaces(firstLineAlternative.substr(0,firstLineAlternative.find_first_of("{")));
+//                            cout<<"-"<<firstLineNoKeys<<"-"<<endl;
+//                            cout<<"-"<<firstLineAlternativeNoKeys<<"-"<<endl;
+//                            cin.get();
+                        }
+                        
+                        found = 1;
+//                        cout<<firstLine<<endl;
+                    }
+                } else if(subsubline.compare("/*") == 0) {
+//                    cout<<"Opened"<<endl;
+//                    cout<<line<<endl;
+                    opened = 1;
+                    if(line.find("*/")>=0 && line.find("*/")<line.length()) {
+//                        cout<<"closed"<<endl;
+//                        cout<<line<<endl;
+//                        cin.get();
+                        opened = 0;
+                    }
+                } else if(line.find("*/")>=0 && line.find("*/")<line.length()) {
+//                    cout<<"closed"<<endl;
+//                    cout<<line<<endl;
 //                    cin.get();
-                    found = 1;
+                    opened = 0;
                 }
             }
-            
+            if(firstLineNoKeys.empty()) {
+                firstLineNoKeys = "bsduifgelawbbuigv bailsadnlnvass+d+¡335r";
+            }
+            if(firstLineAlternativeNoKeys.empty()) {
+                firstLineAlternativeNoKeys = "bsduifgelawbbuigv bailsadnlnvass+d+¡335r";
+            }
             preprocessFile.close();
             std::stringstream mergeToAddMPI, deleteTempFile, createTempFile;
             string tempName;
@@ -1034,8 +1163,11 @@ int main(int argc, char *argv[]) {
             }
             std::stringstream  nameOUT, commandOUT, loopNormCommand;
             int end = endDivisionValue>1 ? endDivisionValue : 1;
+            if((toDo == 0 || toDo == 3) && inlineF) {
+                inlineFunctions(tempName, extKind, firstLine, firstLineAlternative, firstLineNoKeys, firstLineAlternativeNoKeys, includeVector);
+            }
             if((toDo == 0 || toDo == 3) && normalizeLoops) {
-                normalizeLoopsFunction(tempName, extKind, firstLine, firstLineAlternative, includeVector);
+                normalizeLoopsFunction(tempName, extKind, firstLine, firstLineAlternative, firstLineNoKeys, firstLineAlternativeNoKeys, includeVector);
             }
             vector<string> initialincludeVector = includeVector;
             
@@ -1067,20 +1199,22 @@ int main(int argc, char *argv[]) {
                 loopNormCommand.str("");
                 if (extKind) {
                     nameOUT << codesFolder << "/" << name <<"-"<< dV<<".cpp";
-                    cout<<nameOUT.str()<<endl;
-                    commandOUT << "trans-phasec++ -y " << tempName << " -o " << nameOUT.str() << "  -I/usr/lib/openmpi/include/ " << std::endl;
+//                    cout<<nameOUT.str()<<endl;
+                    commandOUT << "trans-phasec++ -y " << tempName << " -o " << nameOUT.str() << "  -I/usr/lib/openmpi/include/ ";  
                 } else {
                     nameOUT << codesFolder << "/" << name <<"-"<< dV<< ".c";
-                    cout<<nameOUT.str()<<endl;
-                    commandOUT << "trans-phasecc -y " << tempName << " -o " << nameOUT.str() << " -std=c99 -I/usr/lib/openmpi/include/ " << std::endl;
+//                    cout<<nameOUT.str()<<endl;
+                    commandOUT << "trans-phasecc -y " << tempName << " -o " << nameOUT.str() << " -std=c99 -I/usr/lib/openmpi/include/ ";
                 }
+                if(_includesOnExec.compare("")!=0)
+                        commandOUT <<_includesOnExec;
 //                cin.get();
                 if (toDo == 0 || toDo == 3) {
                     
                     
                     
-                    cout << commandOUT.str() << endl;
-                    commandOUT << " > /dev/null";
+//                    cout << commandOUT.str() << endl;
+//                    commandOUT << " > /dev/null";
                     //std::cin.get();
                     check = system(commandOUT.str().c_str());
                     if (!(check == 0 || check == 256)) {
@@ -1092,16 +1226,21 @@ int main(int argc, char *argv[]) {
                     
                     ifstream postprocessFile(nameOUT.str());
                     found = 0;
-//                    cout <<"FL: "<< firstLine << endl;
+//                    cout <<"FL: -"<< firstLine <<"-" <<endl;
+//                    cout <<"FL: -"<< firstLineNoKeys <<"-" <<endl;
+//                    cout <<"FL: -"<< firstLineAlternative <<"-" <<endl;
+//                    cout <<"FL: -"<< firstLineAlternativeNoKeys <<"-" <<endl;
 //                    cin.get();
                     int lines = 0;
                     includeVector = initialincludeVector;
                     while (getline(postprocessFile, line)) {
-                        if (line.find(firstLine) == 0 || line.find(firstLineAlternative) == 0 || found) {
+                        if (line.find(firstLine) == 0 || line.find(firstLineAlternative) == 0 ||
+                            line.find(firstLineNoKeys) == 0 || line.find(firstLineAlternativeNoKeys) == 0
+                            || found) {
                             includeVector.push_back(line);
                             found = 1;
                             lines++;
-                            cout<< line<<endl;
+//                            cout<< line<<endl;
                         }
                         
                     }
@@ -1162,7 +1301,8 @@ int main(int argc, char *argv[]) {
                         cout<<"Error not found: "<<nameOUT.str()<<endl;
                     }
                 }
-                compile(files, cP, codesFolder, execFolder, pause, verbose);
+                string originalFileIncludesPath = filename.substr(0,filename.find_last_of("/")+1);
+                compile(files, cP, codesFolder, execFolder, pause, verbose, originalFileIncludesPath);
             }
             
             files.clear();

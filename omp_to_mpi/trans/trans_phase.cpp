@@ -1,4 +1,5 @@
 #include "trans_phase.hpp"
+#include "../../omp_to_hmpp/inline/inline_phase.hpp"
 #include "FunctionDefinitionPred.hpp"
 #include "FunctionCallsPred.hpp"
 #include <stdlib.h>
@@ -28,7 +29,7 @@ TransPhase::TransPhase() : PragmaCustomCompilerPhase("omp") {
     //register_directive("critical");
     register_directive("critical");
     register_directive("check");
-    //    register_directive("schedule");
+    register_directive("threadprivate");
     register_directive("for check");
     register_directive("for private");
     register_directive("for threadprivate");
@@ -228,12 +229,13 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
             "MPI_Comm_size(MPI_COMM_WORLD,&"<<_sizeVar<<");"
             "MPI_Comm_rank(MPI_COMM_WORLD,&"<<_myidVar<<");"
             ;
-    AST_t initAST = initASTSource.parse_statement(functionAST, _scope_link);
-    masterWork << "{"<<initAST.prettyprint();
-    _initializedFunctions[functionName]=initAST;
+    
+    masterWork << "{"<<initASTSource;
+    //    _initializedFunctions[functionName]=initAST;
     int opened = 0;
-    int _hasInit =0;
+    _hasInit =0;
     int lastLine = 0;
+    int sumError = 0;
     for (int l = 0;l < expr_list.size(); l++) {
         //        cout<<l<<endl;
         Expression expr(expr_list[l], _scope_link);
@@ -255,6 +257,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         masterWork  << addCommaIfNeeded(expr_list[l].prettyprint())<<"\n";
                         expr_list[l].remove_in_list();
                         lastLine = expr_list[l].get_line();
+                        //                        lastLine+=sumError;
                         f = 1;
                     } 
                 }
@@ -263,6 +266,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         
                         //                            cout<<expr_list[l].prettyprint()<<endl;
                         lastLine = expr_list[l].get_line();
+                        //                        lastLine+=sumError;
                         if(opened==0) {
                             masterWork << "if("<<_myidVar<<" == 0) {\n";
                             
@@ -277,6 +281,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                 if(expr_list[l].get_line()>lastLine ) {
                     //                        cout<<"NV:"<<expr_list[l].prettyprint()<<endl;
                     lastLine = expr_list[l].get_line();
+                    //                    lastLine+=sumError;
                     if(opened==0) {
                         masterWork << "if("<<_myidVar<<" == 0) {\n";
                         
@@ -301,7 +306,9 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                 if(test.is_construct()) {
                     
                     TL::PragmaCustomClause check_clause = test.get_clause("check");
-                    if(check_clause.is_defined()) {
+                    if(check_clause.is_defined() ) {
+                        //                        cout<<test.prettyprint()<<endl;
+                        //                        cin.get();
                         cout<<"OMP check"<<endl;
                         check = 1;
                         if(opened>0) {
@@ -312,6 +319,8 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         }
                         masterWork << addCommaIfNeeded(expr_list[l].prettyprint())<<"\n";
                     } else {
+                        //                        cout<<test.prettyprint()<<endl;
+                        //                        cin.get();
                         cout<<"OMP no check"<<endl;
                         if(opened==0) {
                             masterWork << "if("<<_myidVar<<" == 0) {\n";
@@ -325,13 +334,21 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         
                     }
                     expr_list[l].remove_in_list();
-                    //                              cout<<lastLine<<endl;
+                    //                    cout<<lastLine<<endl;
                     //AST_t forAST = ;
                     AST_t lastA = get_last_ast(test.get_statement().get_ast(), test.get_scope_link());
-                    
+                    //                    cout<<lastA<<endl;
                     lastA = compute_last_astLoop(lastA, _scope_link);
+                    //                    cout<<lastA<<endl;
                     
                     lastLine = lastA.get_line();
+                    if(!checkDirective(test,"for")) {
+                        sumError = 3;
+                        
+                    }
+                    //                    lastLine+=sumError;
+                    //                    cout<<lastLine<<endl;
+                    //                    cin.get();
                 } else if(ForStatement::predicate(expr_list[l])|| WhileStatement::predicate(expr_list[l])
                         || DoWhileStatement::predicate(expr_list[l])) {
                     AST_t loopAst;
@@ -362,9 +379,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         if(test.is_construct()) {
                             TL::PragmaCustomClause check_clause = test.get_clause("check");
                             if(check_clause.is_defined()) {
-                                //                            cout<<expr_listOMP[o].prettyprint()<<endl;
                                 check = 1;
-                                
                             } else {
                                 noCheckASTs.push_back(test.get_ast());
                             }
@@ -390,8 +405,10 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                     }
                     
                     masterWork << addCommaIfNeeded(expr_list[l].prettyprint());
-                    //                            cout<<"Loop"<<endl;
-                    //                            cout<<lastLine;
+                    cout<<"Loop"<<endl;
+                    //                    cout<<expr_list[l].prettyprint()<<endl;
+                    //                    cout<<expr_list[l].get_line()<<endl;
+                    //                    cin.get();
                     
                     AST_t lastA = get_last_ast(expr_list[l], test.get_scope_link());
                     PragmaCustomConstruct test(lastA,expr.get_scope_link());
@@ -405,6 +422,7 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                         lastA = compute_last_astLoop(lastA, _scope_link);
                     }
                     lastLine = lastA.get_line();
+                    //                    lastLine+=sumError;
                     
                 } else if((cleanWhiteSpaces(expr_list[l].prettyprint()).find_first_of(" ")>=0 &&
                         cleanWhiteSpaces(expr_list[l].prettyprint()).find_first_of(" ")<cleanWhiteSpaces(expr_list[l].prettyprint()).length())) {
@@ -423,10 +441,12 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                             masterWork << "if("<<_myidVar<<" == 0) {\n";
                         }
                         opened++;
+                        _hasInit =1;
                         masterWork << addCommaIfNeeded(expr_list[l].prettyprint());
                         expr_list[l].remove_in_list();
                     }
                     lastLine = expr_list[l].get_line();
+                    //                    lastLine+=sumError;
                 } 
                 //                        cout<<"BYE"<<endl;
                 
@@ -443,8 +463,10 @@ void TransPhase::assignMasterWork(AST_t functionAST, ObjectList<Symbol> function
                 expr_list[l].remove_in_list();              
             } else {
                 //                    cout<<"DISCARTED: "<<expr_list[l].prettyprint()<<endl;
-                if(expr_list[l].get_line()>lastLine)
+                if(expr_list[l].get_line()>lastLine) {
                     lastLine = expr_list[l].get_line();
+                    //                    lastLine+=sumError;
+                }
             }
             //  
         } 
@@ -645,10 +667,12 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
     Symbol function_sym = function_def.get_function_symbol();
     Scope functionScope = function_def.get_function_body().get_scope();
     Scope globalScope = function_def.get_scope();
-    cout<<"OMP("<<pragmaInstruction<<" in: "<<function_sym.get_name()<<")"<<endl;
+    
     TL::PragmaCustomClause check_clause = construct.get_clause("check");
     
     if(check_clause.is_defined()) { 
+        cout<<"OMP check ("<<pragmaInstruction<<" in: "<<function_sym.get_name()<<")"<<endl;
+        
         TraverseASTFunctor4LocateFunction expr_traverseFunc(construct.get_scope_link());
         ObjectList<AST_t> expr_listFunc = construct.get_statement().get_ast().depth_subtrees(expr_traverseFunc);
         if(expr_listFunc.size()>0) {
@@ -656,12 +680,10 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 Expression e(expr_listFunc[f],construct.get_scope_link());
                 if(e.is_function_call()) {
                     cerr<<"Function call("<<e.prettyprint()<<") Found in construct (\n"<<construct.get_ast().prettyprint()<<" . Please use Inline Phase before execute OMP2MPI if you detect any error"<<endl;
-                    //                     cin.get();
-                    //                     exit(-1);
                 }
             }
             
-            //InlinePhase.inlineFunction(exprF.get_called_entity(),exprF);
+            
             
             // a.find_functions(construct.get_statement().get_ast(), construct.get_scope_link());
             
@@ -681,137 +703,14 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         Source empty;
         _aditionalLinesRead = empty;
         _aditionalLinesWrite = empty;
-        
-        int block_line = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), construct.get_ast(),0,0,1);
-        _constructLine = construct.get_pragma_line().get_line();
-        // cin.get();
-        //int block_line = construct.get_ast().get_line();
-        //            cout<<"S: "<<statement.prettyprint()<<endl;
-        //            
-        TL::HLT::Outline outlineAux(construct.get_enclosing_function().get_scope_link(), statement);
-        
-        
-        
-        
-        
-        _prmters = outlineAux.get_parameter_list();
-        
-        if(_prmters.size()==0) {         
-            _prmters =outlineAux.recomputeParameters(); // Error in compute_referenced_entities has to repeat this function
-        }
-        //prmters = outlineAux.get_parameter_list();
-        //  cout<<"Hola"<<endl;
-        //  
-        AST_t prevAST;
-        _construct_inside_bucle = is_inside_bucle(construct.get_ast(),construct.get_enclosing_function().get_scope_link(),block_line, 1);
-        if(_construct_inside_bucle)
-            block_line-=_num_Loop_uncountedLines;
-        _construct_num_loop = _for_num;
-        _construct_loop = _for_ast;
-        if(_construct_inside_bucle) {
-            cout<<"num Loop:"<<_construct_num_loop<<endl;
-            cout<<"Construct inside bucle"<<endl;
-            //            debugPoint("inside bucle");
-        }
-        
-        AST_t minAST = NULL;
-        int minLine= std::numeric_limits<int>::max();
-        for(int i = 0; i<_prmters.size();++i)
-            cout<<_prmters[i].get_name()<<endl;
-        if(_prmters.size()>0) {            
-            cout<<"Finding "<<_prmters.size()<<" parameters"<<endl;
-            //cout<<construct.get_enclosing_function().get_ast().prettyprint()<<endl;
-            
-            _prmtersOutlinedFunc.clear();
-            AST_t last_ast = fill_smart_use_table(function_def.get_function_body().get_ast(), function_def.get_function_body().get_scope_link(), function_def.get_scope(), block_line, _prmters,2,0, prevAST);
-            // cout<<last_ast.prettyprint()<<endl;
-            //
-            for (Mymap::const_iterator it = _smart_use_table.begin(); 
-                    it != _smart_use_table.end(); ++it) {
-                if(it->second.row_last_read_master.row!=0) 
-                    std::cout<<it->first<< "- LR(Master)("<<it->second.row_last_read_master.for_num<<"): "<<it->second.row_last_read_master.row<<" -> "<<it->second.row_last_read_master.ast.prettyprint()<<endl;
-                if(it->second.row_last_write_master.row!=0) 
-                    std::cout<<it->first<< "- LW(Master)("<<it->second.row_last_write_master.for_num<<"): "<<it->second.row_last_write_master.row<<" -> "<<it->second.row_last_write_master.ast.prettyprint()<<endl;
-                if(it->second.row_first_read_master.row!=0) {
-                    std::cout<<it->first<< "- FR(Master)("<<it->second.row_first_read_master.for_num<<"): "<<it->second.row_first_read_master.row<<" -> "<<it->second.row_first_read_master.ast.prettyprint()<<endl;
-                    
-                }
-                minLine = block_line;
-                minAST = construct.get_ast();
-                
-                if(it->second.row_first_write_master.row!=0) 
-                    std::cout<<it->first<< " -FW (Master)("<<it->second.row_first_write_master.for_num<<"): "<<it->second.row_first_write_master.row<<" -> "<<it->second.row_first_write_master.ast.prettyprint()<<endl;
-                
-                std::cout<<"---------------------------"<<endl;
-            }
-            typedef std::unordered_map <std::string,ObjectList<AST_t>> iter4in; 
-            //                 
-            cout<<"Context Analized"<<endl;
-            
-            cout<<"Getting out params"<<endl;
-            _ioParams = outlineAux.get_parameter_io(construct.get_scope());
-            cout<<"This block has "<<_ioParams.size()<<" OUT variables"<<endl;
-            for (iter4in::const_iterator it = _ioParams.begin(); it != _ioParams.end(); ++it) {
-                cout<<it->first<<endl;
-            }
-            
-            cout<<"Getting in params"<<endl;
-            _inParams = outlineAux.get_parameter_in(construct.get_scope());
-            cout<<"This block has "<<_inParams.size()<<" IN variables"<<endl;
-            
-            for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
-                cout<<it->first<<endl;
-            }
-        }
-        
-        //        cin.get();
-        //            cout<<"InVars:"<<endl;
-        //            typedef std::unordered_map <std::string,AST_t> iter4in; 
-        //            for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
-        //                cout<<it->first<<": "<<it->second.prettyprint()<<endl;
-        //            }
-        //            
-        //_inParams =
-        
         Source commented_loop;
         PragmaCustomClause red_clause = construct.get_clause("reduction");
         
         PragmaCustomClause static_clause = construct.get_clause("schedule");
-        if(_lastFunctionName.compare(function_sym.get_name())!=0) {
-            _initialized = 0;
-            _lastFunctionName = function_sym.get_name();
-        }
-        int staticC = 0;
-        cout<<"Studing static clause"<<endl;
-        if(static_clause.is_defined()) {
-            ObjectList<std::string> static_args = static_clause.get_arguments();
-            for (ObjectList<std::string>::iterator it = static_args.begin(); it != static_args.end(); it++) {
-                string actArg(*it);
-                if(actArg.compare("static") == 0) {
-                    staticC = 1;
-                    cout<< "Static Transformation"<<endl;
-                } else if(actArg.compare("guided") == 0) {
-                    cout<<"Guided Transformation";
-                    staticC = 2;
-                } else if(actArg.compare("dynamic") == 0){
-                    cout<< "Dynamic Transformation"<<endl;
-                } else {
-                    cout<< "Static in :"<<actArg<<endl;
-                    cout<< "Not possible to work with harcoded number of processors"<<endl;
-                    cin.get();
-                }
-            }
-            
-        } else {
-            cout<< "Dynamic Transformation"<<endl;
-        }
-        Source arg;
-        
-        
-        _reducedVarsIndexStart = _reducedVars.size();
-        _reducedVars.clear();
+        AST_t minAST = NULL;
+        int minLine= std::numeric_limits<int>::max();
+        AST_t prevAST;
         Source varInitialization;
-        
         //Initialization Common in all
         TL::Statement function_body = function_def.get_function_body();
         Source mpiFixStructurePart1, mpiFixStructurePart2, constructASTS;
@@ -819,9 +718,139 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         int varDefinedInFor = 1;
         Source initVar, initValue, initType, initS, mathExpressiononIteratingVariable;
         string varToWork, conditionToWork;
-        _isForDirective = 0;
         AST_t newASTStart;
+        int block_line;
+        int staticC;
+        TL::HLT::Outline outlineAux(construct.get_enclosing_function().get_scope_link(), statement);
         if(checkDirective(construct,"for")) {
+            cout<<"Omp parallel for"<<endl;
+            block_line = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), construct.get_ast(),0,0,1);
+            _constructLine = construct.get_pragma_line().get_line();
+            // cin.get();
+            //int block_line = construct.get_ast().get_line();
+            //            cout<<"S: "<<statement.prettyprint()<<endl;
+            //            
+            
+            
+            
+            
+            
+            
+            _prmters = outlineAux.get_parameter_list();
+            
+            if(_prmters.size()==0) {         
+                _prmters =outlineAux.recomputeParameters(); // Error in compute_referenced_entities has to repeat this function
+            }
+            //prmters = outlineAux.get_parameter_list();
+            //  cout<<"Hola"<<endl;
+            // 
+            
+            _construct_inside_bucle = is_inside_bucle(construct.get_ast(),construct.get_enclosing_function().get_scope_link(),block_line, 1);
+            if(_construct_inside_bucle)
+                block_line-=_num_Loop_uncountedLines;
+            _construct_num_loop = _for_num;
+            _construct_loop = _for_ast;
+            if(_construct_inside_bucle) {
+                cout<<"num Loop:"<<_construct_num_loop<<endl;
+                cout<<"Construct inside bucle"<<endl;
+                //            debugPoint("inside bucle");
+            }
+            
+            for(int i = 0; i<_prmters.size();++i)
+                cout<<_prmters[i].get_name()<<endl;
+            if(_prmters.size()>0) {            
+                cout<<"Finding "<<_prmters.size()<<" parameters"<<endl;
+                //cout<<construct.get_enclosing_function().get_ast().prettyprint()<<endl;
+                
+                _prmtersOutlinedFunc.clear();
+                AST_t last_ast = fill_smart_use_table(function_def.get_function_body().get_ast(), function_def.get_function_body().get_scope_link(), function_def.get_scope(), block_line, _prmters,2,0, prevAST);
+                // cout<<last_ast.prettyprint()<<endl;
+                //
+                for (Mymap::const_iterator it = _smart_use_table.begin(); 
+                        it != _smart_use_table.end(); ++it) {
+                    if(it->second.row_last_read_master.row!=0) 
+                        std::cout<<it->first<< "- LR(Master)("<<it->second.row_last_read_master.for_num<<"): "<<it->second.row_last_read_master.row<<" -> "<<it->second.row_last_read_master.ast.prettyprint()<<endl;
+                    if(it->second.row_last_write_master.row!=0) 
+                        std::cout<<it->first<< "- LW(Master)("<<it->second.row_last_write_master.for_num<<"): "<<it->second.row_last_write_master.row<<" -> "<<it->second.row_last_write_master.ast.prettyprint()<<endl;
+                    if(it->second.row_first_read_master.row!=0) {
+                        std::cout<<it->first<< "- FR(Master)("<<it->second.row_first_read_master.for_num<<"): "<<it->second.row_first_read_master.row<<" -> "<<it->second.row_first_read_master.ast.prettyprint()<<endl;
+                        
+                    }
+                    minLine = block_line;
+                    minAST = construct.get_ast();
+                    
+                    if(it->second.row_first_write_master.row!=0) 
+                        std::cout<<it->first<< " -FW (Master)("<<it->second.row_first_write_master.for_num<<"): "<<it->second.row_first_write_master.row<<" -> "<<it->second.row_first_write_master.ast.prettyprint()<<endl;
+                    
+                    std::cout<<"---------------------------"<<endl;
+                }
+                typedef std::unordered_map <std::string,ObjectList<AST_t>> iter4in; 
+                //                 
+                cout<<"Context Analized"<<endl;
+                
+                cout<<"Getting out params"<<endl;
+                _ioParams = outlineAux.get_parameter_io(construct.get_scope());
+                cout<<"This block has "<<_ioParams.size()<<" OUT variables"<<endl;
+                for (iter4in::const_iterator it = _ioParams.begin(); it != _ioParams.end(); ++it) {
+                    cout<<it->first<<endl;
+                }
+                
+                cout<<"Getting in params"<<endl;
+                _inParams = outlineAux.get_parameter_in(construct.get_scope());
+                cout<<"This block has "<<_inParams.size()<<" IN variables"<<endl;
+                
+                for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
+                    cout<<it->first<<endl;
+                }
+            }
+            
+            //        cin.get();
+            //            cout<<"InVars:"<<endl;
+            //            typedef std::unordered_map <std::string,AST_t> iter4in; 
+            //            for (iter4in::const_iterator it = _inParams.begin(); it != _inParams.end(); ++it) {
+            //                cout<<it->first<<": "<<it->second.prettyprint()<<endl;
+            //            }
+            //            
+            //_inParams =
+            
+            
+            if(_lastFunctionName.compare(function_sym.get_name())!=0) {
+                _initialized = 0;
+                _lastFunctionName = function_sym.get_name();
+            }
+            staticC = 0;
+            cout<<"Studing static clause"<<endl;
+            if(static_clause.is_defined()) {
+                ObjectList<std::string> static_args = static_clause.get_arguments();
+                for (ObjectList<std::string>::iterator it = static_args.begin(); it != static_args.end(); it++) {
+                    string actArg(*it);
+                    if(actArg.compare("static") == 0) {
+                        staticC = 1;
+                        cout<< "Static Transformation"<<endl;
+                    } else if(actArg.compare("guided") == 0) {
+                        cout<<"Guided Transformation";
+                        staticC = 2;
+                    } else if(actArg.compare("dynamic") == 0){
+                        cout<< "Dynamic Transformation"<<endl;
+                    } else {
+                        cout<< "Static in :"<<actArg<<endl;
+                        cout<< "Not possible to work with harcoded number of processors"<<endl;
+                        cin.get();
+                    }
+                }
+                
+            } else {
+                cout<< "Dynamic Transformation"<<endl;
+            }
+            Source arg;
+            
+            
+            _reducedVarsIndexStart = _reducedVars.size();
+            _reducedVars.clear();
+            
+            _isForDirective = 0;
+            
+            
             _isForDirective = 1;
             ForStatement fS(construct.get_statement());
             AST_t pragma2mpi = fS.get_loop_body().get_ast();
@@ -880,334 +909,334 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             }   
         }
         
-        
-        //conditionToWork = cleanWhiteSpaces(conditionToWork);
-        cout<<"Analyzing Reduction Clause"<<endl;
-        if (red_clause.is_defined()) {
-            ObjectList<std::string> red_args = red_clause.get_arguments();
-            for (ObjectList<std::string>::iterator it = red_args.begin(); it != red_args.end(); it++) {
-                string argument(*it);
-                string act, operation;
-                while(argument.find_first_of(":")>=0 && argument.find_first_of(":")<argument.length()) {
-                    operation = argument.substr(0,argument.find_first_of(":"));
-                    //std::cout <<"n: "<<num<<std::endl;
-                    if(argument.find_first_of(",")>=0 && argument.find_first_of(",")<argument.length()) {
-                        act = argument.substr(argument.find_first_of(":")+1,argument.find_first_of(",")-1);
-                        argument = argument.substr(argument.find_first_of(",")+1,argument.length());
-                    } else {
-                        act = argument.substr(argument.find_first_of(":")+1,argument.length());
-                        argument = argument.substr(argument.find_first_of(":")+1,argument.length());
-                    }
-                    infoVar newR;
-                    newR.name = act;
-                    newR.operation = operation;
-                    // cout << "N: -"<< std::string(newR.name) <<"- O: -"<< std::string(newR.operation) <<"-"<< endl;
-                    Symbol findedS = functionScope.get_symbol_from_name(newR.name);
-                    //                    cout<<construct.get_enclosing_function().get_scope().get_symbol_from_name(act).get_name()<<endl;
-                    string declaration;
-                    if(!findedS.is_valid()){
-                        cout<<"-"<<std::string(newR.name)<<"- not found in local function scope"<<endl;
-                        findedS = globalScope.get_symbol_from_name(act);
-                        if(findedS.is_valid()){
-                            declaration = std::string(findedS.get_type().get_declaration(globalScope,newR.name));
-                            declaration = declaration.substr(0, declaration.find(newR.name));
+        if(_isForDirective) {
+            //conditionToWork = cleanWhiteSpaces(conditionToWork);
+            cout<<"Analyzing Reduction Clause"<<endl;
+            if (red_clause.is_defined()) {
+                ObjectList<std::string> red_args = red_clause.get_arguments();
+                for (ObjectList<std::string>::iterator it = red_args.begin(); it != red_args.end(); it++) {
+                    string argument(*it);
+                    string act, operation;
+                    while(argument.find_first_of(":")>=0 && argument.find_first_of(":")<argument.length()) {
+                        operation = argument.substr(0,argument.find_first_of(":"));
+                        //std::cout <<"n: "<<num<<std::endl;
+                        if(argument.find_first_of(",")>=0 && argument.find_first_of(",")<argument.length()) {
+                            act = argument.substr(argument.find_first_of(":")+1,argument.find_first_of(",")-1);
+                            argument = argument.substr(argument.find_first_of(",")+1,argument.length());
                         } else {
-                            cout<<"-"<<std::string(newR.name)<<"- not found in global scope"<<endl;
-                            cin.get();
+                            act = argument.substr(argument.find_first_of(":")+1,argument.length());
+                            argument = argument.substr(argument.find_first_of(":")+1,argument.length());
                         }
-                    } else {
-                        declaration = std::string(findedS.get_type().get_declaration(functionScope,newR.name));
-                        declaration = declaration.substr(0, declaration.find(newR.name));
+                        infoVar newR;
+                        newR.name = act;
+                        newR.operation = operation;
+                        // cout << "N: -"<< std::string(newR.name) <<"- O: -"<< std::string(newR.operation) <<"-"<< endl;
+                        Symbol findedS = functionScope.get_symbol_from_name(newR.name);
+                        //                    cout<<construct.get_enclosing_function().get_scope().get_symbol_from_name(act).get_name()<<endl;
+                        string declaration;
+                        if(!findedS.is_valid()){
+                            cout<<"-"<<std::string(newR.name)<<"- not found in local function scope"<<endl;
+                            findedS = globalScope.get_symbol_from_name(act);
+                            if(findedS.is_valid()){
+                                declaration = std::string(findedS.get_type().get_declaration(globalScope,newR.name));
+                                declaration = declaration.substr(0, declaration.find(newR.name));
+                            } else {
+                                cout<<"-"<<std::string(newR.name)<<"- not found in global scope"<<endl;
+                                cin.get();
+                            }
+                        } else {
+                            declaration = std::string(findedS.get_type().get_declaration(functionScope,newR.name));
+                            declaration = declaration.substr(0, declaration.find(newR.name));
+                        }
+                        
+                        declaration = cleanWhiteSpaces(declaration);
+                        
+                        //                    cout<< "FS: -"<<declaration<<"-"<<endl;
+                        
+                        newR.type <<  declaration;
+                        _reducedVars.push_back(newR);
+                        
+                        
                     }
                     
-                    declaration = cleanWhiteSpaces(declaration);
-                    
-                    //                    cout<< "FS: -"<<declaration<<"-"<<endl;
-                    
-                    newR.type <<  declaration;
-                    _reducedVars.push_back(newR);
-                    
-                    
+                } 
+                
+                for(int i = 0; i<_reducedVars.size(); ++i){
+                    varInitialization<< _reducedVars[i].type <<" work"<<_reducedVarsIndexStart+i<<";";  
                 }
+                
+                if(varDefinedInFor)
+                    varInitialization<<initType<<" "<<varToWork<<"="<<initValue<<";";
                 
             } 
             
-            for(int i = 0; i<_reducedVars.size(); ++i){
-                varInitialization<< _reducedVars[i].type <<" work"<<_reducedVarsIndexStart+i<<";";  
-            }
-            
-            if(varDefinedInFor)
-                varInitialization<<initType<<" "<<varToWork<<"="<<initValue<<";";
-            
-        } 
-        
-        cout<<"Analyzing Shared Clause"<<endl;
-        PragmaCustomClause shared_clause = construct.get_clause("shared");
-        if (shared_clause.is_defined()) {
-            commented_loop
-                    << "// Arguments found in shared clausule: \n";
-            cout << "// Arguments found in shared clausule: " << endl;
-            ObjectList<Expression> shared_arguments = shared_clause.get_expression_list();
-            for (ObjectList<Expression>::iterator it = shared_arguments.begin(); it != shared_arguments.end(); it++) {
-                Expression argument(*it);
+            cout<<"Analyzing Shared Clause"<<endl;
+            PragmaCustomClause shared_clause = construct.get_clause("shared");
+            if (shared_clause.is_defined()) {
                 commented_loop
-                << "//  - " << argument.prettyprint() << "\n";
-                cout << "//  - " << argument.prettyprint() << endl;
+                        << "// Arguments found in shared clausule: \n";
+                cout << "// Arguments found in shared clausule: " << endl;
+                ObjectList<Expression> shared_arguments = shared_clause.get_expression_list();
+                for (ObjectList<Expression>::iterator it = shared_arguments.begin(); it != shared_arguments.end(); it++) {
+                    Expression argument(*it);
+                    commented_loop
+                    << "//  - " << argument.prettyprint() << "\n";
+                    cout << "//  - " << argument.prettyprint() << endl;
+                }
             }
-        }
-        cout<<"Analyzing Private Clause"<<endl;
-        PragmaCustomClause private_clause = construct.get_clause("private");
-        if (private_clause.is_defined()) {
-            commented_loop
-                    << "// Arguments found in private clausule: \n";
-            cout << "// Arguments found in private clausule: " << endl;
-            ObjectList<Expression> private_arguments = private_clause.get_expression_list();
-            for (ObjectList<Expression>::iterator it = private_arguments.begin(); it != private_arguments.end(); it++) {
-                Expression argument(*it);
-                _privateVars.push_back(argument.prettyprint());
+            cout<<"Analyzing Private Clause"<<endl;
+            PragmaCustomClause private_clause = construct.get_clause("private");
+            if (private_clause.is_defined()) {
+                commented_loop
+                        << "// Arguments found in private clausule: \n";
+                cout << "// Arguments found in private clausule: " << endl;
+                ObjectList<Expression> private_arguments = private_clause.get_expression_list();
+                for (ObjectList<Expression>::iterator it = private_arguments.begin(); it != private_arguments.end(); it++) {
+                    Expression argument(*it);
+                    _privateVars.push_back(argument.prettyprint());
+                }
             }
-        }
-        PragmaCustomClause tPrivate_clause = construct.get_clause("threadprivate");
-        if (tPrivate_clause.is_defined()) {
-            commented_loop
-                    << "// Arguments found in threadprivate clausule: \n";
-            cout << "// Arguments found in threadprivate clausule: " << endl;
-            ObjectList<Expression> private_arguments = tPrivate_clause.get_expression_list();
-            for (ObjectList<Expression>::iterator it = private_arguments.begin(); it != private_arguments.end(); it++) {
-                Expression argument(*it);
-                _privateVars.push_back(argument.prettyprint());
+            PragmaCustomClause tPrivate_clause = construct.get_clause("threadprivate");
+            if (tPrivate_clause.is_defined()) {
+                commented_loop
+                        << "// Arguments found in threadprivate clausule: \n";
+                cout << "// Arguments found in threadprivate clausule: " << endl;
+                ObjectList<Expression> private_arguments = tPrivate_clause.get_expression_list();
+                for (ObjectList<Expression>::iterator it = private_arguments.begin(); it != private_arguments.end(); it++) {
+                    Expression argument(*it);
+                    _privateVars.push_back(argument.prettyprint());
+                }
             }
-        }
-        PragmaCustomClause fPrivate_clause = construct.get_clause("firstprivate");
-        if (fPrivate_clause.is_defined()) {
-            commented_loop
-                    << "// Arguments found in firstprivate clausule: \n";
-            cout << "// Arguments found in firstprivate clausule: " << endl;
-            ObjectList<Expression> private_arguments = fPrivate_clause.get_expression_list();
-            for (ObjectList<Expression>::iterator it = private_arguments.begin(); it != private_arguments.end(); it++) {
-                Expression argument(*it);
-                _privateVars.push_back(argument.prettyprint());
+            PragmaCustomClause fPrivate_clause = construct.get_clause("firstprivate");
+            if (fPrivate_clause.is_defined()) {
+                commented_loop
+                        << "// Arguments found in firstprivate clausule: \n";
+                cout << "// Arguments found in firstprivate clausule: " << endl;
+                ObjectList<Expression> private_arguments = fPrivate_clause.get_expression_list();
+                for (ObjectList<Expression>::iterator it = private_arguments.begin(); it != private_arguments.end(); it++) {
+                    Expression argument(*it);
+                    _privateVars.push_back(argument.prettyprint());
+                }
             }
-        }
-        PragmaCustomClause lPrivate_clause = construct.get_clause("lastprivate");
-        if (lPrivate_clause.is_defined()) {
-            commented_loop
-                    << "// Arguments found in lastprivate clausule: \n";
-            cout << "// Arguments found in lastprivate clausule: " << endl;
-            ObjectList<Expression> private_arguments = lPrivate_clause.get_expression_list();
-            for (ObjectList<Expression>::iterator it = private_arguments.begin(); it != private_arguments.end(); it++) {
-                Expression argument(*it);
-                _privateVars.push_back(argument.prettyprint());
+            PragmaCustomClause lPrivate_clause = construct.get_clause("lastprivate");
+            if (lPrivate_clause.is_defined()) {
+                commented_loop
+                        << "// Arguments found in lastprivate clausule: \n";
+                cout << "// Arguments found in lastprivate clausule: " << endl;
+                ObjectList<Expression> private_arguments = lPrivate_clause.get_expression_list();
+                for (ObjectList<Expression>::iterator it = private_arguments.begin(); it != private_arguments.end(); it++) {
+                    Expression argument(*it);
+                    _privateVars.push_back(argument.prettyprint());
+                }
             }
-        }
-        cout<<"Filling OUT vars info"<<endl;
-        _ioVars = fill_vars_info(_ioParams, outlineAux,  construct, initVar, functionScope, globalScope, 1); 
-        cout <<"** OUT VARS **"<<endl;
-        for(int i =0;i<_ioVars.size();++i){
-            cout<<std::string(_ioVars[i].name)<<endl;
-        }
-        cout<<"Filling IN vars info"<<endl;
-        _inVars = fill_vars_info(_inParams, outlineAux,  construct, initVar, functionScope, globalScope, 0); 
-        cout <<"** IN VARS **"<<endl;
-        for(int i =0;i<_inVars.size();++i){
-            cout<<std::string(_inVars[i].name)<<endl;
-        }
-        
-        cout<<"Block number"<<_num_transformed_blocks<<" information"<<endl;
-        //        cin.get();
-        
-        // 
-        
-        cout<<"Creating initializations"<<endl;
-        if(!_initialized) {
-            if(!_divideWork || !_hasInit) {
-                varInitialization<<
-                        "MPI_Status "<<_statVar<<";"
-                        "int "<<_sizeVar <<", "<<_myidVar<<";"
-                        "int *"<<_argcVar<<"=NULL;"
-                        "char *** "<<_argvVar<<"=NULL;"
-                        "MPI_Init("<<_argcVar<<","<<_argvVar<<");"
-                        "MPI_Comm_size(MPI_COMM_WORLD,&"<<_sizeVar<<");"
-                        "MPI_Comm_rank(MPI_COMM_WORLD,&"<<_myidVar<<");"
-                        ;
+            cout<<"Filling OUT vars info"<<endl;
+            _ioVars = fill_vars_info(_ioParams, outlineAux,  construct, initVar, functionScope, globalScope, 1); 
+            cout <<"** OUT VARS **"<<endl;
+            for(int i =0;i<_ioVars.size();++i){
+                cout<<std::string(_ioVars[i].name)<<endl;
             }
-            varInitialization<< "const int "<<_FTAG<<" = 0;"
-                    "const int "<<_ATAG<<" = 1;"
-                    "const int "<<_RTAG<<" = 2;"
-                    "const int "<<_WTAG<<" = 3;"
-                    "const int "<<_SWTAG<<" = 4;"
-                    "const int "<<_FRTAG<<" = 5;"
-                    "const int "<<_FWTAG<<" = 6;"
-                    "double "<<_timeStartVar<<" = MPI_Wtime();"
-                    "double "<<_timeFinishVar<<";";
+            cout<<"Filling IN vars info"<<endl;
+            _inVars = fill_vars_info(_inParams, outlineAux,  construct, initVar, functionScope, globalScope, 0); 
+            cout <<"** IN VARS **"<<endl;
+            for(int i =0;i<_inVars.size();++i){
+                cout<<std::string(_inVars[i].name)<<endl;
+            }
             
-            _maxManagedVarsCoor = 0;
-            for(int j = 0; j<_inVars.size();++j) {  
-                //cout<<std::string(_inVars[j].name)<<" S: "<<_inVars[j].size.size()<< endl;
-                if(_inVars[j].size.size()>_maxManagedVarsCoor) {
-                    _maxManagedVarsCoor = _inVars[j].size.size();
-                    
+            cout<<"Block number"<<_num_transformed_blocks<<" information"<<endl;
+            //        cin.get();
+            
+            // 
+            
+            cout<<"Creating initializations"<<endl;
+            if(!_initialized) {
+                if(!_divideWork || !_hasInit) {
+                    varInitialization<<
+                            "MPI_Status "<<_statVar<<";"
+                            "int "<<_sizeVar <<", "<<_myidVar<<";"
+                            "int *"<<_argcVar<<"=NULL;"
+                            "char *** "<<_argvVar<<"=NULL;"
+                            "MPI_Init("<<_argcVar<<","<<_argvVar<<");"
+                            "MPI_Comm_size(MPI_COMM_WORLD,&"<<_sizeVar<<");"
+                            "MPI_Comm_rank(MPI_COMM_WORLD,&"<<_myidVar<<");"
+                            ;
                 }
-            }
-            for(int j = 0; j<_ioVars.size();++j) {  
-                //cout<<std::string(_inVars[j].name)<<" S: "<<_inVars[j].size.size()<< endl;
-                if(_ioVars[j].size.size()>_maxManagedVarsCoor) {
-                    _maxManagedVarsCoor = _ioVars[j].size.size();
-                    
-                }
-            }
-            //
-            varInitialization << "int "<<_coordVectorVar << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
-            //                if(_maxManagedVarsCoor>1) {
-            //                    varInitialization << "int c0";
-            //                    for(int n = 1; n<_maxManagedVarsCoor;++n)
-            //                        varInitialization << ", c"<<n;
-            //                    varInitialization <<";";
-            //                }
-        }
-        
-        //             cout<<std::string(varInitialization)<<endl;
-        //             cin.get();
-        
-        
-        //                cout<< "Array"<<endl;
-        
-        
-        
-        
-        // cout<<conditionToWork<<endl;
-        //
-        stringstream maxSTemp;
-        maxSTemp <<"("<<conditionToWork<<"- ("<<std::string(initValue)<<"))";
-        string maxS = maxSTemp.str();
-        //                  string maxS = "-1";
-        //                  for(int i = 0; i<_ioVars.size(); ++i){
-        //                      if(_ioVars[i].size>atoi(maxS.c_str()))
-        //                          maxS=_ioVars[i].size;
-        //                  }
-        ifstream divFile("div.data");
-        int lines = 0;
-        string infoDiv;
-        int fixDivided = 0;
-        string partSizeDivisionString, line;
-        while (getline(divFile, line)) {
-            if(!line.empty()) {
-                partSizeDivisionString = line;
-            }
-            lines++;
-        }
-        
-        divFile.close();
-        if(lines>1)
-            fixDivided = 1;
-        else if(partSizeDivisionString.empty())
-            partSizeDivisionString =  "1";
-        if(!_initialized) {
-            if(_construct_inside_bucle && _isForDirective) {
-                varInitialization << "int "<<_partSizeVar<<", "<<_offsetVar<<";";
-            } else if(_isForDirective){
-                if(fixDivided) {
-                    varInitialization << "int "<<_partSizeVar<<" = ("<<partSizeDivisionString<<");";
-                } else {
-                    varInitialization << "int "<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0) ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString<<") : 1;";
-                }
-                varInitialization << "int "<<_offsetVar<<";";
-                //varInitialization << "int "<<_partSizeVar<<" = ("<<maxS<<") / 100000 * "<<_sizeVar<<"), "<<_offsetVar<<";";
-            }
-        } else {
-            if(_isForDirective) {
+                varInitialization<< "const int "<<_FTAG<<" = 0;"
+                        "const int "<<_ATAG<<" = 1;"
+                        "const int "<<_RTAG<<" = 2;"
+                        "const int "<<_WTAG<<" = 3;"
+                        "const int "<<_SWTAG<<" = 4;"
+                        "const int "<<_FRTAG<<" = 5;"
+                        "const int "<<_FWTAG<<" = 6;"
+                        "double "<<_timeStartVar<<" = MPI_Wtime();"
+                        "double "<<_timeFinishVar<<";";
                 
-                if(fixDivided) {
-                    varInitialization << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
-                } else {
-                    varInitialization << "("<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0) ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString <<") : 1);";
-                }
-            }
-            varInitialization << "int "<<_coordVectorVar << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
-        }
-        
-        
-        TraverseASTFunctor4LocateUse expr_traverse(_scope_link);
-        ObjectList<AST_t> expr_list = function_body.get_ast().depth_subtrees(expr_traverse);
-        AST_t initalizationAST = varInitialization.parse_statement(function_body.get_ast(), function_body.get_scope_link());
-        AST_t astToAttach;
-        //                cout<< emptyAst.prettyprint()<<endl;
-        if(!_initialized) {
-            
-            ObjectList<Symbol> allSymbols = functionScope.get_all_symbols(false);
-            
-            for(int j = 0; j<expr_list.size() ;++j ){
-                int finded=0;
-                //                    cout<<expr_list[j].prettyprint()<<endl;
-                for(int i = 0; i<allSymbols.size();++i){
-                    //cout<<"S: "<<allSymbols[i].get_point_of_definition().prettyprint()<<endl;
-                    if(expr_list[j].prettyprint().compare(allSymbols[i].get_point_of_definition().prettyprint())==0) {   
-                        finded = 1;
-                        break;
-                    }  
-                }
-                if(!finded) {
-                    
-                    int astToAppendLine = get_real_line(construct.get_enclosing_function().get_ast(),construct.get_enclosing_function().get_scope_link(), expr_list[j],1,0,0);
-                    //astToAppendLine += _num_transformed_blocks;
-                    
-                    if(block_line>=astToAppendLine) {
+                _maxManagedVarsCoor = 0;
+                for(int j = 0; j<_inVars.size();++j) {  
+                    //cout<<std::string(_inVars[j].name)<<" S: "<<_inVars[j].size.size()<< endl;
+                    if(_inVars[j].size.size()>_maxManagedVarsCoor) {
+                        _maxManagedVarsCoor = _inVars[j].size.size();
                         
-                        if(_construct_inside_bucle) {
-                            astToAttach = _construct_loop;
-                            Source partSizeSource;
-                            if(_isForDirective) {
-                                if(fixDivided) {
-                                    partSizeSource << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
-                                } else {
-                                    partSizeSource << "("<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1)) > 0 ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString <<") : 1);";
-                                }
-                                construct.get_ast().prepend(partSizeSource.parse_statement(function_body.get_ast(), function_body.get_scope_link()));
-                            }
-                        } else {
-                            astToAttach = construct.get_ast();
-                            // cout<<"Prepend to2: "<<astToAttach.prettyprint()<<endl;  
-                        }
-                        astToAttach.prepend(initalizationAST);
-                        
-                    }  else {
-                        astToAttach = expr_list[j];
-                        astToAttach.append(initalizationAST);
-                        //                            cout<<"Append to: "<<astToAttach.prettyprint()<<endl;  
                     }
-                    break;
                 }
+                for(int j = 0; j<_ioVars.size();++j) {  
+                    //cout<<std::string(_inVars[j].name)<<" S: "<<_inVars[j].size.size()<< endl;
+                    if(_ioVars[j].size.size()>_maxManagedVarsCoor) {
+                        _maxManagedVarsCoor = _ioVars[j].size.size();
+                        
+                    }
+                }
+                //
+                varInitialization << "int "<<_coordVectorVar << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
+                //                if(_maxManagedVarsCoor>1) {
+                //                    varInitialization << "int c0";
+                //                    for(int n = 1; n<_maxManagedVarsCoor;++n)
+                //                        varInitialization << ", c"<<n;
+                //                    varInitialization <<";";
+                //                }
             }
-            _initialized =1;
             
-        } else {
-            if(_lastTransformInfo[_lastTransformInfo.size()-1]._inside_bucle) {
-                cout<<"last was inside bucle"<<endl;
-                if(_lastTransformInfo[_lastTransformInfo.size()-1]._num_loop == _construct_num_loop) {
-                    
-                    cout<<"last was on the same bucle"<<endl;
-                    cout<<_lastTransformInfo[_lastTransformInfo.size()-1]._num_loop<<endl;
-                    cout<<_construct_num_loop<<endl;
-                    astToAttach = _lastTransformInfo[_lastTransformInfo.size()-1]._lastModifiedAST;
-                } else {
-                    cout<<"last was not on the same bucle"<<endl;
-                    cout<<_lastTransformInfo[_lastTransformInfo.size()-1]._num_loop<<endl;
-                    cout<<_construct_num_loop<<endl;
-                    astToAttach = _lastTransformInfo[_lastTransformInfo.size()-1]._wherePutFinal;
+            //             cout<<std::string(varInitialization)<<endl;
+            //             cin.get();
+            
+            
+            //                cout<< "Array"<<endl;
+            
+            
+            
+            
+            // cout<<conditionToWork<<endl;
+            //
+            stringstream maxSTemp;
+            maxSTemp <<"("<<conditionToWork<<"- ("<<std::string(initValue)<<"))";
+            string maxS = maxSTemp.str();
+            //                  string maxS = "-1";
+            //                  for(int i = 0; i<_ioVars.size(); ++i){
+            //                      if(_ioVars[i].size>atoi(maxS.c_str()))
+            //                          maxS=_ioVars[i].size;
+            //                  }
+            ifstream divFile("div.data");
+            int lines = 0;
+            string infoDiv;
+            int fixDivided = 0;
+            string partSizeDivisionString, line;
+            while (getline(divFile, line)) {
+                if(!line.empty()) {
+                    partSizeDivisionString = line;
+                }
+                lines++;
+            }
+            
+            divFile.close();
+            if(lines>1)
+                fixDivided = 1;
+            else if(partSizeDivisionString.empty())
+                partSizeDivisionString =  "1";
+            if(!_initialized) {
+                if(_construct_inside_bucle && _isForDirective) {
+                    varInitialization << "int "<<_partSizeVar<<", "<<_offsetVar<<";";
+                } else if(_isForDirective){
+                    if(fixDivided) {
+                        varInitialization << "int "<<_partSizeVar<<" = ("<<partSizeDivisionString<<");";
+                    } else {
+                        varInitialization << "int "<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0) ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString<<") : 1;";
+                    }
+                    varInitialization << "int "<<_offsetVar<<";";
+                    //varInitialization << "int "<<_partSizeVar<<" = ("<<maxS<<") / 100000 * "<<_sizeVar<<"), "<<_offsetVar<<";";
                 }
             } else {
-                cout<<"last was not inside bucle"<<endl;
-                astToAttach = _lastTransformInfo[_lastTransformInfo.size()-1]._lastModifiedAST;
+                if(_isForDirective) {
+                    
+                    if(fixDivided) {
+                        varInitialization << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
+                    } else {
+                        varInitialization << "("<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1) > 0) ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString <<") : 1);";
+                    }
+                }
+                varInitialization << "int "<<_coordVectorVar << _num_transformed_blocks <<"["<<_maxManagedVarsCoor<<"];";
             }
             
-            //            cout<<astToAttach<<endl;
-            //            cin.get();
-            astToAttach.append(initalizationAST);            
-        }
-        // cout<<astToAttach.prettyprint()<<endl;
-        // 
-        // 
-        if(_isForDirective) {
+            
+            TraverseASTFunctor4LocateUse expr_traverse(_scope_link);
+            ObjectList<AST_t> expr_list = function_body.get_ast().depth_subtrees(expr_traverse);
+            AST_t initalizationAST = varInitialization.parse_statement(function_body.get_ast(), function_body.get_scope_link());
+            AST_t astToAttach;
+            //                cout<< emptyAst.prettyprint()<<endl;
+            if(!_initialized) {
+                
+                ObjectList<Symbol> allSymbols = functionScope.get_all_symbols(false);
+                
+                for(int j = 0; j<expr_list.size() ;++j ){
+                    int finded=0;
+                    //                    cout<<expr_list[j].prettyprint()<<endl;
+                    for(int i = 0; i<allSymbols.size();++i){
+                        //cout<<"S: "<<allSymbols[i].get_point_of_definition().prettyprint()<<endl;
+                        if(expr_list[j].prettyprint().compare(allSymbols[i].get_point_of_definition().prettyprint())==0) {   
+                            finded = 1;
+                            break;
+                        }  
+                    }
+                    if(!finded) {
+                        
+                        int astToAppendLine = get_real_line(construct.get_enclosing_function().get_ast(),construct.get_enclosing_function().get_scope_link(), expr_list[j],1,0,0);
+                        //astToAppendLine += _num_transformed_blocks;
+                        
+                        if(block_line>=astToAppendLine) {
+                            
+                            if(_construct_inside_bucle) {
+                                astToAttach = _construct_loop;
+                                Source partSizeSource;
+                                if(_isForDirective) {
+                                    if(fixDivided) {
+                                        partSizeSource << "("<<_partSizeVar<<" = ("<<partSizeDivisionString<<"));";
+                                    } else {
+                                        partSizeSource << "("<<_partSizeVar<<" = (("<<maxS<<")/ ("<<_sizeVar<<"-1)) > 0 ? ((("<<maxS<<") / ("<<_sizeVar<<"-1)) / "<<partSizeDivisionString <<") : 1);";
+                                    }
+                                    construct.get_ast().prepend(partSizeSource.parse_statement(function_body.get_ast(), function_body.get_scope_link()));
+                                }
+                            } else {
+                                astToAttach = construct.get_ast();
+                                // cout<<"Prepend to2: "<<astToAttach.prettyprint()<<endl;  
+                            }
+                            astToAttach.prepend(initalizationAST);
+                            
+                        }  else {
+                            astToAttach = expr_list[j];
+                            astToAttach.append(initalizationAST);
+                            //                            cout<<"Append to: "<<astToAttach.prettyprint()<<endl;  
+                        }
+                        break;
+                    }
+                }
+                _initialized =1;
+                
+            } else {
+                if(_lastTransformInfo[_lastTransformInfo.size()-1]._inside_bucle) {
+                    //                cout<<"last was inside bucle"<<endl;
+                    if(_lastTransformInfo[_lastTransformInfo.size()-1]._num_loop == _construct_num_loop) {
+                        
+                        //                    cout<<"last was on the same bucle"<<endl;
+                        //                    cout<<_lastTransformInfo[_lastTransformInfo.size()-1]._num_loop<<endl;
+                        //                    cout<<_construct_num_loop<<endl;
+                        astToAttach = _lastTransformInfo[_lastTransformInfo.size()-1]._lastModifiedAST;
+                    } else {
+                        //                    cout<<"last was not on the same bucle"<<endl;
+                        //                    cout<<_lastTransformInfo[_lastTransformInfo.size()-1]._num_loop<<endl;
+                        //                    cout<<_construct_num_loop<<endl;
+                        astToAttach = _lastTransformInfo[_lastTransformInfo.size()-1]._wherePutFinal;
+                    }
+                } else {
+                    //                cout<<"last was not inside bucle"<<endl;
+                    astToAttach = _lastTransformInfo[_lastTransformInfo.size()-1]._lastModifiedAST;
+                }
+                
+                //            cout<<astToAttach<<endl;
+                //            cin.get();
+                astToAttach.append(initalizationAST);            
+            }
+            // cout<<astToAttach.prettyprint()<<endl;
+            // 
+            // 
+            
             cout<<"Generating MPI Master code"<<endl;
             
             
@@ -1427,7 +1456,10 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 Source mpiVariantStructurePart4, mpiVariantStructurePart5, mpiVariantStructurePart6;
                 
-                cout<<"Generating MPI Slave code"<<endl;;
+                cout<<"Generating MPI Slave code"<<endl;
+                
+                //                cout<<function_body.prettyprint()<<endl;
+                //                cin.get();
                 if(staticC!=0) {
                     if(_inVars.size()!=0){
                         mpiVariantStructurePart4 
@@ -1799,15 +1831,15 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 AST_t ASTmpiFixStructurePart2 = mpiFixStructurePart2.parse_statement(function_body.get_ast(), function_body.get_scope_link());
                 construct.get_ast().replace_with(ASTmpiFixStructurePart2);
                 //                construct.get_ast().prepend(ast2start);
-                //                cout<<function_body.prettyprint()<<endl;
-                //                cin.get();
+                //                                cout<<function_body.prettyprint()<<endl;
+                //                               cin.get();
                 
             }
             putBarrier(minLine, staticC, block_line, construct, function_sym, function_body, minAST, newASTStart);
             
             
-        }else if(checkDirective(construct,"barrier")) {
-            //            cout<<"barrier"<<endl;
+        } else if(checkDirective(construct,"barrier")) {
+            cout<<"barrier"<<endl;
             //            cin.get();
             Source newSource;
             
@@ -1826,7 +1858,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             putBarrier(minLine, staticC, block_line, construct, function_sym, function_body, minAST, newASTStart);
             
         } else {
-            cout<<"Parallel"<<endl;
+            cout<<"Parallel Group"<<endl;
+            //            cin.get();
             AST_t new_block;
             Source new_blockS;
             int preHMPPstart=0;
@@ -1841,16 +1874,16 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             if(preHMPPstart) {
                 Source newConstructSource;
                 string contructSourceWithoutKeys = construct.get_statement().get_ast().prettyprint();
-                cout<<contructSourceWithoutKeys<<endl;
+                //                cout<<contructSourceWithoutKeys<<endl;
                 int finded = 0;
                 if(contructSourceWithoutKeys.find_first_of("{")==0) {
                     finded =1;
                     contructSourceWithoutKeys =  contructSourceWithoutKeys.substr(1,contructSourceWithoutKeys.length());
-                    cout<<"yes on start"<<endl;
+                    //                    cout<<"yes on start"<<endl;
                 }
                 if(contructSourceWithoutKeys.find_last_of("}")==contructSourceWithoutKeys.length()-1 && finded) {
                     contructSourceWithoutKeys =  contructSourceWithoutKeys.substr(0,contructSourceWithoutKeys.length()-1);
-                    cout<<"yes on fin"<<endl;
+                    //                    cout<<"yes on fin"<<endl;
                 } 
                 
                 
@@ -1881,14 +1914,20 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                 checkSinside=" check";    
                             clauses  = clauses.substr(0,clauses.find("check")-1);
                         }
-                        int outline_line = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), construct.get_ast(),1,0,0);
-                        TL::HLT::Outline outlineAux(statement.get_scope_link(), statement,outline_line);
+                        
+                        
+//                        cout<<"Finding block line"<<endl;
+//                        int outline_line = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), construct.get_ast(),1,0,0);
+//                        cout<<"Creating outline"<<endl;
+//                        TL::HLT::Outline outlineAux(statement.get_scope_link(), statement,outline_line);
                         Source sharedVars,privateVars, s,sep,f;
-                        s<<"shared(";
-                        sep <<", ";
-                        f <<") ";
-                        sharedVars = outlineAux.get_parameter_io(statement.get_scope(),s,sep,f);
-                        sharedVars = std::string(sharedVars).substr(std::string(sharedVars).find(", s")+1,std::string(sharedVars).length());
+//                        s<<"shared(";
+//                        sep <<", ";
+//                        f <<") ";
+//                        cout<<"Filling shared vars of parallel block"<<endl;
+//                        sharedVars = outlineAux.get_parameter_io(statement.get_scope(),s,sep,f);
+//                        sharedVars = std::string(sharedVars).substr(std::string(sharedVars).find(", s")+1,std::string(sharedVars).length());
+                        
                         std::string astText= expr.get_ast().prettyprint(true);
                         int num = 0;
                         size_t forIndx=-1;
@@ -1904,23 +1943,11 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                                 }
                                 if(astText.substr(0,astText.find_first_of("(")).compare(std::string(stringSpaces))==0){
                                     astText = astText.substr(astText.find_first_of("(")+1,astText.length());
-                                    
+                                   
                                     std::string express;
                                     express = astText.substr(0,astText.find("="));
                                     // std::cout<<"0: "<<express<<std::endl;
-                                    while(express.find(" ")==0) {
-                                        express = express.substr(express.find(" ")+1,express.length());
-                                        //  std::cout<<"1: "<<express<<std::endl;
-                                    }
-                                    while(express.find_last_of(" ")==express.length()-1){
-                                        express = express.substr(0,express.find_last_of(" "));
-                                        //  std::cout<<"2: "<<express<<std::endl;
-                                    }
-                                    
-                                    if(express.find_last_of(" ")>0 && express.find_last_of(" ")<express.length()) {
-                                        express= express.substr(express.find_last_of(" ")+1,express.length());
-                                        //   std::cout<<"3: "<<express<<std::endl;
-                                    }
+                                    express = cleanWhiteSpaces(express);
                                     
                                     if(num==0)
                                         privateVars << express;
@@ -1934,25 +1961,43 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                             
                             privateVars<<")";
                         }
-                        //                std::cout<<"Shared: "<<std::string(sharedVars)<<endl;
+                        std::cout<<"Private: "<<std::string(privateVars)<<endl;
+                        std::cout<<"Shared: "<<std::string(sharedVars)<<endl;
+//                        AST_t statementAST;
+//                        expr.get_ast().replace_with(statement.get_ast());
+//                        cout<<expr.get_ast().prettyprint()<<endl;
                         Source newSource;
                         if(fixedSinside.empty() && checkSinside.empty()) {
-                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<fixedS<<checkS<<"\n"<<statement.prettyprint()<<"\n";
+                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<fixedS<<checkS<<"\n"<<statement.prettyprint();
                         }
                         if(!fixedSinside.empty() && checkSinside.empty()) {
-                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<fixedSinside<<"\n"<<statement.prettyprint()<<"\n";
+                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<fixedSinside<<"\n"<<statement.prettyprint();
                         }
                         if(fixedSinside.empty() && !checkSinside.empty()) {
-                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<checkSinside<<"\n"<<statement.prettyprint()<<"\n";
+                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<checkSinside<<"\n"<<statement.prettyprint();
                         }
-                        
-                        AST_t newAst = newSource.parse_statement(construct.get_ast(), construct.get_enclosing_function().get_scope_link());
+//                        if(fixedSinside.empty() && checkSinside.empty()) {
+//                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<fixedS<<checkS;
+//                        }
+//                        if(!fixedSinside.empty() && checkSinside.empty()) {
+//                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<fixedSinside;
+//                        }
+//                        if(fixedSinside.empty() && !checkSinside.empty()) {
+//                            newSource<<"#pragma omp parallel "<<clauses<<sharedVars<<privateVars<<checkSinside;
+//                        }
+//                        cout<<std::string(newSource)<<endl;
+////                        cout<<construct.get_enclosing_statement().get_scope_link().prettyprint()<<endl;
+                        AST_t newAst = newSource.parse_statement(construct.get_ast(), construct.get_scope_link());
                         expr.get_ast().replace(newAst);
+                        cout<<newAst.prettyprint()<<endl;
+                        
                         
                     }
                 }
                 int n =0;
                 for(ObjectList<PragmaCustomConstruct>::iterator itC = constructList.begin(); itC!=constructList.end();itC++,n++) {    
+                    cout<<"------------------------------------------------------------"<<endl;
+                    cout<<"Follow Transformation of pragma omp: "<<constructList[n].prettyprint()<<endl;
                     pragma_postorder(constructList[n]);
                 }
                 
@@ -2067,6 +2112,8 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             }
         }
         _num_transformed_blocks++;
+    } else {
+        cout<<"OMP no transform ("<<pragmaInstruction<<" in: "<<function_sym.get_name()<<")"<<endl;
     }
     _num_non_trasformed_blocks++;
     
@@ -2280,7 +2327,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             int lineIO = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), _ioParams[actArg][i],1,0,0);
                             if(lineIO>maxLine) {
                                 maxLine = lineIO;
-                                cout<<"IO: "<<_ioParams[actArg][i].prettyprint()<<endl;
+                                //                                cout<<"IO: "<<_ioParams[actArg][i].prettyprint()<<endl;
                             }
                         }
                         int numIoVar = 0;
@@ -2400,7 +2447,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                 knowedVariable = 1;
                                 break;
                             }
-                            cout<<"iterators: "<<actIt<<endl;
+                            //                            cout<<"iterators: "<<actIt<<endl;
                             if(isLastWrite) {
                                 if(!_fullArrayWrites || !isInRange) {
                                     operandMPIWrites << "("<<_coordVectorVar
@@ -2471,7 +2518,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                             //if(_withMemoryLimitation || !isUploadedVar(firstO)) {
                             if((_withMemoryLimitation || !isInRange)) {
                                 int f1 = 0;
-                                cout<<expr_list[l].prettyprint()<<endl;
+                                //                                cout<<expr_list[l].prettyprint()<<endl;
                                 for(int itIO=0;itIO<_ioVars[finded].iterVar.size();++itIO) {
                                     //                                    cout<<std::string(_ioVars[finded].iterVar[itIO])<<" vs. "<<std::string(initVar)<<endl;
                                     if(std::string(_ioVars[finded].iterVar[itIO]).compare(std::string(initVar))==0)
@@ -2557,8 +2604,8 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     if(!_outsideAditionalWrites) {
                                         //                                                                            cout<<"NO additional"<<endl;
                                         //                                                                            cin.get();
-                                        cout<<forIterated.get_line()<<endl;
-                                        cout<<construct_ast.get_line()<<endl;
+                                        //                                        cout<<forIterated.get_line()<<endl;
+                                        //                                        cout<<construct_ast.get_line()<<endl;
                                         //                                        cout<<"append"<<endl;
                                         AST_t writeAST;
                                         writeAST = write.parse_statement(construct.get_scope(),construct.get_enclosing_function().get_scope_link());
@@ -2622,8 +2669,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                 for (int e=0;e<operands.size();e++){ //second Operand
                     
                     Source operandMPIReads;
-                    //                    cout<<"O("<<e<<"): "<<std::string(operands[e])<<endl;
-                    //                        cin.get();
+                                        
                     int old_outsideAditionalReads = _outsideAditionalReads;
                     if(std::string(operands[e]).find_first_of("[")>= 0 && std::string(operands[e]).find_first_of("[")<std::string(operands[e]).length()) {
                         
@@ -2635,14 +2681,15 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                         
                         int finded = -1;
                         for(int k=0 ;k<_inVars.size();k++) {
-                            //                        cout<<std::string(_inVars[k].name)<<" vs. "<<actArg<<endl;
+//                            cout<<std::string(_inVars[k].name)<<" vs. "<<actArg<<endl;
                             if(std::string(_inVars[k].name).compare(actArg)==0) {
                                 finded = k;
                                 break;
                             }
                         }
                         if(finded>-1) {
-                            
+//                            cout<<"O("<<e<<"): "<<std::string(operands[e])<<endl;
+//                                            cin.get();
                             Source variableNewName, variableDeclaration, dimensions;
                             int isInRange = 0;
                             string rangeInitialValue = "0";
@@ -2669,19 +2716,19 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                     isInRange = checkIfIteratedByOutsideIterators(firstIterator, _construct_loop, scopeL, 0, exprLine);
                                     
                                 }
-                                cout<<"...--------------------..."<<endl;
+                                //                                cout<<"...--------------------..."<<endl;
                                 if(!isInRange) {
                                     
                                     int exprLine =  construct_ast.get_line();
-                                    cout<<std::string(operands[e])<<endl;
-                                    cout<<"Construct on--"<<exprLine<<endl;
-                                    cout<<"Expression on--"<<expr_list[l].get_line()<<endl;
-                                    cout<<"Is expression n--"<<l<<endl;
+                                    //                                    cout<<std::string(operands[e])<<endl;
+                                    //                                    cout<<"Construct on--"<<exprLine<<endl;
+                                    //                                    cout<<"Expression on--"<<expr_list[l].get_line()<<endl;
+                                    //                                    cout<<"Is expression n--"<<l<<endl;
                                     //                                    cin.get();
                                     isInRange = isInForIteratedBy(firstIterator, expr_list[l], construct.get_ast(), scopeL, actArg, 0, itList, std::string(operands[e]));
                                 } else {
                                     cout<<std::string(operands[e])<<endl;
-                                    cout<<"In in outsideFor"<<endl;
+                                    //                                    cout<<"In in outsideFor"<<endl;
                                 }
                                 
                                 rangeInitialValue = _rI;
@@ -2697,7 +2744,7 @@ string TransPhase::transformConstructAST(PragmaCustomConstruct construct, ScopeL
                                         up.name = actArg;
                                         _uploadedVars.push_back(up);
                                         isNewUploadedVar = 1;
-                                        cout<<rangeInitialValue<<" to "<<rangeFinishValue<<endl;
+                                        //                                        cout<<rangeInitialValue<<" to "<<rangeFinishValue<<endl;
                                         
                                         numUploadedVar = _uploadedVars.size()-1;
                                     } 
@@ -3563,12 +3610,12 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
             
             ObjectList<Source> iterators;
             if(iNOUT){
+
                 string actASTstring = actAST.prettyprint();
                 if(actASTstring.find_first_of("=")>0 && actASTstring.find_first_of("=")<actASTstring.length())
                     actASTstring = actASTstring.substr(0,actASTstring.find_first_of("="));
                 iterators = findPrincipalIterator(actASTstring, it->first);
-                //                cout<<actAST<<endl;
-                
+                                
                 
                 for(int j=0;j<iterators.size();++j) {
                     int find = 0;
@@ -3608,12 +3655,13 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                 }
                 //                cin.get();
             } else {
-                //                 cout<<"HI"<<endl;
+                                 
                 string actASTstring = actAST.prettyprint();
                 if(actASTstring.find_first_of("=")>0 && actASTstring.find_first_of("=")<actASTstring.length())
                     actASTstring = actASTstring.substr(actASTstring.find_first_of("=")+1, actASTstring.length());
                 string second = actASTstring;
-                //                cout<<"HI2"<<endl;
+//                cout<<second<<endl;
+//                cin.get();
                 iterators = findPrincipalIterator(second, it->first);
                 ObjectList<Source> iteratorsAdditional;
                 switch(actAST.prettyprint()[actAST.prettyprint().find_first_of("=")-1]) {
@@ -3638,10 +3686,14 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                             find = 1;
                     }
                     if(!find && !iterators[j].empty()) {
-                        //                        cout<<"adding "<<std::string(iterators[j])<<" to "<<std::string(newR.name)<<endl;
+                                                cout<<"adding "<<std::string(iterators[j])<<" to "<<std::string(newR.name)<<endl;
                         newR.iterVar.push_back(iterators[j]);
+                    } else {
+                        cout<<"discarted it "<<std::string(iterators[j])<<" for "<<std::string(newR.name)<<endl;
                     }
+                           
                 }
+                
                 for(int x=0;x<_ioVars.size();++x) {
                     //                    cout<<"H2I"<<endl;
                     if(std::string(newR.name).compare(std::string(_ioVars[x].name))==0) {
@@ -3755,7 +3807,8 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
         //
         if(!isReducedVar(std::string(newR.name))  && !isPrivateVar(std::string(newR.name))){
             
-            //cout<<"Test as: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[i])<<endl;
+//            cout<<"Test as: "<<std::string(newR.name)<<" iterated by "<<std::string(newR.iterVar[0])<<endl;
+//            cin.get();
             if (iNOUT && (isIOVar(std::string(newR.name)) || !_smartUploadDownload)) {
                 //if(iNOUT) {
                 vars.push_back(newR);
@@ -3768,9 +3821,11 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                     
                 }
                 cout<<endl;
-            } else if (!iNOUT && (isINVar(std::string(newR.name)) || !_smartUploadDownload)) {
-                //TEST THAT} else if (!iNOUT && (isINVar(std::string(newR.name)))) {
-                //} else if (!iNOUT) {
+            } else if (!iNOUT && (
+                    (isINVar(std::string(newR.name)) || !_smartUploadDownload) 
+                    || 
+                    (_construct_inside_bucle && isIOVar(std::string(newR.name)))
+                    )) {
                 vars.push_back(newR);
                 cout<<"INVAR: "<<std::string(newR.name);
                 if(newR.iterVar.size()>0) {
@@ -3779,8 +3834,10 @@ vector<TransPhase::infoVar> TransPhase::fill_vars_info(std::unordered_map <std::
                         cout<<", "<<std::string(newR.iterVar[i]);
                 }
                 cout<<endl;
+            } else {
+                cout<<"DISCARTED: "<<std::string(newR.name);
             }
-            
+//            cin.get();
             
             // 
         }
@@ -4751,9 +4808,9 @@ AST_t TransPhase::fill_smart_use_table(AST_t asT, ScopeLink scopeL, Scope sC, in
                                 f = 1;
                                 
                                 FunctionDefinition fD(sym.get_definition_tree(),_scope_link);
-
+                                
                                 Statement fBS = fD.get_function_body();
-
+                                
                                 _levelFunc++;
                                 fill_smart_use_table(fBS.get_ast(), fD.get_scope_link(), fD.get_scope(), outline_num_line, prmters, 3, line, actAst);
                                 _levelFunc--;
@@ -5201,7 +5258,7 @@ TransPhase::use TransPhase::fill_use(int line, AST_t actAst){
 }
 
 int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine, int searching_construct) {
-    cout<< ast2check<<endl;
+    //    cout<< ast2check<<endl;
     
     TraverseASTFunctor4LocateFor expr_traverseFor(scopeL);
     ObjectList<AST_t> expr_listFor = _file_tree.depth_subtrees(expr_traverseFor);
@@ -5266,7 +5323,7 @@ int TransPhase::is_inside_bucle(AST_t ast2check, ScopeLink scopeL, int exprLine,
         
         
     }
-    cout<<exprLine<<endl;
+    //    cout<<exprLine<<endl;
     if(_for_min_line>-1 || _for_min_line==exprLine){
         _for_num = num_for;
         //        cout<<"inside bucle "<< _for_num<<endl;
@@ -5419,7 +5476,7 @@ int TransPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLineAST, int
                         //                            cout<<actLineAST.prettyprint()<<endl;
                         //                            if(expr_list2.size()>1) {
                         //                                line+=expr_list2.size();
-                        cout<<line<<endl;
+                        //                        cout<<line<<endl;
                         
                         line-=myidLines;
                         //                        cout<<line<<endl;
