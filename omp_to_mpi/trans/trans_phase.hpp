@@ -117,6 +117,7 @@ private:
     vector<infoVar> _inVars;
     int _initialized;
     int _constructLine;
+
     int _elseNeeded;
     AST_t _initAST;
     int _maxManagedVarsCoor;

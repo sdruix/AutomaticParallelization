@@ -914,8 +914,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'I':
                 _includesOnExec = _includesOnExec + " -I" + optarg;
-//                cout<<_includesOnExec<<endl;
-//                cin.get();
                 break;
             case 'i':
                 inlineF = 1;    
@@ -1163,6 +1161,7 @@ int main(int argc, char *argv[]) {
             }
             std::stringstream  nameOUT, commandOUT, loopNormCommand;
             int end = endDivisionValue>1 ? endDivisionValue : 1;
+            end = endDivisionValue>startDivisionValue ? endDivisionValue : startDivisionValue;
             if((toDo == 0 || toDo == 3) && inlineF) {
                 inlineFunctions(tempName, extKind, firstLine, firstLineAlternative, firstLineNoKeys, firstLineAlternativeNoKeys, includeVector);
             }
@@ -1170,7 +1169,7 @@ int main(int argc, char *argv[]) {
                 normalizeLoopsFunction(tempName, extKind, firstLine, firstLineAlternative, firstLineNoKeys, firstLineAlternativeNoKeys, includeVector);
             }
             vector<string> initialincludeVector = includeVector;
-            
+            cout<<"["<<startDivisionValue<<"..."<<end<<"]"<<endl;
             for(int dV = startDivisionValue;dV<=end;dV*=2) {
                 if(partSize > 0) {
                     cout<<"Fixed problem division to "<<partSize<<endl;
