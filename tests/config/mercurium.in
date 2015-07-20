@@ -1,0 +1,21 @@
+#!@BASH@
+
+# Basic mercurium generator
+
+if [ ! -e "mercurium" ];
+then
+# Mercurium default
+
+source @abs_top_builddir@/tests/config/mercurium-libraries
+
+cat <<EOF
+MCXX="@abs_top_builddir@/src/driver/mcxx --output-dir=@abs_top_builddir@/tests --config-dir=@abs_top_builddir@/config --verbose"
+test_CC="\${MCXX} --profile=plaincc"
+test_CXX="\${MCXX} --profile=plaincxx"
+test_FC="\${MCXX} --profile=plainfc"
+test_nolink=yes
+EOF
+else
+    # If current directory has a generator, use it
+    ./mercurium
+fi

@@ -288,7 +288,7 @@ void OutlinePhase::pragma_postorder(PragmaCustomConstruct construct) {
                             std::cout<<it->first<< "FW(CPU)("<<it->second.row_first_write_cpu.for_num<<"): "<<it->second.row_first_write_cpu.row<<" -> "<<it->second.row_first_write_cpu.ast.prettyprint()<<endl;
                         std::cout<<"---------------------------"<<endl;
                     }
-                    
+                   
                     Source param_list,pragmaTemp;
                     
                     param_list = get_Params(construct, statement, kindofOutline.cod, kindofOutline.transfer, outline);
@@ -877,7 +877,7 @@ void OutlinePhase::pragma_postorder(PragmaCustomConstruct construct) {
         }
         delete kindofOutline.lvl1;
         delete kindofOutline.lvl2;
-        
+         
         
     } 
     else {

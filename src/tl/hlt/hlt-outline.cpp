@@ -51,6 +51,7 @@ Outline::Outline(ScopeLink sl, Statement stmt)
         _overriden_outline_name(false),
         _default_parameter_passing(POINTER) {
     _outline_statements.append(stmt);
+    
     set_cod_trans(0, 0);
     _exec=0;
 }
@@ -69,6 +70,7 @@ Outline::Outline(ScopeLink sl, Statement stmt, ObjectList <std::string> unchange
     _unchanged_vars = unchanged;
     _real_outline = 1;
     _outline_num=out_num;
+    
 }
 Outline::Outline(ScopeLink sl, Statement stmt, int out_num)
 : _sl(sl),
@@ -83,6 +85,7 @@ Outline::Outline(ScopeLink sl, Statement stmt, int out_num)
     set_cod_trans(0, 0);
     _exec=0;
     _outline_num=out_num;
+    
 }
 Outline::Outline(ScopeLink sl, ObjectList<Statement> stmt_list, int out_num)
 : _sl(sl),
@@ -98,6 +101,7 @@ Outline::Outline(ScopeLink sl, ObjectList<Statement> stmt_list, int out_num)
     _exec=0;
     _real_outline = 0;
     _outline_num = out_num;
+    
     
 }
 void Outline::set_cod_trans(int cod, int trans) {
@@ -131,6 +135,17 @@ Outline& Outline::do_not_embed() {
 }
 void Outline::set_unchanged_vars(ObjectList<std::string> unchanged){
     _unchanged_vars = unchanged;
+}
+TL::ObjectList<TL::Symbol> Outline::recomputeParameters(){
+    compute_referenced_entities();
+    //    std::cout<<"*****OS"<<_outline_statements[0].prettyprint()<<std::endl;
+    //    std::cout<<"Parameters: "<<_parameter_passed_symbols.size()<<std::endl;
+    //    for(int i=0;i<_parameter_passed_symbols.size();++i){
+    //        std::cout<<i<<": "<<_parameter_passed_symbols[i].get_name()<<std::endl;
+    //    }
+    //    
+    //    std::cin.get();
+    return _parameter_passed_symbols;
 }
 void Outline::do_outline() {
     if (_outline_performed)
@@ -174,7 +189,7 @@ void Outline::do_outline() {
             reduced_vars_recover = get_reduced_vars_recover(); 
             gridify_text = find_grid(_sl.get_scope(_outline_statements[0].get_ast()));
         }
-        
+       
         
         //   std::cout<<"Number of UnChangedVars : "<<_unchanged_vars.size();
         //        for(int a=0;a<_unchanged_vars.size();++a){
@@ -214,12 +229,16 @@ void Outline::do_outline() {
         startIN << "args[";
         separationIN << ",";
         finalIN << "].io=in";
+//         std::cout<<"HAHA"<<std::endl;
+//        std::cin.get();
         intv = get_parameter_in(_sl.get_scope(_outline_statements[0].get_ast()), startIN, separationIN, finalIN);
         startOUT << "args[";
         separationOUT << ",";
         finalOUT << "].io=inout";
         outv = get_parameter_io(_sl.get_scope(_outline_statements[0].get_ast()), startOUT, separationOUT, finalOUT);
+
         sizeS = get_parameter_sizes(_sl.get_scope(_outline_statements[0].get_ast()));
+
         
         if (!red_string.empty()) {
             Source reducedVarsSize;
@@ -905,76 +924,77 @@ TL::Source Outline::get_parameter_io(Scope scope_of_decls, Source start, Source 
     int num = 0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();
             it != expr_list.end(); it++, l++) {
-        Expression expr(expr_list[l], _sl);
-        
-        
-        int r = 0;
-        Expression firstOperand = expr.get_first_operand();
-        
-        
-        size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
-        Source cutParam;
-        cutParam << std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
-        while(std::string(cutParam).find_first_of(" ")==0)
-            std::string(cutParam) = std::string(cutParam).substr(1,std::string(cutParam).length());
-        while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length())
-            std::string(cutParam) = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
-        Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-        
-        
-        if (paramSym.get_type().is_array() || paramSym.get_type().is_pointer() || (paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")<paramSym.get_point_of_declaration().prettyprint(true).length())){// || paramSym.get_type().is_pointer()) {// && std::string(parameters).find(std::string(cutParam)) > 0) {
+        if((expr_list[l].prettyprint().find("++")<0 || expr_list[l].prettyprint().find("++")>expr_list[l].prettyprint().length())
+                && (expr_list[l].prettyprint().find("--")<0 || expr_list[l].prettyprint().find("--")>expr_list[l].prettyprint().length())){
+
+            Expression expr(expr_list[l], _sl);
             
-            Source caseFirst;
-            Source caseOthers;
-            caseFirst << ", " << start << std::string(cutParam);
-            caseOthers << separation << " " << std::string(cutParam);
             
-            size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
-            size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
-            bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
-            bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
-            bool fconstrain = (!constrain1 && !constrain2);
-            // std::cout<<"Array in:"<<std::string(cutParam)<<std::endl;
-            //            std::cout<<"Finding( \""<<std::string(caseFirst) <<"\",\""<<std::string(caseOthers)<<"\") in(\""<<std::string(parameters)<<"\")"<<std::endl;
-            //            std::cout<<"Resulting:("<<caseFind1<<","<< caseFind2 <<")"<<std::endl;
-            //        std::cout<<"Cosntrains:("<<constrain1<<","<< constrain2 <<")"<<std::endl;      
-            //        std::cout<<"Fosntrain:("<<fconstrain <<")"<<std::endl;
-            int finded=0;
-            if(fconstrain){
-                for(int w=0;w<_unchanged_vars.size();++w){
-                    //   std::cout<<"-"<<_unchanged_vars[w]<<"- vs1 -"<<std::string(cutParam)<<"-"<<std::endl;
-                    if(_unchanged_vars[w].compare(std::string(cutParam))==0){
-                        finded =1;
-                        //                        std::cout<<"-"<<std::string(cutParam)<<"-"<<std::endl;
-                        int find_unch=0;
-                        for(int y=0;y<_unchanged_to_in.size();++y){
-                            if(std::string(_unchanged_to_in[y]).compare(std::string(cutParam))==0)
-                                find_unch=1;
+            int r = 0;
+            Expression firstOperand = expr.get_first_operand();
+            
+            
+            size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
+            Source cutParam;
+            cutParam << std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
+            cutParam = cleanWhiteSpaces(std::string(cutParam));
+            Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+            
+            
+            if (paramSym.get_type().is_array() || paramSym.get_type().is_pointer() || (paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")<paramSym.get_point_of_declaration().prettyprint(true).length())){// || paramSym.get_type().is_pointer()) {// && std::string(parameters).find(std::string(cutParam)) > 0) {
+                
+                Source caseFirst;
+                Source caseOthers;
+                caseFirst << ", " << start << std::string(cutParam);
+                caseOthers << separation << " " << std::string(cutParam);
+                
+                size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
+                size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
+                bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
+                bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
+                bool fconstrain = (!constrain1 && !constrain2);
+                // std::cout<<"Array in:"<<std::string(cutParam)<<std::endl;
+                //            std::cout<<"Finding( \""<<std::string(caseFirst) <<"\",\""<<std::string(caseOthers)<<"\") in(\""<<std::string(parameters)<<"\")"<<std::endl;
+                //            std::cout<<"Resulting:("<<caseFind1<<","<< caseFind2 <<")"<<std::endl;
+                //        std::cout<<"Cosntrains:("<<constrain1<<","<< constrain2 <<")"<<std::endl;      
+                //        std::cout<<"Fosntrain:("<<fconstrain <<")"<<std::endl;
+                int finded=0;
+                if(fconstrain){
+                    for(int w=0;w<_unchanged_vars.size();++w){
+                        //   std::cout<<"-"<<_unchanged_vars[w]<<"- vs1 -"<<std::string(cutParam)<<"-"<<std::endl;
+                        if(_unchanged_vars[w].compare(std::string(cutParam))==0){
+                            finded =1;
+                            //                        std::cout<<"-"<<std::string(cutParam)<<"-"<<std::endl;
+                            int find_unch=0;
+                            for(int y=0;y<_unchanged_to_in.size();++y){
+                                if(std::string(_unchanged_to_in[y]).compare(std::string(cutParam))==0)
+                                    find_unch=1;
+                            }
+                            if(!find_unch)
+                                _unchanged_to_in.push_back(cutParam);
                         }
-                        if(!find_unch)
-                            _unchanged_to_in.push_back(cutParam);
                     }
-                }
-                if (num ==0 && !finded) {
-                    parameters << ", " << start;
-                    parameters << std::string(cutParam);
-                    num++;
-                } else if(fconstrain && !finded){
-                    parameters << separation << " ";
-                    parameters << std::string(cutParam);
-                    num++;
+                    if (num ==0 && !finded) {
+                        parameters << ", " << start;
+                        parameters << std::string(cutParam);
+                        num++;
+                    } else if(fconstrain && !finded){
+                        parameters << separation << " ";
+                        parameters << std::string(cutParam);
+                        num++;
+                    }
                 }
             }
         }
-        
     }
     if (num > 0) {
         parameters << std::string(final);
     }
     return parameters;
 }
-std::unordered_map<std::string,TL::AST_t> Outline::get_parameter_io(Scope scope_of_decls) {
-    std::unordered_map<std::string,TL::AST_t> parameters;
+std::unordered_map<std::string,TL::ObjectList<TL::AST_t>> Outline::get_parameter_io(Scope scope_of_decls) {
+    
+    std::unordered_map<std::string,TL::ObjectList<TL::AST_t>> parameters;
     AST_t ast = _outline_statements[0].get_ast();
     
     TraverseASTFunctor4AssigmentLine expr_traverse(_sl);
@@ -983,104 +1003,110 @@ std::unordered_map<std::string,TL::AST_t> Outline::get_parameter_io(Scope scope_
     int num = 0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();
             it != expr_list.end(); it++, l++) {
+        int isArray = 0;
         Expression expr(expr_list[l], _sl);
+       
         
-        
-        int r = 0;
-        Expression firstOperand = expr.get_first_operand();
-        
-        
-        size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
         Source cutParam;
-        cutParam << std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
-        while(std::string(cutParam).find_first_of(" ")==0)
-            std::string(cutParam) = std::string(cutParam).substr(1,std::string(cutParam).length());
-        while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length())
-            std::string(cutParam) = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
-        Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-        
-        
-        if (paramSym.get_type().is_array() || paramSym.get_type().is_pointer() || (paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")<paramSym.get_point_of_declaration().prettyprint(true).length())){// || paramSym.get_type().is_pointer()) {// && std::string(parameters).find(std::string(cutParam)) > 0) {
-            int finded = 0;
-            for (iter4io::const_iterator it = parameters.begin(); 
-                                it != parameters.end(); ++it) {
-                if(it->first.compare(std::string(cutParam))==0) {
-                    finded = 1;
-                }
-            }
+         if((expr_list[l].prettyprint().find("++")<0 || expr_list[l].prettyprint().find("++")>expr_list[l].prettyprint().length())
+                && (expr_list[l].prettyprint().find("--")<0 || expr_list[l].prettyprint().find("--")>expr_list[l].prettyprint().length())){
+//            std::cout<<"1: "<<expr_list[l].prettyprint()<<std::endl;
+//            std::cin.get();
+            int r = 0;
+            Expression firstOperand = expr.get_first_operand();
             
             
-            for(int w=0;w<_unchanged_vars.size();++w){
-                if(_unchanged_vars[w].compare(std::string(cutParam))==0){
-                    finded =1;
-                    int find_unch=0;
-                    for(int y=0;y<_unchanged_to_in.size();++y){
-                        if(std::string(_unchanged_to_in[y]).compare(std::string(cutParam))==0)
-                            find_unch=1;
-                    }
-                    if(!find_unch)
-                        _unchanged_to_in.push_back(cutParam);
-                }
+            size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
+            cutParam = firstOperand.prettyprint();
+            if(EndPart1>0 && EndPart1<std::string(firstOperand.prettyprint()).length()) {
+               cutParam = std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
+               isArray=1;
             }
-            if(!finded){
-                parameters[std::string(cutParam)] = expr_list[l];
+            //std::cout<<"P: "<<std::string(cutParam)<<std::endl;
+            cutParam = cleanWhiteSpaces(std::string(cutParam));
+            //std::cout<<"E: "<<std::string(cutParam)<<std::endl;
+            
+            
+         
+            
+        } else {
+//             std::cout<<"2: "<<expr_list[l].prettyprint()<<std::endl;
+            std::string ppExpr=expr_list[l].prettyprint();
+             
+            if(ppExpr.find("++")==0) {
+                cutParam = ppExpr.substr(ppExpr.find("++")+2,ppExpr.length());
+            } else if(ppExpr.find("--")==0) {
+                cutParam = ppExpr.substr(ppExpr.find("--")+2,ppExpr.length());
+            }else if(ppExpr.find("++")==ppExpr.length()-3) {
+                cutParam = ppExpr.substr(0,ppExpr.find("++"));
+            }else if(ppExpr.find("--")==ppExpr.length()-3) {
+                cutParam = ppExpr.substr(0,ppExpr.find("--"));
             }
+//            std::cout<<std::string(cutParam)<<std::endl;
+            size_t EndPart1 = std::string(cutParam).find_first_of("[");
+            if(EndPart1>0 && EndPart1<std::string(cutParam).length()){
+                cutParam = std::string(std::string(cutParam).substr(0, EndPart1));
+                isArray=1;
+            }
+            cutParam = cleanWhiteSpaces(std::string(cutParam));
+            
+           
         }
-        
+        if(isArray)
+            parameters[std::string(cutParam)].push_back(expr_list[l]);
+
     }
     return parameters;
 }
 int Outline::get_parameter_ioSpecificIsIteratorDependent(Scope scope_of_decls, std::string name, std::string iterVar) {
     AST_t ast = _outline_statements[0].get_ast();
-    
     TraverseASTFunctor4AssigmentLine expr_traverse(_sl);
     ObjectList<AST_t> expr_list = ast.depth_subtrees(expr_traverse);
     int l = 0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();
             it != expr_list.end(); it++, l++) {
-        Expression expr(expr_list[l], _sl);
-        Expression firstOperand = expr.get_first_operand();
-        
-        
-        size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
         Source cutParam;
-        cutParam << std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
-        while(std::string(cutParam).find_first_of(" ")==0)
-            std::string(cutParam) = std::string(cutParam).substr(1,std::string(cutParam).length());
-        while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length())
-            std::string(cutParam) = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
-        Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-        if(paramSym.get_name().compare(name)==0){
-        
-            if (paramSym.get_type().is_array() || paramSym.get_type().is_pointer() || (paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")<paramSym.get_point_of_declaration().prettyprint(true).length())){// || paramSym.get_type().is_pointer()) {// && std::string(parameters).find(std::string(cutParam)) > 0) {
-                Expression secondOperand = expr.get_second_operand();
-                std::string secondO = secondOperand.prettyprint();
-                while(secondO.find_first_of("[")>=0 && secondO.find_first_of("[")<secondO.length()) {
-                    std::string actIterator = secondO.substr(secondO.find_first_of("[")+1,secondO.length());
-                    actIterator = actIterator.substr(0,actIterator.find_first_of("]"));
-                    actIterator = cleanWhiteSpaces(actIterator);
-                   // std::cout<< name << "-> "<<actIterator <<" =? " <<iterVar <<" on  ("<<secondO<<")"<<std::endl;
-                    
-                   // std::cin.get();
-                    if(actIterator.compare(iterVar)==0)
-                        return 1;
-                    secondO = secondO.substr(secondO.find_first_of("]")+1, secondO.length());
-                            
-                }
+         if((expr_list[l].prettyprint().find("++")<0 || expr_list[l].prettyprint().find("++")>expr_list[l].prettyprint().length())
+                && (expr_list[l].prettyprint().find("--")<0 || expr_list[l].prettyprint().find("--")>expr_list[l].prettyprint().length())){
+            Expression expr(expr_list[l], _sl);
+            Expression firstOperand = expr.get_first_operand();
+            size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
+            
+            cutParam << std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
+            cutParam = cleanWhiteSpaces(std::string(cutParam));
 
+            Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+            if(paramSym.get_name().compare(name)==0){
+                if (paramSym.get_type().is_array() || paramSym.get_type().is_pointer() || (paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")<paramSym.get_point_of_declaration().prettyprint(true).length())){// || paramSym.get_type().is_pointer()) {// && std::string(parameters).find(std::string(cutParam)) > 0) {
+                    Expression secondOperand = expr.get_second_operand();
+                    std::string secondO = secondOperand.prettyprint();
+                    while(secondO.find_first_of("[")>=0 && secondO.find_first_of("[")<secondO.length()) {
+                        std::string actIterator = secondO.substr(secondO.find_first_of("[")+1,secondO.length());
+                        actIterator = actIterator.substr(0,actIterator.find_first_of("]"));
+                        actIterator = cleanWhiteSpaces(actIterator);
+                        // std::cout<< name << "-> "<<actIterator <<" =? " <<iterVar <<" on ("<<secondO<<")"<<std::endl;
+                        // std::cin.get();
+                        if(actIterator.compare(iterVar)==0)
+                            return 1;
+                        secondO = secondO.substr(secondO.find_first_of("]")+1, secondO.length());
+                    }
+                }
             }
+        } else {
+            return 0;
         }
-        
     }
     return 0;
 }
 
 std::string Outline::cleanWhiteSpaces(std::string toClean) {
-    while(std::string(toClean).find_first_of(" ")==0){                       
-        toClean = std::string(toClean).substr(1,std::string(toClean).length());
-    }
-    while(std::string(toClean).find_first_of(" ")<std::string(toClean).length()){
-        toClean = std::string(toClean).substr(0,std::string(toClean).length()-1);
+    if(!toClean.empty()) {
+        while(std::string(toClean).find_first_of(" ")==0){                       
+            toClean = std::string(toClean).substr(1,std::string(toClean).length());
+        }
+        while(std::string(toClean).find_last_of(" ")==std::string(toClean).length()-1){
+            toClean = std::string(toClean).substr(0,std::string(toClean).length()-1);
+        }
     }
     return toClean;
 }
@@ -1168,76 +1194,99 @@ TL::Source Outline::get_parameter_in(Scope scope_of_decls, Source start, Source 
     outv = get_parameter_io(scope_of_decls, start, separation, separation);
     int l = 0;
     int num = 0, j=0;
-    for (ObjectList<AST_t>::iterator it = expr_list.begin();
-            it != expr_list.end(); it++, l++) {
-        Expression expr(expr_list[l], _sl);
-        int r = 0;
-        Expression secondOperand = expr.get_second_operand();
-        ObjectList<Source> operands;
-        operands = splitMathExpression(scope_of_decls, secondOperand.prettyprint());
-        for (int e=0;e<operands.size();e++){
-            //            std::cout<<std::string(operands[e])<<std::endl;
-            size_t EndPart1 = std::string(operands[e]).find_first_of("[");
-            if(EndPart1>0 && EndPart1<std::string(operands[e]).length()) {
-                Source cutParam;
-                cutParam << std::string(std::string(operands[e]).substr(0, EndPart1));
-                //                std::cout<<"-"<<std::string(cutParam)<<"-"<<std::endl;
-                while(std::string(cutParam).find_first_of(" ")==0){                       
-                    cutParam = std::string(cutParam).substr(1,std::string(cutParam).length());
+    for (ObjectList<AST_t>::iterator it = expr_list.begin();it != expr_list.end(); it++, l++) {
+        
+        Symbol paramSym;
+        Source cutParam;
+         if((expr_list[l].prettyprint().find("++")<0 || expr_list[l].prettyprint().find("++")>expr_list[l].prettyprint().length())
+                && (expr_list[l].prettyprint().find("--")<0 || expr_list[l].prettyprint().find("--")>expr_list[l].prettyprint().length())){
+//            std::cout<<"1"<<expr_list[l].prettyprint()<<std::endl;
+//            std::cin.get();
+            Expression expr(expr_list[l], _sl);
+            int r = 0;
+            Expression secondOperand = expr.get_second_operand();
+            ObjectList<Source> operands;
+            operands = splitMathExpression(scope_of_decls, secondOperand.prettyprint());
+            for (int e=0;e<operands.size();e++){
+                //            std::cout<<std::string(operands[e])<<std::endl;
+                size_t EndPart1 = std::string(operands[e]).find_first_of("[");
+                if(EndPart1>0 && EndPart1<std::string(operands[e]).length()) {
+                    
+                    cutParam << std::string(std::string(operands[e]).substr(0, EndPart1));
+                    //                std::cout<<"-"<<std::string(cutParam)<<"-"<<std::endl;
+                    cutParam = cleanWhiteSpaces(std::string(cutParam));
+                    //Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+                    paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
                 }
-                
-                while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length()){
-                    cutParam = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
-                }
-                //Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-                Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-                j=0;
-                if(!paramSym.is_invalid()) {
-                    for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
-                            itu != _parameter_passed_symbols.end();
-                            itu++, j++) {
-                        if(!_parameter_passed_symbols[j].is_invalid()){
-                            //                            std::cout<<"-"<<_parameter_passed_symbols[j].get_name()<<"- vs -"<<std::string(cutParam)<<std::endl;
-                            if(_parameter_passed_symbols[j].get_name().compare(std::string(cutParam))==0){
-                                Source varName;
-                                varName << _parameter_passed_symbols[j].get_name();
-                                if (_parameter_passed_symbols[j].get_type().is_array() || _parameter_passed_symbols[j].get_type().is_pointer() || _parameter_passed_symbols[j].get_type().is_pointer() || (_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && _parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")<_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).length())) {
-                                    //                                    std::cout<<"In parameter: "<<std::string(varName)<<std::endl;
-                                    Source caseFirst;
-                                    Source caseOthers;
-                                    caseFirst << ", " << start << std::string(cutParam);
-                                    caseOthers << separation << " " << std::string(cutParam);
-                                    
-                                    size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
-                                    size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
-                                    bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
-                                    bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
-                                    bool fconstrain = (!constrain1 && !constrain2);
-                                    if(fconstrain){
-                                        Source caseFirst1;
-                                        Source caseOthers1;
-                                        caseFirst1 << ", " << start << std::string(cutParam);
-                                        caseOthers1 << separation << " " << std::string(cutParam);
-                                        
-                                        size_t caseFind11 = std::string(outv).find(std::string(caseFirst1));
-                                        size_t caseFind21 = std::string(outv).find(std::string(caseOthers1));
-                                        bool constrain11= (caseFind11 >= 0 && caseFind11 < std::string(outv).length());
-                                        bool constrain21= (caseFind21 >= 0 && caseFind21 < std::string(outv).length());
-                                        bool fconstrain1 = (!constrain11 && !constrain21);
-                                       
-                                        if(fconstrain1) {
-                                            if (num ==0) {
-                                                parameters << ", " << start;
-                                                parameters << std::string(cutParam);
-                                                num++;
-                                                in_params.push_back(cutParam);
-                                            } else if(fconstrain){
-                                                parameters << separation << " ";
-                                                parameters << std::string(cutParam);
-                                                in_params.push_back(cutParam);
-                                                num++;
-                                            }
-                                        }
+            }
+        } else {
+//            std::cout<<"2"<<expr_list[l].prettyprint()<<std::endl;
+//            std::cin.get();
+            std::string ppExpr=expr_list[l].prettyprint();
+            Source cutParam;
+            if(ppExpr.find("++")==0) {
+                cutParam = ppExpr.substr(ppExpr.find("++")+2,ppExpr.length());
+            } else if(ppExpr.find("--")==0) {
+                cutParam = ppExpr.substr(ppExpr.find("--")+2,ppExpr.length());
+            }else if(ppExpr.find("++")==ppExpr.length()-3) {
+                cutParam = ppExpr.substr(0,ppExpr.find("++"));
+            }else if(ppExpr.find("--")==ppExpr.length()-3) {
+                cutParam = ppExpr.substr(0,ppExpr.find("--"));
+            }
+            size_t EndPart1 = std::string(cutParam).find_first_of("[");
+            if(EndPart1>0 && EndPart1<std::string(cutParam).length()) 
+                cutParam = std::string(std::string(cutParam).substr(0, EndPart1));
+            while(std::string(cutParam).find_first_of(" ")==0)
+                std::string(cutParam) = std::string(cutParam).substr(1,std::string(cutParam).length());
+            while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length())
+                std::string(cutParam) = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
+            paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+        }
+        j=0;
+        if(!paramSym.is_invalid()) {
+            for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
+                    itu != _parameter_passed_symbols.end();
+                    itu++, j++) {
+                if(!_parameter_passed_symbols[j].is_invalid()){
+                    //                            std::cout<<"-"<<_parameter_passed_symbols[j].get_name()<<"- vs -"<<std::string(cutParam)<<std::endl;
+                    if(_parameter_passed_symbols[j].get_name().compare(std::string(cutParam))==0){
+                        Source varName;
+                        varName << _parameter_passed_symbols[j].get_name();
+                        if (_parameter_passed_symbols[j].get_type().is_array() || _parameter_passed_symbols[j].get_type().is_pointer() || _parameter_passed_symbols[j].get_type().is_pointer() || (_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && _parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")<_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).length())) {
+                            //                                    std::cout<<"In parameter: "<<std::string(varName)<<std::endl;
+                            Source caseFirst;
+                            Source caseOthers;
+                            caseFirst << ", " << start << std::string(cutParam);
+                            caseOthers << separation << " " << std::string(cutParam);
+                            
+                            size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
+                            size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
+                            bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
+                            bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
+                            bool fconstrain = (!constrain1 && !constrain2);
+                            if(fconstrain){
+                                Source caseFirst1;
+                                Source caseOthers1;
+                                caseFirst1 << ", " << start << std::string(cutParam);
+                                caseOthers1 << separation << " " << std::string(cutParam);
+                                
+                                size_t caseFind11 = std::string(outv).find(std::string(caseFirst1));
+                                size_t caseFind21 = std::string(outv).find(std::string(caseOthers1));
+                                bool constrain11= (caseFind11 >= 0 && caseFind11 < std::string(outv).length());
+                                bool constrain21= (caseFind21 >= 0 && caseFind21 < std::string(outv).length());
+                                bool fconstrain1 = (!constrain11 && !constrain21);
+                                
+                                if(fconstrain1) {
+                                    if (num ==0) {
+                                        parameters << ", " << start;
+                                        parameters << std::string(cutParam);
+                                        num++;
+                                        in_params.push_back(cutParam);
+                                    } else if(fconstrain){
+                                        parameters << separation << " ";
+                                        parameters << std::string(cutParam);
+                                        in_params.push_back(cutParam);
+                                        num++;
                                     }
                                 }
                             }
@@ -1248,7 +1297,7 @@ TL::Source Outline::get_parameter_in(Scope scope_of_decls, Source start, Source 
         }
         
     }
-
+    
     for(int y=0;y<_unchanged_to_in.size();++y){
         int finded=0;
         for(int x=0;x<in_params.size();++x){
@@ -1276,7 +1325,121 @@ TL::Source Outline::get_parameter_in(Scope scope_of_decls, Source start, Source 
     }
     
     return parameters;
-   
+    
+}
+
+std::unordered_map<std::string,TL::ObjectList<TL::AST_t>>  Outline::get_parameter_in(Scope scope_of_decls) {
+    std::unordered_map<std::string,TL::ObjectList<TL::AST_t>> parameters;
+    AST_t ast = _outline_statements[0].get_ast();
+    compute_referenced_entities();
+    TraverseASTFunctor4All expr_traverse(_sl);
+    ObjectList<AST_t> expr_list = ast.depth_subtrees(expr_traverse);
+    ObjectList<Source> in_params; 
+    Source nulls;
+    nulls<<"";
+    _unchanged_to_in.clear();
+    int l = 0;
+    int num = 0, j=0;
+    for (ObjectList<AST_t>::iterator it = expr_list.begin();
+            it != expr_list.end(); it++, l++) {
+        Symbol paramSym;
+        Source cutParam;
+        if((expr_list[l].prettyprint().find("++")<0 || expr_list[l].prettyprint().find("++")>expr_list[l].prettyprint().length())
+                && (expr_list[l].prettyprint().find("--")<0 || expr_list[l].prettyprint().find("--")>expr_list[l].prettyprint().length())){
+            Expression expr(expr_list[l], _sl);
+            int r = 0;
+            //std::cout<<"E:"<<expr.prettyprint()<<std::endl;
+            
+            std::string secondOperandString = expr.prettyprint().substr(expr.prettyprint().find("=")+1, expr.prettyprint().length());
+            //Expression secondOperand = expr.get_second_operand();
+            ObjectList<Source> operands;
+            operands = splitMathExpression(scope_of_decls, secondOperandString);
+            switch(expr.prettyprint()[expr.prettyprint().find_first_of("=")-1]) {
+                case '+':
+                case '-':
+                case '/':
+                case '*':
+                    Source firstO;
+                    firstO = expr.prettyprint().substr(0,expr.prettyprint().find_first_of("=")-1); 
+                    operands.push_back(firstO);
+                    break;
+            }
+            for (int e=0;e<operands.size();e++){
+                size_t EndPart1 = std::string(operands[e]).find_first_of("[");
+                if(EndPart1>0 && EndPart1<std::string(operands[e]).length()) {
+                    cutParam = std::string(std::string(operands[e]).substr(0, EndPart1));
+                } else {
+                    cutParam = operands[e];
+                }
+                cutParam = cleanWhiteSpaces(std::string(cutParam));
+
+//                std::cout<<std::string(cutParam)<<std::endl;
+                //Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+                paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+                j=0;
+                if(!paramSym.is_invalid()) {
+                    for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
+                            itu != _parameter_passed_symbols.end();
+                            itu++, j++) {
+                        if(!_parameter_passed_symbols[j].is_invalid()){
+//                                                        std::cout<<"-"<<_parameter_passed_symbols[j].get_name()<<"- vs -"<<std::string(cutParam)<<std::endl;
+                            if(_parameter_passed_symbols[j].get_name().compare(std::string(cutParam))==0){
+                                Source varName;
+                                varName << _parameter_passed_symbols[j].get_name();
+                                parameters[std::string(varName)].push_back(expr_list[l]);
+                            }
+                        }
+                    }
+                }
+//                std::cin.get();
+            }
+                    
+        } else {
+            
+            std::string ppExpr=expr_list[l].prettyprint();
+//            std::cout<<ppExpr<<std::endl;
+//            std::cin.get();
+            if(ppExpr.find("++")==0) {
+                cutParam = ppExpr.substr(ppExpr.find("++")+2,ppExpr.length());
+            } else if(ppExpr.find("--")==0) {
+                cutParam = ppExpr.substr(ppExpr.find("--")+2,ppExpr.length());
+            }else if(ppExpr.find("++")==ppExpr.length()-3) {
+                cutParam = ppExpr.substr(0,ppExpr.find("++"));
+            }else if(ppExpr.find("--")==ppExpr.length()-3) {
+                cutParam = ppExpr.substr(0,ppExpr.find("--"));
+            }
+                cutParam = ppExpr.substr(0,ppExpr.find("--"));
+            size_t EndPart1 = std::string(cutParam).find_first_of("[");
+            if(EndPart1>0 && EndPart1<std::string(cutParam).length()) 
+                cutParam = std::string(std::string(cutParam).substr(0, EndPart1));
+            while(std::string(cutParam).find_first_of(" ")==0)
+                std::string(cutParam) = std::string(cutParam).substr(1,std::string(cutParam).length());
+            while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length())
+                std::string(cutParam) = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
+            paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+            j=0;
+                if(!paramSym.is_invalid()) {
+                    for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
+                            itu != _parameter_passed_symbols.end();
+                            itu++, j++) {
+                        if(!_parameter_passed_symbols[j].is_invalid()){
+                            //                            std::cout<<"-"<<_parameter_passed_symbols[j].get_name()<<"- vs -"<<std::string(cutParam)<<std::endl;
+                            if(_parameter_passed_symbols[j].get_name().compare(std::string(cutParam))==0){
+                                Source varName;
+                                varName << _parameter_passed_symbols[j].get_name();
+                                parameters[std::string(varName)].push_back(expr_list[l]);
+                            }
+                        }
+                    }
+                }
+        }
+        
+        
+    }
+    
+    
+    return parameters;
+    
 }
 
 TL::Source Outline::get_parameter_in_noch(Scope scope_of_decls, Source start, Source separation, Source final) {
@@ -1290,60 +1453,57 @@ TL::Source Outline::get_parameter_in_noch(Scope scope_of_decls, Source start, So
     int num = 0, j=0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();
             it != expr_list.end(); it++, l++) {
-        Expression expr(expr_list[l], _sl);
-        int r = 0;
-        Expression secondOperand = expr.get_second_operand();
-        ObjectList<Source> operands;
-        operands = splitMathExpression(scope_of_decls, secondOperand.prettyprint());
-        for (int e=0;e<operands.size();e++){
-            //            std::cout<<std::string(operands[e])<<std::endl;
-            size_t EndPart1 = std::string(operands[e]).find_first_of("[");
-            if(EndPart1>0 && EndPart1<std::string(operands[e]).length()) {
-                Source cutParam;
-                cutParam << std::string(std::string(operands[e]).substr(0, EndPart1));
-                //                std::cout<<"-"<<std::string(cutParam)<<"-"<<std::endl;
-                while(std::string(cutParam).find_first_of(" ")==0){                       
-                    cutParam = std::string(cutParam).substr(1,std::string(cutParam).length());
-                }
-                
-                while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length()){
-                    cutParam = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
-                }
-                //Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-                Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-                j=0;
-                if(!paramSym.is_invalid()) {
-                    for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
-                            itu != _parameter_passed_symbols.end();
-                            itu++, j++) {
-                        if(!_parameter_passed_symbols[j].is_invalid()){
-                            //                            std::cout<<"-"<<_parameter_passed_symbols[j].get_name()<<"- vs -"<<std::string(cutParam)<<std::endl;
-                            if(_parameter_passed_symbols[j].get_name().compare(std::string(cutParam))==0){
-                                Source varName;
-                                varName << _parameter_passed_symbols[j].get_name();
-                                if (_parameter_passed_symbols[j].get_type().is_array() || _parameter_passed_symbols[j].get_type().is_pointer() || _parameter_passed_symbols[j].get_type().is_pointer() || (_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && _parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")<_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).length())) {
-                                    //                                    std::cout<<"In parameter: "<<std::string(varName)<<std::endl;
-                                    Source caseFirst;
-                                    Source caseOthers;
-                                    caseFirst << ", " << start << std::string(cutParam);
-                                    caseOthers << separation << " " << std::string(cutParam);
-                                    
-                                    size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
-                                    size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
-                                    bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
-                                    bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
-                                    bool fconstrain = (!constrain1 && !constrain2);
-                                    
-                                    if (num ==0) {
-                                        parameters << ", " << start;
-                                        parameters << std::string(cutParam);
-                                        num++;
-                                        in_params.push_back(cutParam);
-                                    } else if(fconstrain){
-                                        parameters << separation << " ";
-                                        parameters << std::string(cutParam);
-                                        in_params.push_back(cutParam);
-                                        num++;
+         if((expr_list[l].prettyprint().find("++")<0 || expr_list[l].prettyprint().find("++")>expr_list[l].prettyprint().length())
+                && (expr_list[l].prettyprint().find("--")<0 || expr_list[l].prettyprint().find("--")>expr_list[l].prettyprint().length())){
+            Expression expr(expr_list[l], _sl);
+            int r = 0;
+            Expression secondOperand = expr.get_second_operand();
+            ObjectList<Source> operands;
+            operands = splitMathExpression(scope_of_decls, secondOperand.prettyprint());
+            for (int e=0;e<operands.size();e++){
+                //            std::cout<<std::string(operands[e])<<std::endl;
+                size_t EndPart1 = std::string(operands[e]).find_first_of("[");
+                if(EndPart1>0 && EndPart1<std::string(operands[e]).length()) {
+                    Source cutParam;
+                    cutParam << std::string(std::string(operands[e]).substr(0, EndPart1));
+                    //                std::cout<<"-"<<std::string(cutParam)<<"-"<<std::endl;
+                    cutParam = cleanWhiteSpaces(std::string(cutParam));
+                    //Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+                    Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+                    j=0;
+                    if(!paramSym.is_invalid()) {
+                        for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
+                                itu != _parameter_passed_symbols.end();
+                                itu++, j++) {
+                            if(!_parameter_passed_symbols[j].is_invalid()){
+                                //                            std::cout<<"-"<<_parameter_passed_symbols[j].get_name()<<"- vs -"<<std::string(cutParam)<<std::endl;
+                                if(_parameter_passed_symbols[j].get_name().compare(std::string(cutParam))==0){
+                                    Source varName;
+                                    varName << _parameter_passed_symbols[j].get_name();
+                                    if (_parameter_passed_symbols[j].get_type().is_array() || _parameter_passed_symbols[j].get_type().is_pointer() || _parameter_passed_symbols[j].get_type().is_pointer() || (_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && _parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")<_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).length())) {
+                                        //                                    std::cout<<"In parameter: "<<std::string(varName)<<std::endl;
+                                        Source caseFirst;
+                                        Source caseOthers;
+                                        caseFirst << ", " << start << std::string(cutParam);
+                                        caseOthers << separation << " " << std::string(cutParam);
+                                        
+                                        size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
+                                        size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
+                                        bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
+                                        bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
+                                        bool fconstrain = (!constrain1 && !constrain2);
+                                        
+                                        if (num ==0) {
+                                            parameters << ", " << start;
+                                            parameters << std::string(cutParam);
+                                            num++;
+                                            in_params.push_back(cutParam);
+                                        } else if(fconstrain){
+                                            parameters << separation << " ";
+                                            parameters << std::string(cutParam);
+                                            in_params.push_back(cutParam);
+                                            num++;
+                                        }
                                     }
                                 }
                             }
@@ -1638,8 +1798,7 @@ public:
 void Outline::compute_referenced_entities() {
     ObjectList<Symbol> all_referenced_symbols;
     
-    std::for_each(_outline_statements.begin(), _outline_statements.end(),
-    std::bind2nd(std::ptr_fun(get_referenced_entities), &all_referenced_symbols));
+    std::for_each(_outline_statements.begin(), _outline_statements.end(),std::bind2nd(std::ptr_fun(get_referenced_entities), &all_referenced_symbols));
     
     if (_use_nonlocal_scope) {
         // Remove those that can use the "file" scope
@@ -1654,20 +1813,7 @@ void Outline::compute_referenced_entities() {
     
     // Remove those that we've been told they should not be passed
     _parameter_passed_symbols = _parameter_passed_symbols.filter(DoNotPass(*this));
-    //    for(int i=0;i<_parameter_passed_symbols.size();++i){
-    //        std::cout<<i<<": "<<_parameter_passed_symbols[i].get_name()<<" -> ";
-    //        int finded=0;
-    //        for(int j=0;j<all_referenced_symbols.size();++j){
-    //            if(_parameter_passed_symbols[i].get_name().compare(all_referenced_symbols[j].get_name())==0) {
-    //                std::cout<<j<<": "<<all_referenced_symbols[j].get_name()<<std::endl;
-    //                finded=1;
-    //            }
-    //        }
-    //        if(!finded) {
-    //            std::cout<<"*Not Found*"<<std::endl; 
-    //        }
-    //    }
-    //    std::cin.get();
+    
 }
 
 struct AuxiliarOutlineReplace {
@@ -1897,70 +2043,69 @@ TL::Source Outline::get_parameter_io_specific(Scope scope_of_decls, Source start
     int num = 0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();
             it != expr_list.end(); it++, l++) {
-        Expression expr(expr_list[l], _sl);
-        
-        
-        int r = 0;
-        Expression firstOperand = expr.get_first_operand();
-        
-        
-        size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
-        Source cutParam;
-        cutParam << std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
-        while(std::string(cutParam).find_first_of(" ")==0)
-            std::string(cutParam) = std::string(cutParam).substr(1,std::string(cutParam).length());
-        while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length())
-            std::string(cutParam) = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
-        Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-        
-        
-        if (paramSym.get_type().is_array() || paramSym.get_type().is_pointer() || (paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")<paramSym.get_point_of_declaration().prettyprint(true).length())){// || paramSym.get_type().is_pointer()) {// && std::string(parameters).find(std::string(cutParam)) > 0) {
+         if((expr_list[l].prettyprint().find("++")<0 || expr_list[l].prettyprint().find("++")>expr_list[l].prettyprint().length())
+                && (expr_list[l].prettyprint().find("--")<0 || expr_list[l].prettyprint().find("--")>expr_list[l].prettyprint().length())){
+            Expression expr(expr_list[l], _sl);
             
-            Source caseFirst;
-            Source caseOthers;
-            caseFirst << ", " << start << std::string(cutParam);
-            caseOthers << separation << " " << std::string(cutParam);
             
-            size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
-            size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
-            bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
-            bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
-            bool fconstrain = (!constrain1 && !constrain2);
-            // std::cout<<"Array in:"<<std::string(cutParam)<<std::endl;
-            //            std::cout<<"Finding( \""<<std::string(caseFirst) <<"\",\""<<std::string(caseOthers)<<"\") in(\""<<std::string(parameters)<<"\")"<<std::endl;
-            //            std::cout<<"Resulting:("<<caseFind1<<","<< caseFind2 <<")"<<std::endl;
-            //        std::cout<<"Cosntrains:("<<constrain1<<","<< constrain2 <<")"<<std::endl;      
-            //        std::cout<<"Fosntrain:("<<fconstrain <<")"<<std::endl;
-            int finded=0;
-            int specified=0;
-            if(nup){
-                for(int w=0;w<_unchanged_vars.size();++w){
-                    //std::cout<<"-"<<_unchanged_vars[w]<<"- vs1 -"<<std::string(cutParam)<<"-"<<std::endl;
-                    if(_unchanged_vars[w].compare(std::string(cutParam))==0){
-                        finded =1;
-                        break;
+            int r = 0;
+            Expression firstOperand = expr.get_first_operand();
+            
+            
+            size_t EndPart1 = std::string(firstOperand.prettyprint()).find_first_of("[");
+            Source cutParam;
+            cutParam << std::string(std::string(firstOperand.prettyprint()).substr(0, EndPart1));
+            cutParam = cleanWhiteSpaces(std::string(cutParam));
+            Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+            
+            
+            if (paramSym.get_type().is_array() || paramSym.get_type().is_pointer() || (paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && paramSym.get_point_of_declaration().prettyprint(true).find_first_of("[")<paramSym.get_point_of_declaration().prettyprint(true).length())){// || paramSym.get_type().is_pointer()) {// && std::string(parameters).find(std::string(cutParam)) > 0) {
+                
+                Source caseFirst;
+                Source caseOthers;
+                caseFirst << ", " << start << std::string(cutParam);
+                caseOthers << separation << " " << std::string(cutParam);
+                
+                size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
+                size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
+                bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
+                bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
+                bool fconstrain = (!constrain1 && !constrain2);
+                // std::cout<<"Array in:"<<std::string(cutParam)<<std::endl;
+                //            std::cout<<"Finding( \""<<std::string(caseFirst) <<"\",\""<<std::string(caseOthers)<<"\") in(\""<<std::string(parameters)<<"\")"<<std::endl;
+                //            std::cout<<"Resulting:("<<caseFind1<<","<< caseFind2 <<")"<<std::endl;
+                //        std::cout<<"Cosntrains:("<<constrain1<<","<< constrain2 <<")"<<std::endl;      
+                //        std::cout<<"Fosntrain:("<<fconstrain <<")"<<std::endl;
+                int finded=0;
+                int specified=0;
+                if(nup){
+                    for(int w=0;w<_unchanged_vars.size();++w){
+                        //std::cout<<"-"<<_unchanged_vars[w]<<"- vs1 -"<<std::string(cutParam)<<"-"<<std::endl;
+                        if(_unchanged_vars[w].compare(std::string(cutParam))==0){
+                            finded =1;
+                            break;
+                        }
                     }
                 }
-            }
-            for(int e=0;e<specific_names.size();++e){
-                //                std::cout<<"Compare(IO-spec) : -"<<specific_names[e]<<"- vs -"<<std::string(cutParam)<<"-"<<std::endl;
-                if(specific_names[e].compare(std::string(cutParam))==0) {
-                    //                    std::cout<<"Equals\n";
-                    specified=1;
+                for(int e=0;e<specific_names.size();++e){
+                    //                std::cout<<"Compare(IO-spec) : -"<<specific_names[e]<<"- vs -"<<std::string(cutParam)<<"-"<<std::endl;
+                    if(specific_names[e].compare(std::string(cutParam))==0) {
+                        //                    std::cout<<"Equals\n";
+                        specified=1;
+                    }
                 }
+                if (fconstrain && num ==0 && !finded && specified) {
+                    parameters << ", " << start << std::string(cutParam);
+                    //                std::cout<<std::string(parameters)<<std::endl;
+                    num++;
+                } else if(fconstrain && !finded && specified){
+                    parameters << separation << " " << std::string(cutParam);
+                    //                std::cout<<std::string(parameters)<<std::endl;
+                    num++;
+                }
+                //            std::cin.get();
             }
-            if (fconstrain && num ==0 && !finded && specified) {
-                parameters << ", " << start << std::string(cutParam);
-                //                std::cout<<std::string(parameters)<<std::endl;
-                num++;
-            } else if(fconstrain && !finded && specified){
-                parameters << separation << " " << std::string(cutParam);
-                //                std::cout<<std::string(parameters)<<std::endl;
-                num++;
-            }
-            //            std::cin.get();
         }
-        
     }
     if (num > 0) {
         parameters << std::string(final);
@@ -1980,68 +2125,65 @@ TL::Source Outline::get_parameter_in_specific(Scope scope_of_decls, Source start
     int num = 0, j=0;
     for (ObjectList<AST_t>::iterator it = expr_list.begin();
             it != expr_list.end(); it++, l++) {
-        Expression expr(expr_list[l], _sl);
-        int r = 0;
-        Expression secondOperand = expr.get_second_operand();
-        ObjectList<Source> operands;
-        operands = splitMathExpression(scope_of_decls, secondOperand.prettyprint());
-        for (int e=0;e<operands.size();e++){
-            //            std::cout<<std::string(operands[e])<<std::endl;
-            size_t EndPart1 = std::string(operands[e]).find_first_of("[");
-            if(EndPart1>0 && EndPart1<std::string(operands[e]).length()) {
-                Source cutParam;
-                cutParam << std::string(std::string(operands[e]).substr(0, EndPart1));
-                //                std::cout<<"-"<<std::string(cutParam)<<"-"<<std::endl;
-                while(std::string(cutParam).find_first_of(" ")==0){                       
-                    cutParam = std::string(cutParam).substr(1,std::string(cutParam).length());
-                }
-                
-                while(std::string(cutParam).find_first_of(" ")<std::string(cutParam).length()){
-                    cutParam = std::string(cutParam).substr(0,std::string(cutParam).length()-1);
-                }
-                //Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-                Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
-                j=0;
-                if(!paramSym.is_invalid()) {
-                    for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
-                            itu != _parameter_passed_symbols.end();
-                            itu++, j++) {
-                        if(!_parameter_passed_symbols[j].is_invalid()){
-                            //                            std::cout<<"-"<<_parameter_passed_symbols[j].get_name()<<"- vs -"<<std::string(cutParam)<<std::endl;
-                            if(_parameter_passed_symbols[j].get_name().compare(std::string(cutParam))==0){
-                                Source varName;
-                                varName << _parameter_passed_symbols[j].get_name();
-                                if (_parameter_passed_symbols[j].get_type().is_array() || _parameter_passed_symbols[j].get_type().is_pointer() || _parameter_passed_symbols[j].get_type().is_pointer() || (_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && _parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")<_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).length())) {
-                                    //                                    std::cout<<"In parameter: "<<std::string(varName)<<std::endl;
-                                    Source caseFirst;
-                                    Source caseOthers;
-                                    caseFirst << ", " << start << std::string(cutParam);
-                                    caseOthers << separation << " " << std::string(cutParam);
-                                    //std::cout<< "-"<<std::string(caseFirst) << "- in. -"<<std::string(parameters)<<"-"<<std::endl;
-                                    //std::cout<< "-"<<std::string(caseOthers) << "- in. -"<<std::string(parameters)<<"-"<<std::endl;
-                                    //std::cin.get();
-                                    size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
-                                    size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
-                                    bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
-                                    bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
-                                    bool fconstrain = (!constrain1 && !constrain2);
-                                    if(fconstrain) {
-                                        int finded=0;
-                                        for(int i=0;i<specific_names.size();++i){
-                                            if(std::string(varName).compare(specific_names[i])==0){
-                                                finded=1;
+        if((expr_list[l].prettyprint().find("++")<0 || expr_list[l].prettyprint().find("++")>expr_list[l].prettyprint().length())
+                && (expr_list[l].prettyprint().find("--")<0 || expr_list[l].prettyprint().find("--")>expr_list[l].prettyprint().length())){
+            Expression expr(expr_list[l], _sl);
+            int r = 0;
+            Expression secondOperand = expr.get_second_operand();
+            ObjectList<Source> operands;
+            operands = splitMathExpression(scope_of_decls, secondOperand.prettyprint());
+            for (int e=0;e<operands.size();e++){
+                //            std::cout<<std::string(operands[e])<<std::endl;
+                size_t EndPart1 = std::string(operands[e]).find_first_of("[");
+                if(EndPart1>0 && EndPart1<std::string(operands[e]).length()) {
+                    Source cutParam;
+                    cutParam << std::string(std::string(operands[e]).substr(0, EndPart1));
+                    //                std::cout<<"-"<<std::string(cutParam)<<"-"<<std::endl;
+                    cutParam = cleanWhiteSpaces(std::string(cutParam));
+                    //Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+                    Symbol paramSym = scope_of_decls.get_symbol_from_name(std::string(cutParam));
+                    j=0;
+                    if(!paramSym.is_invalid()) {
+                        for (ObjectList<Symbol>::iterator itu = _parameter_passed_symbols.begin();
+                                itu != _parameter_passed_symbols.end();
+                                itu++, j++) {
+                            if(!_parameter_passed_symbols[j].is_invalid()){
+                                //                            std::cout<<"-"<<_parameter_passed_symbols[j].get_name()<<"- vs -"<<std::string(cutParam)<<std::endl;
+                                if(_parameter_passed_symbols[j].get_name().compare(std::string(cutParam))==0){
+                                    Source varName;
+                                    varName << _parameter_passed_symbols[j].get_name();
+                                    if (_parameter_passed_symbols[j].get_type().is_array() || _parameter_passed_symbols[j].get_type().is_pointer() || _parameter_passed_symbols[j].get_type().is_pointer() || (_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")>=0 && _parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).find_first_of("[")<_parameter_passed_symbols[j].get_point_of_declaration().prettyprint(true).length())) {
+                                        //                                    std::cout<<"In parameter: "<<std::string(varName)<<std::endl;
+                                        Source caseFirst;
+                                        Source caseOthers;
+                                        caseFirst << ", " << start << std::string(cutParam);
+                                        caseOthers << separation << " " << std::string(cutParam);
+                                        //std::cout<< "-"<<std::string(caseFirst) << "- in. -"<<std::string(parameters)<<"-"<<std::endl;
+                                        //std::cout<< "-"<<std::string(caseOthers) << "- in. -"<<std::string(parameters)<<"-"<<std::endl;
+                                        //std::cin.get();
+                                        size_t caseFind1 = std::string(parameters).find(std::string(caseFirst));
+                                        size_t caseFind2 = std::string(parameters).find(std::string(caseOthers));
+                                        bool constrain1= (caseFind1 >= 0 && caseFind1 < std::string(parameters).length());
+                                        bool constrain2= (caseFind2 >= 0 && caseFind2 < std::string(parameters).length());
+                                        bool fconstrain = (!constrain1 && !constrain2);
+                                        if(fconstrain) {
+                                            int finded=0;
+                                            for(int i=0;i<specific_names.size();++i){
+                                                if(std::string(varName).compare(specific_names[i])==0){
+                                                    finded=1;
+                                                }
                                             }
-                                        }
-                                        if(finded){
-                                            if (num > 0) {
-                                                parameters << std::string(separation) << " ";
-                                            } else {
-                                                parameters << ", " << std::string(start);
+                                            if(finded){
+                                                if (num > 0) {
+                                                    parameters << std::string(separation) << " ";
+                                                } else {
+                                                    parameters << ", " << std::string(start);
+                                                }
+                                                
+                                                num++;
+                                                
+                                                parameters << std::string(varName);
                                             }
-                                            
-                                            num++;
-                                            
-                                            parameters << std::string(varName);
                                         }
                                     }
                                 }
@@ -2060,7 +2202,7 @@ TL::Source Outline::get_parameter_in_specific(Scope scope_of_decls, Source start
     }
     return parameters;
     
-  
+    
 }
 TL::Source Outline::get_parameter_addr_specific(Scope scope_of_decls,std::vector<std::string> specific_names){
     int num = 0;
@@ -2098,7 +2240,7 @@ TL::ObjectList<TL::Source> Outline::splitMathExpression(Scope sC,std::string sec
     ObjectList<Source> operators;
     int numElem=0;
     Source empty;
-    std::string math[4] = {"+","*","/","-"};
+    std::string math[11] = {"+","*","/","-","<",">","=","?",":","&","|"};
     operators.clear();
     operators.push_back(empty);
     for (int i=0;i<secondO.length();++i){
@@ -2115,10 +2257,41 @@ TL::ObjectList<TL::Source> Outline::splitMathExpression(Scope sC,std::string sec
         }
         int find=0;
         if(!(std::string(actChar).compare(")")==0 || std::string(actChar).compare(" ")==0  || std::string(actChar).compare("(")==0)) {
-            for(int x=0; x<4;++x){
+            for(int x=0; x<11;++x){
                 if(std::string(actChar).compare(math[x])==0) {
                     find=1; 
                 }
+                if(math[x].compare("<")==0 || math[x].compare(">")==0) {
+                    if(nextChar.compare("=")==0)
+                        i++;
+                    
+                }
+                if(math[x].compare("&")==0) {
+                    if(nextChar.compare("&")==0)
+                        i++;
+                    
+                }
+                if(math[x].compare("|")==0 ) {
+                    if(nextChar.compare("|")==0)
+                        i++;
+                    
+                }
+                if(math[x].compare("<")==0) {
+                    if(nextChar.compare("<")==0) {
+//                        std::cout<<"HI"<<std::endl;
+                        i++;
+                    }
+                    
+                }
+                if(math[x].compare("-")==0) {
+                    if(nextChar.compare(">")==0) {
+//                        std::cout<<"HI"<<std::endl;
+                        i++;
+                        find = 0;
+                    }
+                    
+                }
+                
             }
             if(!find){
                 Source actElem;

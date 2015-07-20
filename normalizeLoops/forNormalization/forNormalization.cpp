@@ -22,10 +22,19 @@ ForNormalizationPhase::ForNormalizationPhase() {
     ompP.register_directive("for");
     ompP.register_directive("hmpp");
     ompP.register_directive("fixed");
-    ompP.register_directive("check");
-    ompP.register_directive("for check");
+   ompP.register_directive("check");
+   ompP.register_directive("hybrid");  
+   ompP.register_directive("for check");
     ompP.register_directive("for fixed");
-    
+    ompP.register_directive("critical");
+    ompP.register_construct("threadprivate");
+    //ompP.register_construct("master");
+
+    ompP.register_directive("firstprivate");
+    ompP.register_directive("threadprivate");
+    ompP.register_directive("atomic");
+    ompP.register_directive("master");
+    ompP.register_directive("nowait");  
     
 }
 void ForNormalizationPhase::normalizeNestedLevel(ObjectList<AST_t> expr_listFor, ScopeLink scope_link){

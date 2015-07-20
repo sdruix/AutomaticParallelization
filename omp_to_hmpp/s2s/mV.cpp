@@ -831,6 +831,7 @@ int generateVersions(int lvl1, int lvl2, int j, string codesFolder, string filen
         transformations << "all\n";
         transformations.close();
         name << transfer[t];
+        
         numCombinations+= doTransform(inlin, extKind,codesFolder, filename, name.str());
         numCombinations+= generatePragmaCombinationVersions(inlin, extKind,codesFolder, filename, name.str());
     } 

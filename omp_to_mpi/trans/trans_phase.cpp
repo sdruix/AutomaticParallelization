@@ -661,7 +661,7 @@ int TransPhase::isDeclarationLine(AST_t ast, ObjectList<Symbol> allSym, ScopeLin
 
 void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
     
-
+    Source newPragmaLine;
     string pragmaInstruction = construct.get_pragma_line().prettyprint(false);
     FunctionDefinition function_def = construct.get_enclosing_function();
     Symbol function_sym = function_def.get_function_symbol();
@@ -724,6 +724,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
         int staticC;
         TL::HLT::Outline outlineAux(construct.get_enclosing_function().get_scope_link(), statement);
         if(checkDirective(construct,"for")) {
+            
             cout<<"Omp parallel for"<<endl;
             block_line = get_real_line(_file_tree, construct.get_enclosing_function().get_scope_link(), construct.get_ast(),0,0,1);
             //_constructLine = construct.get_pragma_line().get_line();
@@ -733,7 +734,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             //            cout<<"S: "<<statement.prettyprint()<<endl;
             //            
             
-            
+           
             
             
             
@@ -974,6 +975,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
             
             cout<<"Analyzing Shared Clause"<<endl;
             PragmaCustomClause shared_clause = construct.get_clause("shared");
+            ObjectList<string> shared_vars;
             if (shared_clause.is_defined()) {
                 commented_loop
                         << "// Arguments found in shared clausule: \n";
@@ -984,6 +986,7 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     commented_loop
                     << "//  - " << argument.prettyprint() << "\n";
                     cout << "//  - " << argument.prettyprint() << endl;
+                    shared_vars.push_back(argument.prettyprint());
                 }
             }
             cout<<"Analyzing Private Clause"<<endl;
@@ -1030,6 +1033,16 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                     Expression argument(*it);
                     _privateVars.push_back(argument.prettyprint());
                 }
+            }
+             PragmaCustomClause hybrid_clause = construct.get_clause("hybrid");
+            
+            if (pragmaInstruction.find(" hybrid")>0 && pragmaInstruction.find(" hybrid")<pragmaInstruction.length()) {
+                string n = replaceAll(pragmaInstruction," check", "");
+//                cout<<n<<endl;
+                n = replaceAll(n," hybrid", "");
+//                cout<<n<<endl;
+//                cin.get();
+                newPragmaLine << "#pragma omp " << n<< "\n";
             }
             cout<<"Filling OUT vars info"<<endl;
             _ioVars = fill_vars_info(_ioParams, outlineAux,  construct, initVar, functionScope, globalScope, 1); 
@@ -1815,8 +1828,9 @@ void TransPhase::pragma_postorder(PragmaCustomConstruct construct) {
                 
                 completeLoopsInAST(construct.get_ast(), function_def.get_function_body().get_scope_link());
                 constructASTS = transformConstructAST(construct, function_def.get_function_body().get_scope_link(), functionScope, initVar); 
-                
-                mpiFixStructurePart2 <<mpiVariantStructurePart6<<_aditionalLinesRead<<"for("<<initType<<" "<<initVar<<" = "<<_offsetVar<<"; "<<initVar<<"<"<<_offsetVar<<"+"<<_partSizeVar<<";++"<<initVar<<")";
+//                cout<<"NP: "<<std::string(newPragmaLine)<<endl;
+//                cin.get();
+                mpiFixStructurePart2 <<mpiVariantStructurePart6<<_aditionalLinesRead<<newPragmaLine<<"for("<<initType<<" "<<initVar<<" = "<<_offsetVar<<"; "<<initVar<<"<"<<_offsetVar<<"+"<<_partSizeVar<<";++"<<initVar<<")";
                 mpiFixStructurePart2 <<"{"<<constructASTS<<"}"<<_aditionalLinesWrite<<mpiVariantStructurePart2;
                 
                 //mpiFixStructurePart2 << generateMPIVariableMessagesSend(_ioVars,initVar,functionScope,"0",_offsetVar,1);

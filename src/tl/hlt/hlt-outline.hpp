@@ -153,6 +153,7 @@ namespace TL {
         public:
             ObjectList<std::string> _unchanged_vars;
             ObjectList<Source> _unchanged_to_in;
+            ObjectList<Symbol> recomputeParameters();
             void clear_reduction(); 
             void set_unchanged_vars(ObjectList <std::string> unchanged);
             int get_outline_num();
@@ -169,6 +170,7 @@ namespace TL {
             Source get_parameter_io(Scope scope_of_decls, Source start, Source separation, Source final);
             Source get_parameter_io_specific(Scope scope_of_decls, Source start, Source separation, Source final,std::vector<std::string> specific_names, int nup);
             Source get_parameter_in(Scope scope_of_decls, Source start, Source separation, Source final);
+            std::unordered_map<std::string,TL::ObjectList<TL::AST_t>>  get_parameter_in(Scope scope_of_decls);
             Source get_parameter_in_specific(Scope scope_of_decls, Source start, Source separation, Source final,std::vector<std::string> specific_names, int nup);
             Source get_parameter_in_noch(Scope scope_of_decls, Source start, Source separation, Source final);
             Source get_parameter_sizes(Scope scope_of_decls);
@@ -181,6 +183,49 @@ namespace TL {
             Source find_grid(Scope scope_of_decls);
             int get_num_dynamic_var(Scope scope_of_decls);
             ObjectList<Source> splitMathExpression(Scope sC,std::string secondO);
+
+            class TraverseASTFunctor4All : public TraverseASTFunctor {
+            private:
+                ScopeLink _slAL;
+               
+            public:
+                TraverseASTFunctor4All(ScopeLink sl) : _slAL(sl) {};
+                virtual ASTTraversalResult do_(const TL::AST_t &a) const
+                {
+                        if (Expression::predicate(a)) {
+                            Expression expr(a, _slAL);
+                            bool retBool = false;
+                            bool is_assigment = expr.is_assignment();
+                            bool is_op_assigment = expr.is_operation_assignment();
+                            if(is_assigment || is_op_assigment)
+                                retBool = true;
+                            if(a.prettyprint().find("++")==0 || a.prettyprint().find("++")==a.prettyprint().length()-3
+                            || a.prettyprint().find("--")==0 || a.prettyprint().find("--")<a.prettyprint().length()-3) {
+                               retBool = true;
+                            }
+                            return ast_traversal_result_helper(retBool,false);
+                        } else {
+                            if(a.prettyprint().find_first_of("=")>=0 && a.prettyprint().find_first_of("=")<a.prettyprint().length()) {
+
+                                if(a.prettyprint().find(";")<0 || a.prettyprint().find(";")>a.prettyprint().length()) {
+
+                                     if(a.prettyprint().find(" ")!=0 && a.prettyprint().find("=")!=0) {
+                                        //std::cout<<"4-"<<a.prettyprint()<<"-"<<std::endl;
+                                        Source s;
+                                        s << a.prettyprint()<<";";
+                                       // std::cout<< "-"<<std::string(s)<<"-"<<std::endl;                               
+                                        AST_t newAST = s.parse_statement(a, _slAL);
+                                        Expression expr(newAST, _slAL);
+                                        return ast_traversal_result_helper(true,false);
+                                     }
+                                
+                                }
+                            }
+                        } 
+                    
+                    return ast_traversal_result_helper(false, true);
+                };
+            };
             class TraverseASTFunctor4AssigmentLine : public TraverseASTFunctor {
             private:
                 ScopeLink _slAL;
@@ -192,12 +237,15 @@ namespace TL {
                    
                     if (Expression::predicate(a)) {
                         Expression expr(a, _slAL);
-                       // std::cout<<"e: "<<expr.prettyprint()<<endl;
                         bool retBool = false;
                         bool is_assigment = expr.is_assignment();
                         bool is_op_assigment = expr.is_operation_assignment();
                         if(is_assigment || is_op_assigment)
                             retBool = true;
+                        if(a.prettyprint().find("++")==0 || a.prettyprint().find("++")==a.prettyprint().length()-3
+                            || a.prettyprint().find("--")==0 || a.prettyprint().find("--")<a.prettyprint().length()-3) {
+                                retBool = true;
+                        }
                         return ast_traversal_result_helper(retBool,false);
                     }
                     return ast_traversal_result_helper(false, true);
@@ -311,7 +359,7 @@ namespace TL {
                     virtual ASTTraversalResult do_(const TL::AST_t &a) const
                     {
                         bool retBool = false;
-                        std::cout<<a.prettyprint()<<std::endl;
+//                        std::cout<<a.prettyprint()<<std::endl;
                         if(ForStatement::predicate(a)) {
                             
                             retBool =true;
@@ -329,8 +377,8 @@ namespace TL {
                     };
             };
             
-            typedef std::unordered_map <std::string,AST_t> iter4io; 
-            std::unordered_map<std::string,AST_t> get_parameter_io(Scope scope_of_decls);
+            typedef std::unordered_map <std::string,ObjectList<AST_t>> iter4io; 
+            std::unordered_map<std::string,TL::ObjectList<TL::AST_t>> get_parameter_io(Scope scope_of_decls);
             int get_parameter_ioSpecificIsIteratorDependent(Scope scope_of_decls, std::string name, std::string iterVar);
             ObjectList<Symbol> get_parameter_list();
             std::string cleanWhiteSpaces(std::string toClean);

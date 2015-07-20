@@ -1,0 +1,40 @@
+#!/bin/bash
+
+if [ -z "" -o "no" = "no" ];
+then
+
+cat <<EOF
+test_ignore=yes
+EOF
+  
+exit
+
+fi
+
+source /home/sdruix/mcxx/tests/config/mercurium-libraries
+
+cat <<EOF
+MCC="/home/sdruix/mcxx/src/driver/mcxx --output-dir=/home/sdruix/mcxx/tests --profile=mcc --config-dir=/home/sdruix/mcxx/config --verbose"
+MCXX="/home/sdruix/mcxx/src/driver/mcxx --output-dir=/home/sdruix/mcxx/tests --profile=mcxx --config-dir=/home/sdruix/mcxx/config --verbose"
+EOF
+
+COMMON_NANOX_CFLAGS=-DNANOX
+
+cat <<EOF
+compile_versions="\${compile_versions} nanox_plain"
+
+test_CC_nanox_plain="\${MCC}"
+test_CXX_nanox_plain="\${MCXX}"
+
+test_CFLAGS_nanox_plain="--simd -std=gnu99 ${COMMON_NANOX_CFLAGS}"
+test_CXXFLAGS_nanox_plain="--simd ${COMMON_NANOX_CFLAGS}"
+
+test_LDFLAGS_nanox_plain="-L/home/sdruix/mcxx/lib -lperish"
+
+EOF
+
+cat <<EOF
+exec_versions="1thread"
+
+test_ENV_1thread="OMP_NUM_THREADS='1'"
+EOF

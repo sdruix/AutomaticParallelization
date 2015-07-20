@@ -31,7 +31,7 @@ public:
 private:
     void pragma_postorder(PragmaCustomConstruct construct);
     DTO _dto;
-    AST_t _translation_unit;
+    AST_t _translation_unit, _loopSub;
     ScopeLink _scope_link;
     ObjectList<string> _declaredVars;
     string cleanWhiteSpaces(string toClean);

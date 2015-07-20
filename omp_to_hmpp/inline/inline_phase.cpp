@@ -17,7 +17,7 @@ using namespace std;
 InlinePhase::InlinePhase() {
 
     OpenMP::OpenMPPhase ompP;
-    ompP.register_directive("parallel");
+     ompP.register_directive("parallel");
     ompP.register_directive("for");
     ompP.register_directive("hmpp");
     ompP.register_directive("fixed");
@@ -26,9 +26,11 @@ InlinePhase::InlinePhase() {
     ompP.register_directive("for fixed");
     ompP.register_directive("critical");
 
+    ompP.register_directive("firstprivate");
     ompP.register_directive("threadprivate");
     ompP.register_directive("atomic");
     ompP.register_directive("master");
+    ompP.register_directive("nowait");  
 
     _callNum=0;
     _retid = 0;
@@ -66,7 +68,6 @@ void InlinePhase::run(DTO& dto) {
         while(getline(inFile, line)) {
            if(std::string(function_def.get_function_name()).compare(line)==0){
                 std::cout<<"Starting inlines in function body named: "<< function_def.get_function_name() <<"\n {\n";
-               
                 find_functions(function_def, scope_link);
                 cout<<"Continue"<<endl;
                 inFile.seekg (0, ios::end);
@@ -139,7 +140,6 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
 //        cout<<_callNum<<endl;
         AST_t element = *it;
 
-
         Expression expr(element, scope_link);
         
         // We already know it is a function call, no need to check again
@@ -154,12 +154,8 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
             Symbol called_sym = id_expr.get_symbol();
             Symbol last_called_sym =  called_sym;
             set_FSym(&called_sym);
-//            cout<<called_sym.is_valid()<<endl;
-//            cout<<called_sym.is_function()<<endl;
-//            cout<<called_sym.is_defined()<<endl;
-           cout<<"HI"<<endl;
             if (called_sym.is_valid() && called_sym.is_function() && called_sym.is_defined()) {
-                cout << "\nFinding if necessary forward inline for function '" << id_expr << "' in " << element.get_locus() << "\n";
+//                cout << "\nFinding if necessary forward inline for function '" << id_expr << "' in " << element.get_locus() << "\n";
                 _functionName = called_sym.get_name();
                 _rowOfCall = element.get_line();
                 int fnd = 0;
@@ -172,7 +168,7 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
                
                 if(!fnd) {
                      _inlinedFunctions.push_back(called_sym);
-                    cout << "\nForward inline of "<<called_sym.get_name()<<" called on: "<<function_def.get_function_name().get_symbol().get_name()<<" \n";
+//                    cout << "\nForward inline of "<<called_sym.get_name()<<" called on: "<<function_def.get_function_name().get_symbol().get_name()<<" \n";
                     ObjectList<AST_t> list_of_fun_defs = _translation_unit.depth_subtrees(_function_def_pred);
                     for (ObjectList<AST_t>::iterator it = list_of_fun_defs.begin(); it != list_of_fun_defs.end(); it++) {
                         FunctionDefinition function_defNF(*it, scope_link);
@@ -181,13 +177,12 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
                             find_functions(function_defNF,scope_link);
                             set_FCall(&last_function_call);
                             set_FSym(&last_called_sym);
-//                            cout<<"HI2s"<<endl;
                         }
                     }
                 }
-                cout << "\nApplying inlining for function" << called_sym.get_name() << "\n {";
+//                cout << "\nApplying inlining for function" << called_sym.get_name() << "\n {";
                 inlineFunction(called_sym, expr);
-                cout<<"} \n";
+//                cout<<"} \n";
             } else if(called_sym.is_defined()){
                 cerr << "************************************"<<
                         "\n You can not use "<<called_sym.get_name()<<"inside HMPP codelet.\n"
@@ -197,9 +192,9 @@ void InlinePhase::find_functions(FunctionDefinition function_def, ScopeLink scop
         }
     }
     if(list_of_calls.size()==0) {
-        cout<<"} \n No function calls in : "<<function_def.get_function_name().get_symbol().get_name()<<endl;
+        cout<<"No function calls in : "<<function_def.get_function_name().get_symbol().get_name()<<endl;
     } else {
-        cout<<"} \n"<<function_def.get_function_name().get_symbol().get_name()<< " finished -------------"<<endl;
+        cout<<function_def.get_function_name().get_symbol().get_name()<< " finished -------------"<<endl;
     }
 }
 
@@ -247,7 +242,6 @@ void InlinePhase::inlineFunction(Symbol& called_sym, Expression& expr) {
 //    cout<<funct_body.get_ast().prettyprint()<<endl;
     const char *c = prettyprint_in_buffer_callback(funct_body.get_ast().get_internal_ast(),
             &InlinePhase::inline_prettyprint_callback, (void*) this);
-//    cout<<"HI2"<<endl;
     if (c != NULL) {
         inlined_function_body << std::string(c);
     }
@@ -390,7 +384,7 @@ void InlinePhase::replace_call(FunctionDefinition funct_def,
     TL::AST_t inline_source_tree;
     ScopeLink sl = expr.get_scope_link();
     AST_t fAst = expr.get_ast();
-    std::cout<<std::string(_nameReturn)<<"\n";
+//    std::cout<<std::string(_nameReturn)<<"\n";
     if(std::string(_nameReturn).compare("")!=0){
         inline_source_tree = _nameReturn.parse_expression(fAst, sl);
         expr.get_ast().replace(inline_source_tree);
@@ -440,10 +434,8 @@ const char* InlinePhase::inline_prettyprint_callback(AST _a, void* data) {
     Expression function_call = *_this->get_FCall();
     Symbol function_symbol = *_this->get_FSym();
     if (ReturnStatement::predicate(a)) {
-        std::cout<<a.prettyprint(false)<<"\n";
         return solve_result_predicate(a, &function_call, &function_symbol, data);
     } else if (IdExpression::predicate(a)) {
-        std::cout<<a.prettyprint(false)<<"\n";
         return solve_predicate(a, function_call, function_symbol, data);
     } else
         return NULL;

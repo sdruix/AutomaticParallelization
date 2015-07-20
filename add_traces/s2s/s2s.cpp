@@ -359,7 +359,7 @@ int main(int argc, char *argv[]) {
     createLogFolder << "mkdir " << logFolder << " > /dev/null";
     system(createLogFolder.str().c_str());
     stringstream mvResult;
-    mvResult << "mv mem.log "<< logFolder <<"/";
+    mvResult << "mv mem.log "<< logFolder <<"/"<<name<<".log";
     system(mvResult.str().c_str());
     
     

@@ -56,10 +56,6 @@ int main(int argc, char** argv) {
 
   /* Initialize array. */
   init_array();
-
-#pragma omp parallel fixed(9,1,0)
-{
-
   /* C := alpha*A*B + beta*C */
   #pragma omp for private (j, k)
   for (i = 0; i < ni; i++)
@@ -69,7 +65,7 @@ int main(int argc, char** argv) {
         C[i][j] += alpha * A[i][k] * B[k][j];
     }
 
-}
+
 
 
 

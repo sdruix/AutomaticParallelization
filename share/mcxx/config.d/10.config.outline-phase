@@ -1,0 +1,23 @@
+[outline-phasecc]
+language = C
+options =  
+preprocessor_name = gcc 
+preprocessor_options = -E 
+compiler_name = gcc 
+compiler_options =  
+linker_name = gcc 
+linker_options =  
+compiler_phase=/home/sdruix/mcxx/omp_to_hmpp/outline/outline-phase.so 
+pragma_prefix=omp
+
+[outline-phasec++] 
+language = C++  
+options =  
+preprocessor_name = g++  
+preprocessor_options = -E  
+compiler_name = g++  
+compiler_options =  
+linker_name = g++  
+linker_options =  
+compiler_phase=/home/sdruix/mcxx/omp_to_hmpp/outline/outline-phase.so 
+pragma_prefix=omp

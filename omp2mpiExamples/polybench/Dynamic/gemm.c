@@ -60,13 +60,17 @@ struct timeval start, end;
     long mtime, seconds, useconds;    
     gettimeofday(&start, NULL);    
     
-#pragma omp parallel for private (j, k) check
+#pragma omp parallel check
+{
+#pragma omp for private (j, k) 
+//#pragma omp parallel for private (j, k) check
     for (i = 0; i < ni; i++)
         for (j = 0; j < nj; j++) {
             C[i][j] *= beta;
             for (k = 0; k < nk; ++k)
                 C[i][j] += alpha * A[i][k] * B[k][j];
         }
+}
     
  gettimeofday(&end, NULL);
 

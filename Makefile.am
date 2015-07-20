@@ -24,7 +24,7 @@
 #  Cambridge, MA 02139, USA.                                             #
 ##########################################################################
 
-SUBDIRS = gnulib lib src config tests scripts omp_to_hmpp omp_to_mpi
+SUBDIRS = gnulib lib src config tests scripts omp_to_hmpp omp_to_mpi normalizeLoops
 
 DIST_SUBDIRS = $(SUBDIRS) doc
 

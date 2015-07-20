@@ -10,8 +10,8 @@ void timestamp ( void );
 /******************************************************************************/
 
 int main ( void ) {
-  int m = 500;
-  int n = 500;
+  int m = 2048;
+  int n = 2048;
 
   int b[m][n];
   int c;
@@ -38,24 +38,6 @@ int main ( void ) {
   double y;
   double y1;
   double y2;
-
-  printf ( "\n" );
-  printf ( "MANDELBROT_OPENMP\n" );
-  printf ( "  C/OpenMP version\n" );
-  printf ( "\n" );
-  printf ( "  Create an ASCII PPM image of the Mandelbrot set.\n" );
-  printf ( "\n" );
-  printf ( "  For each point C = X + i*Y\n" );
-  printf ( "  with X range [%g,%g]\n", x_min, x_max );
-  printf ( "  and  Y range [%g,%g]\n", y_min, y_max );
-  printf ( "  carry out %d iterations of the map\n", count_max );
-  printf ( "  Z(n+1) = Z(n)^2 + C.\n" );
-  printf ( "  If the iterates stay bounded (norm less than 2)\n" );
-  printf ( "  then C is taken to be a member of the set.\n" );
-  printf ( "\n" );
-  printf ( "  An ASCII PPM image of the set is created using\n" );
-  printf ( "    M = %d pixels in the X direction and\n", m );
-  printf ( "    N = %d pixels in the Y direction.\n", n );
 
 /*
   Carry out the iteration for each pixel, determining COUNT.
@@ -110,12 +92,6 @@ int main ( void ) {
   }
 
   fclose ( output_unit );
-  printf ( "\n" );
-  printf ( "  Graphics data written to \"%s\".\n", output_filename );
-  printf ( "\n" );
-  printf ( "MANDELBROT_OPENMP\n" );
-  printf ( "  Normal end of execution.\n" );
-  printf ( "\n" );
 
   return 0;
 }

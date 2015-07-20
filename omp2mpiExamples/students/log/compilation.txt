@@ -1,0 +1,8 @@
+---------------------------Compiling codes/tMPI-1.c-------------------------
+
+codes/tMPI-1.c: In function 'main':
+codes/tMPI-1.c:1599: error: 'NULL' undeclared (first use in this function)
+codes/tMPI-1.c:1599: error: (Each undeclared identifier is reported only once
+codes/tMPI-1.c:1599: error: for each function it appears in.)
+codes/tMPI-1.c:1602: error: 'MPI_COMM_WORLD' undeclared (first use in this function)
+codes/tMPI-1.c:1658: error: 'X' undeclared (first use in this function)

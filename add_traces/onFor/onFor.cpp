@@ -236,7 +236,7 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
 //    cout<<construct.get_statement().get_ast().prettyprint()<<endl;
 //    cin.get();
      
-     construct.get_ast().replace(construct.get_statement().get_ast());
+     construct.get_ast().replace_with(construct.get_statement().get_ast());
 //    cout<< construct.get_ast()<<endl;
 //    cout<<"HI"<<endl;
 //    cin.get();
@@ -256,7 +256,6 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
         }
         _initialized =1;
         _initializationAST = newdeclaration.parse_statement(functionScope,functionScopeLink);
-        cout<<ast2append.prettyprint()<<endl;
          ast2append.prepend(_initializationAST);
     } else {
         ast2append = _initializationAST;
@@ -267,20 +266,78 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
     completeLoopsInAST(construct.get_ast(), functionScopeLink);
     Source newASTSource;
     newASTSource = transformConstructAST(construct,functionScopeLink,functionScope, shared_arguments);
-    construct.get_ast().replace(newASTSource.parse_statement(functionScope,functionScopeLink));
+    AST_t newAST = newASTSource.parse_statement(functionScope,functionScopeLink);
+    construct.get_ast().replace(newAST);
     
     for(int y=0;y<iter_arguments.size();++y) {
         string principalIt = iter_arguments[y].prettyprint();
         if(!putIteratedVarsOfInterest(principalIt, construct.get_ast(), functionScopeLink)) {
-            Source newBodySource;
-                newBodySource << "mem_trace_iter_start(\""<<principalIt<<"\", "<<principalIt<<");"
-                        << construct.get_ast().prettyprint()
-                        << "mem_trace_iter_end(\""<<principalIt<<"\", "<<principalIt<<");";
-            construct.get_ast().replace(newBodySource.parse_statement(functionScope,functionScopeLink));
+            if(_construct_inside_bucle) {
+                ForStatement fS(_construct_loop,functionScopeLink);
+                TraverseASTFunctor4LocateBucle expr_traverseBucle(functionScopeLink);
+                ObjectList<AST_t> expr_listBucle = _construct_loop.depth_subtrees(expr_traverseBucle);
+                int lF = 0;
+                int finded = 0;
+                for (ObjectList<AST_t>::iterator it = expr_listBucle.begin();it != expr_listBucle.end(); it++, lF++) { 
+                
+                    cout<<"--------------------------------------------"<<endl;
+                    ForStatement fN(expr_listBucle[lF],functionScopeLink);
+                    //int lin = expr_listBucle[lF].get_line();
+                    int lin = get_real_line(construct.get_enclosing_function().get_ast(), construct.get_enclosing_function().get_scope_link(), expr_listBucle[lF],0,0,0);
+                     cout<<lin<<" vs. "<<block_line<<endl;
+                      cout<<principalIt<<" vs. "<<fN.get_induction_variable().prettyprint()<<endl;
+//                     if(lin<construct.get_ast().get_line()) {
+                         cout<<"2"<<endl;
+                         if(principalIt.compare(fN.get_induction_variable().prettyprint())==0) {
+                                        finded =1;
+                                       
+                                    }
+                         cin.get();
+                }
+                if(!finded) {
+                    cerr<<"1Unable to find loop with iterator "<<principalIt<<endl;
+                    cin.get();
+//                    exit(-1);
+                }
+                
+                
+                Source newBodySource,newloopAST;
+                newBodySource << "{mem_trace_iter_start( \""<<principalIt<<"\", "<<principalIt<<");"
+                        << fS.get_loop_body().get_ast().prettyprint()
+                        << "mem_trace_iter_end( \""<<principalIt<<"\", "<<principalIt<<");}";
+                fS.get_loop_body().get_ast().replace(newBodySource.parse_statement(functionScope,functionScopeLink));
+                newloopAST<<"mem_trace_loop_start(\"loop"<<_numLoop<<"\");\n"
+                        <<fS.prettyprint()<<"\n"
+                        <<"mem_trace_loop_end(\"loop"<<_numLoop<<"\");\n";
+//                 cout<<std::string(newloopAST)<<endl;
+                newAST.replace_with(newloopAST.parse_statement(functionScope,functionScopeLink));
+                _numLoop++;
+            } else {
+                cerr<<"Unable to find loop with iterator "<<principalIt<<endl;
+                cin.get();
+//                exit(-1);
+//                Source newBodySourcePre,newBodySourcePost;
+//                newBodySourcePre << "mem_trace_iter_start(\""<<principalIt<<"\", "<<principalIt<<");";
+//                newBodySourcePost << "mem_trace_iter_end(\""<<principalIt<<"\", "<<principalIt<<");";
+//                construct.get_ast().prepend(newBodySourcePre.parse_statement(functionScope,functionScopeLink));
+//                construct.get_ast().append(newBodySourcePost.parse_statement(functionScope,functionScopeLink));
+            }
+//             cout<<"C*: "<<construct.get_ast().prettyprint()<<endl;
+//            cin.get();
+//            Source newBodySource;
+//                newBodySource << "mem_trace_iter_start(\""<<principalIt<<"\", "<<principalIt<<");"
+//                        << construct.get_ast().prettyprint()
+//                        << "mem_trace_iter_end(\""<<principalIt<<"\", "<<principalIt<<");";
+//            construct.get_ast().replace(newBodySource.parse_statement(functionScope,functionScopeLink));
+        } else {
+//            construct.get_ast().obj_reference();
+//            cout<<"C:"<<function_def.get_function_body().prettyprint()<<endl;
+            cout<<"L:"<<_loopSub<<endl;
+            cin.get();
         }
     }
-//    cout<<construct.get_ast()<<endl;
-//    cin.get();
+    cout<<"No more iterators to find"<<endl;
+    
     } else {
          TraverseASTFunctor4LocateBucle expr_traverse(construct.get_scope_link());
          ObjectList<AST_t> expr_list = construct.get_statement().get_ast().depth_subtrees(expr_traverse);
@@ -316,10 +373,6 @@ void AddTracesOnForPhase::pragma_postorder(PragmaCustomConstruct construct) {
 //                cout<<translation_unit.prettyprint()<<endl;
                 _groupInside = 0;
     }
-//     Source constructAST;
-//    constructAST <<"mem_trace_loop_start(\"loop"<<_numLoop<<"\");\n"<<construct.get_ast().prettyprint()<<"mem_trace_loop_end(\"loop"<<_numLoop<<"\");\n";
-//    
-//     construct.get_ast().replace(constructAST.parse_statement(functionScope,functionScopeLink));
 }
 
 int AddTracesOnForPhase::putIteratedVarsOfInterest(string principalIt,  AST_t astWhereSearch, ScopeLink scopeL) {
@@ -333,8 +386,11 @@ int AddTracesOnForPhase::putIteratedVarsOfInterest(string principalIt,  AST_t as
         if(ForStatement::predicate(expr_listBucle[lF])) {
             ForStatement fS(expr_listBucle[lF],scopeL);
             inductionVar = fS.get_induction_variable().prettyprint();
+            cout<<inductionVar<<" vs. "<<principalIt<<endl;
+            cin.get();
             if(inductionVar.compare(principalIt) == 0) {
                 Source newBodySource,newloopAST;
+                
                 newBodySource << "{mem_trace_iter_start( \""<<principalIt<<"\", "<<principalIt<<");"
                         << fS.get_loop_body().get_ast().prettyprint()
                         << "mem_trace_iter_end( \""<<principalIt<<"\", "<<principalIt<<");}";
@@ -343,12 +399,14 @@ int AddTracesOnForPhase::putIteratedVarsOfInterest(string principalIt,  AST_t as
                 newloopAST<<"mem_trace_loop_start(\"loop"<<_numLoop<<"\");\n"
                         <<fS.prettyprint()<<"\n"
                         <<"mem_trace_loop_end(\"loop"<<_numLoop<<"\");\n";
-                 cout<<std::string(newloopAST)<<endl;
-                fS.get_ast().replace_with(newloopAST.parse_statement(astWhereSearch,scopeL));
-                finded = 1;
+                expr_listBucle[lF].replace_with(newloopAST.parse_statement(astWhereSearch,scopeL));
+                cout<<expr_listBucle[lF]<<endl;
+                _loopSub = expr_listBucle[lF];
+                cin.get();
                 _numLoop++;
+                finded = 1;
             } else if(putIteratedVarsOfInterest(principalIt, fS.get_loop_body().get_ast(), scopeL)) {
-                        return 1;
+                return 1;
             }
         } 
         
@@ -450,49 +508,17 @@ int AddTracesOnForPhase::get_real_line(AST_t asT, ScopeLink scopeL, AST_t actLin
     ObjectList<AST_t> expr_list = asT.depth_subtrees(expr_traverse);
     int line=-1;
     int l=0; 
-    if(update) {
-        _pragma_lines=0;
-        
-    }
     for (ObjectList<AST_t>::iterator it = expr_list.begin();it != expr_list.end(); it++, l++) {
         Expression expr(expr_list[l], scopeL);
         std::string ppExpr;
         ppExpr=expr.prettyprint();
+//        cout<<"-"<<ppExpr<<"-\n vs. \n-"<<actLine<<"-"<<endl;
         if(actLine.compare(ppExpr)==0) {
-            
+//            cout<<"HURL"<<endl;
             
             line = l;
             
             if(actLineAST.get_line() == expr_list[l].get_line() || searching_construct || actLineAST.get_line()==1){
-                
-                if(initialConstruct){
-                    PragmaCustomConstruct test(actLineAST,scopeL);
-                    if(test.is_construct()){
-                        
-                        TraverseASTFunctor4LocateUse expr_traverse2(scopeL);
-                        
-                        ObjectList<AST_t> expr_list2 = test.get_statement().get_ast().depth_subtrees(expr_traverse2);
-                        //            if(searching_construct) {
-                        //                            cout<<actLineAST.prettyprint()<<endl;
-                        //                            if(expr_list2.size()>1) {
-                        //                                line+=expr_list2.size();
-                        cout<<line<<endl;
-                        
-                        //                        cout<<line<<endl;
-                        //                        line+=(_num_transformed_blocks);
-                        //                        cout<<line<<endl;
-                        //                        line-=(_num_non_trasformed_blocks);
-                        //                        cout<<line<<endl;
-                        //                        cin.get();
-                        //                                cout<<"Incrementing line in: "<<expr_list2.size()<<endl;
-                        
-                        //            }
-                        //                            }
-                        
-                    }
-                }
-                //                cout<<line<<endl;
-                //                cin.get();
                 it = expr_list.end();
                 break;
             }

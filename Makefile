@@ -403,7 +403,7 @@ target_vendor = pc
 top_build_prefix = 
 top_builddir = .
 top_srcdir = .
-SUBDIRS = gnulib lib src config tests scripts omp_to_hmpp omp_to_mpi
+SUBDIRS = gnulib lib src config tests scripts omp_to_hmpp omp_to_mpi normalizeLoops
 DIST_SUBDIRS = $(SUBDIRS) doc
 ACLOCAL_AMFLAGS = -I m4
 SUPERSCALAR_DISTCHECK_CONFIGURE_FLAGS = --with-superscalar-runtime-api-version=none
